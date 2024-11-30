@@ -1,7 +1,4 @@
-// https://github.com/OverlayPlugin/cactbot/blob/main/ui/raidboss/data/06-ew/raid/p8s.txt
-
 using System;
-// using System.Linq;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.Draw;
