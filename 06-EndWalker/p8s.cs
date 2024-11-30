@@ -99,8 +99,7 @@ public class p8s
         mb_hc1_sid = [0, 0, 0, 0, 0, 0, 0, 0];
         mb_sideCleaveNum = 0;
         mb_conceptFinNum = 0;
-        // mb_towerColor = null;
-        mb_mentionTxt = null;
+        mb_mentionTxt = "Hello Koda!";
 
         mb_TwoStackDestination = default;
         mb_ThreeStackDestination = default;
