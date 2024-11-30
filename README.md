@@ -4,7 +4,7 @@ A repository contains scripts for the Dalamud KodakkuAssist plugin, created by a
 ## Scripts
 
 ### 06-EndWalker
-- p8s.cs (Online library)
+- p8s.cs (Online)
 
 ### 07-DawnTrail
 - M1s.cs (Local)
