@@ -8,6 +8,14 @@
         "UpdateInfo": "门神一分身结束，本体万象结束。"
     },
     {
+        "Name": "P12S [零式万魔殿 荒天之狱4]",
+        "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
+        "Version": "0.0.0.1",
+        "Author": "Usami",
+        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
+        "UpdateInfo": "【未完成！】仅门神，一范正攻，门神到三泛前的对话"
+    },
+    {
         "Name": "Lv87 [创造环境极北造物院]",
         "Guid": "8d4e4a9c-b144-4ec2-82cd-46b38867e4e6",
         "Version": "0.0.0.1",
