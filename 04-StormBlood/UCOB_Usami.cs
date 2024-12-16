@@ -65,18 +65,27 @@ public class Ucob
     Vector3 QuickMarchPos = new(0, 0, 0);           // P3进军位置
     bool QuickMarchStackDrawn = false;              // P3进军核爆绘图完成记录
     bool QuickMarchEarthShakerDrawn = false;        // P3进军大地摇动绘图完成记录
+    Vector3 NaelPosition = new(0, 0, 0);            // P3奈尔位置记录
+    bool heavensfallTrio = false;                   // P3天地记录（Joshua残留）
+    List<bool> heavensfallDangerPos = [false, false, false, false, false, false, false, false]; // P3天地安全位置（仅判断左右）
+    List<bool> heavensfallBossPos = [false, false, false, false, false, false, false, false];   // P3天地BOSS所在位置（仅判断左右）
 
     public void Init(ScriptAccessory accessory)
     {
         phase = UCOB_Phase.Twintania;
         MyId = accessory.Data.Me;
 
-        // DeathSentenceNum = 0;               // P2死宣次数
-        DeathSentenceTarget = [0, 0, 0];    // P2死宣目标
+        DeathSentenceTarget = [0, 0, 0];        // P2死宣目标
 
-        QuickMarchPos = new(0, 0, 0);       // P3进军位置
-        QuickMarchStackDrawn = false;       // P3进军核爆绘图完成记录
-        QuickMarchEarthShakerDrawn = false;        // P3进军大地摇动绘图完成记录
+        QuickMarchPos = new(0, 0, 0);           // P3进军位置
+        QuickMarchStackDrawn = false;           // P3进军核爆绘图完成记录
+        QuickMarchEarthShakerDrawn = false;     // P3进军大地摇动绘图完成记录
+
+        NaelPosition = new(0, 0, 0);            // P3奈尔位置记录
+        heavensfallTrio = false;                // P3天地记录（Joshua残留）
+
+        heavensfallDangerPos = [false, false, false, false, false, false, false, false]; // P3天地安全位置（仅判断左右）
+        heavensfallBossPos = [false, false, false, false, false, false, false, false];   // P3天地BOSS所在位置（仅判断左右）
 
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
@@ -174,7 +183,7 @@ public class Ucob
         dp.DestoryAt = 5000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
 
-        var esPos_right = RotatePoint(new(-15.58f, 0, -15.58f), new(0, 0, 0), float.Pi/2);
+        var esPos_right = RotatePoint(new(-15.58f, 0, -15.58f), new(0, 0, 0), float.Pi / 2);
 
         dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "大地摇动线指路-右";
@@ -327,7 +336,7 @@ public class Ucob
 
     // 月光啊！照亮铁血霸道！
     [ScriptMethod(name: "月环钢铁", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6492"])]
-    public void 月环钢铁(Event @event, ScriptAccessory accessory)
+    public void In_and_Out(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -354,7 +363,7 @@ public class Ucob
 
     // 月光啊！用你的炽热烧尽敌人！
     [ScriptMethod(name: "月环分摊", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6493"])]
-    public void 月环分摊(Event @event, ScriptAccessory accessory)
+    public void In_and_Stack(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -383,7 +392,7 @@ public class Ucob
 
     // 被炽热灼烧过的轨迹 乃成铁血霸道！
     [ScriptMethod(name: "分摊钢铁", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6494"])]
-    public void 分摊钢铁(Event @event, ScriptAccessory accessory)
+    public void Stack_and_Out(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -411,7 +420,7 @@ public class Ucob
 
     // 炽热燃烧！给予我月亮的祝福！
     [ScriptMethod(name: "分摊月环", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6495"])]
-    public void 分摊月环(Event @event, ScriptAccessory accessory)
+    public void Stack_and_In(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -440,7 +449,7 @@ public class Ucob
 
     // 我降临于此，征战铁血霸道！
     [ScriptMethod(name: "分散钢铁", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6496"])]
-    public void 分散钢铁(Event @event, ScriptAccessory accessory)
+    public void Spread_and_Out(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -469,7 +478,7 @@ public class Ucob
 
     // 我降临于此，对月长啸！
     [ScriptMethod(name: "分散月环", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6497"])]
-    public void 分散月环(Event @event, ScriptAccessory accessory)
+    public void Spread_and_In(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -499,7 +508,7 @@ public class Ucob
 
     // 超新星啊，更加闪耀吧！在星降之夜，称赞红月！
     [ScriptMethod(name: "分散月华冲", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6500"])]
-    public void 分散月华冲(Event @event, ScriptAccessory accessory)
+    public void Spread_and_Tank(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         lock (this)
@@ -569,7 +578,7 @@ public class Ucob
 
     #region P2：小龙
 
-    // TODO：超新星持续时间没验
+
     [ScriptMethod(name: "P2奈尔：超新星危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2003393", "Operate:Add"])]
     public void Hypernova_Field(Event @event, ScriptAccessory accessory)
     {
@@ -685,7 +694,7 @@ public class Ucob
 
     #region P3：巴哈姆特
 
-    [ScriptMethod(name: "P3巴哈：一运阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9954"], userControl: false)]
+    [ScriptMethod(name: "P3巴哈：【进军】一运阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9954"], userControl: false)]
     public void P3_PhaseChange_1st(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Nael) return;
@@ -737,32 +746,6 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
 
-    [ScriptMethod(name: "P3巴哈：【进军】百万核爆冲位置记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"], userControl: false)]
-    public void MegaFlareDivePosRecord(Event @event, ScriptAccessory accessory)
-    {
-        if (phase != UCOB_Phase.Quickmarch_1st) return;
-        QuickMarchPos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
-    }
-
-    [ScriptMethod(name: "P3巴哈：【进军】12点位置标记", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"])]
-    public void MegaFlareDiveNorth(Event @event, ScriptAccessory accessory)
-    {
-        if (phase != UCOB_Phase.Quickmarch_1st) return;
-        Task.Delay(100).ContinueWith(t =>
-        {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = "进军12点标记";
-            dp.Scale = new(1.5f);
-            dp.ScaleMode = ScaleMode.YByDistance;
-            dp.Color = posColorNormal.V4.WithW(3);
-            dp.Position = new(0, 0, 0);
-            dp.TargetPosition = QuickMarchPos;
-            dp.Delay = 4000;
-            dp.DestoryAt = 11000;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-        });
-    }
-
     [ScriptMethod(name: "P3巴哈：巴哈百万核爆冲与分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"])]
     public void MegaFlareDive(Event @event, ScriptAccessory accessory)
     {
@@ -792,6 +775,48 @@ public class Ucob
         }
     }
 
+    [ScriptMethod(name: "P3巴哈：大地摇动范围预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
+    public void EarthShaker(Event @event, ScriptAccessory accessory)
+    {
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"大地摇动{tid}";
+        dp.Position = new(0, 0, 0);
+        dp.Scale = new(50);
+        dp.Radian = float.Pi / 2;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.TargetObject = tid;
+        dp.DestoryAt = 5000;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+    }
+
+    [ScriptMethod(name: "P3巴哈：【进军】百万核爆冲位置记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"], userControl: false)]
+    public void MegaFlareDivePosRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Quickmarch_1st) return;
+        QuickMarchPos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+    }
+
+    [ScriptMethod(name: "P3巴哈：【进军】12点位置标记", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"])]
+    public void MegaFlareDiveNorth(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Quickmarch_1st) return;
+        Task.Delay(100).ContinueWith(t =>
+        {
+            var dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "进军12点标记";
+            dp.Scale = new(1.5f);
+            dp.ScaleMode = ScaleMode.YByDistance;
+            dp.Color = posColorNormal.V4.WithW(3);
+            dp.Position = new(0, 0, 0);
+            dp.TargetPosition = QuickMarchPos;
+            dp.Delay = 4000;
+            dp.DestoryAt = 11000;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        });
+    }
+
     [ScriptMethod(name: "P3巴哈：【进军】核爆分摊指路", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0027"])]
     public void QuickmarchStack(Event @event, ScriptAccessory accessory)
     {
@@ -817,7 +842,7 @@ public class Ucob
         dp.Name = $"核爆分摊位置{tid}";
         dp.Scale = new(3f);
         dp.ScaleMode = ScaleMode.ByTime;
-        dp.Color = tid == accessory.Data.Me ? posColorPlayer.V4.WithW(3) : posColorNormal.V4.WithW(1); 
+        dp.Color = tid == accessory.Data.Me ? posColorPlayer.V4.WithW(3) : posColorNormal.V4.WithW(1);
         dp.Position = stackPos;
         dp.Delay = 0;
         dp.DestoryAt = 5000;
@@ -835,23 +860,7 @@ public class Ucob
         dp.Delay = 0;
         dp.DestoryAt = 5000;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        
-    }
 
-    [ScriptMethod(name: "P3巴哈：大地摇动范围预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
-    public void EarthShaker(Event @event, ScriptAccessory accessory)
-    {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"大地摇动{tid}";
-        dp.Position = new(0, 0, 0);
-        dp.Scale = new(50);
-        dp.Radian = float.Pi / 2;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.TargetObject = tid;
-        dp.DestoryAt = 5000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
 
     [ScriptMethod(name: "P3巴哈：【进军】大地摇动站位指示", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
@@ -864,8 +873,8 @@ public class Ucob
 
         QuickMarchEarthShakerDrawn = true;
         accessory.Method.RemoveDraw($"进军12点标记");
-        var esPos_right = RotatePoint(QuickMarchPos, new(0, 0, 0), float.Pi/2);
-        var esPos_left = RotatePoint(QuickMarchPos, new(0, 0, 0), -float.Pi/2);
+        var esPos_right = RotatePoint(QuickMarchPos, new(0, 0, 0), float.Pi / 2);
+        var esPos_left = RotatePoint(QuickMarchPos, new(0, 0, 0), -float.Pi / 2);
 
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "大地摇动线指路-中";
@@ -902,45 +911,65 @@ public class Ucob
 
     }
 
-    bool blackfireTrio = false;
-
-    [ScriptMethod(name: "黑炎的三重奏", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9955"])]
-    public void 黑炎的三重奏(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P3巴哈：二运阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9955"], userControl: false)]
+    public void P3_PhaseChange_2nd(Event @event, ScriptAccessory accessory)
     {
-        this.blackfireTrio = true;
+        if (phase != UCOB_Phase.Quickmarch_1st) return;
+        phase = UCOB_Phase.Blackfire_2nd;
     }
 
-
-    Vector3 NaelPosition = new(0, 0, 0);
-
-    [ScriptMethod(name: "奈尔位置", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:8161"])]
-    public void 奈尔位置(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P3巴哈：奈尔位置定位（不可控）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:8161"], userControl: false)]
+    public void NaelPosRecord(Event @event, ScriptAccessory accessory)
     {
+        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+        float distance = new Vector2(spos.X, spos.Z).Length();
+        if (distance < 23) return;
+        NaelPosition = spos;
+    }
+
+    [ScriptMethod(name: "P3巴哈：【黑炎】奈尔位置指路", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:8161"])]
+    public void BlackFireNaelDir(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Blackfire_2nd) return;
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-
-        this.NaelPosition = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
-        if (Math.Sqrt(this.NaelPosition.X * this.NaelPosition.X + this.NaelPosition.Z * this.NaelPosition.Z) < 23) return;
-
-        if (this.blackfireTrio)
+        
+        Task.Delay(100).ContinueWith(t =>
         {
-            this.blackfireTrio = false;
-
+            if (new Vector2(NaelPosition.X, NaelPosition.Z).Length() < 23) return;
+            if (DebugMode)
+            {
+                accessory.Method.SendChat($"/e 找到奈尔位置，在其脚下绘图");
+                var dp0 = accessory.Data.GetDefaultDrawProperties();
+                dp0.Name = $"奈尔位置";
+                dp0.Scale = new(3f);
+                dp0.Color = posColorPlayer.V4.WithW(3);
+                dp0.Position = NaelPosition;
+                dp0.Delay = 0;
+                dp0.DestoryAt = 3000;
+                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+            }
             var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = "奈尔位置";
-            dp.Scale = new(1.5f, 24);
+            dp.Name = "奈尔位置指路";
+            dp.Scale = new(0.5f, 24);
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultSafeColor;
-            dp.Owner = MyId;
+            dp.Owner = accessory.Data.Me;
             dp.TargetObject = sid;
-            dp.DestoryAt = 2000;
-
+            dp.DestoryAt = 3000;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        }
+        });
+    }
+
+    [ScriptMethod(name: "P3巴哈：三运阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9956"], userControl: false)]
+    public void P3_PhaseChange_3rd(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Blackfire_2nd) return;
+        phase = UCOB_Phase.Fellruin_3rd;
     }
 
     // 我降临于此对月长啸！召唤星降之夜！
-    [ScriptMethod(name: "灾厄分散月环", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6502"])]
-    public void 灾厄分散月环(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P3巴哈：【灾厄】分散月环", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6502"])]
+    public void FR_Spread_and_In(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -969,8 +998,8 @@ public class Ucob
     }
 
     // 我自月而来降临于此，召唤星降之夜！
-    [ScriptMethod(name: "灾厄月环分散", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6503"])]
-    public void 灾厄月环分散(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P3巴哈：【灾厄】月环分散", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:6503"])]
+    public void FR_In_and_Spread(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
@@ -998,11 +1027,10 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "以太失控", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9905"])]
-    public void 以太失控(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P3巴哈：【灾厄】以太失控后陨石流", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9905"])]
+    public void AethericProfusion(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = $"陨石流{tid}";
         dp.Scale = new(4);
@@ -1011,16 +1039,36 @@ public class Ucob
         dp.DestoryAt = 4000;
         dp.Color = accessory.Data.DefaultDangerColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-
-        this.heavensfallTrio = false;
     }
 
-    bool heavensfallTrio = false;
-
-    [ScriptMethod(name: "天地的三重奏", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9957"])]
-    public void 天地的三重奏(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P3巴哈：四运阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9957"], userControl: false)]
+    public void P3_PhaseChange_4th(Event @event, ScriptAccessory accessory)
     {
-        this.heavensfallTrio = true;
+        if (phase != UCOB_Phase.Fellruin_3rd) return;
+        phase = UCOB_Phase.Heavensfall_4th;
+    }
+
+    // TODO：三兄弟必在正或斜点，修改三个sourceDataId
+    [ScriptMethod(name: "P3巴哈：【天地】起始位置记录（不可控）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:XXXX"])]
+    public void HeavensFallPosRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Heavensfall_4th) return;
+        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+        float distance = new Vector2(spos.X, spos.Z).Length();
+        if (distance < 23) return;
+        var idx = PositionTo8Dir(spos, new(0, 0, 0));
+        heavensfallBossPos[idx] = true;
+        heavensfallDangerPos[idx] = true;
+        heavensfallDangerPos[idx >= 4 ? idx - 4 : idx + 4] = true;
+    }
+
+    // TODO
+    [ScriptMethod(name: "P3巴哈：【天地】起始位置指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9906"])]
+    public void HeavensFallSafeDir(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Heavensfall_4th) return;
+        // 此时，heavensfallDangerPos中仅剩两个false，即为安全点。
+        // 检查heavensfallBossPos中，这两个false idx的前一个变量，如果是true，代表右边；如果是false，代表左边
     }
 
     Dictionary<int, Vector3> towers = new();
@@ -1115,8 +1163,6 @@ public class Ucob
         dp2.DestoryAt = 6000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp2);
     }
-
-
 
     [ScriptMethod(name: "群龙的八重奏", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9959"])]
     public void 群龙的八重奏(Event @event, ScriptAccessory accessory)
