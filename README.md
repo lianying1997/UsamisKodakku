@@ -4,7 +4,7 @@ A repository contains scripts for the Dalamud KodakkuAssist plugin, created by a
 ## Scripts
 
 ### 04-StormBlood
-- （未完成）巴哈姆特绝境战 [UCOB_Usami.cs] (Local)
+- （未完成）巴哈姆特绝境战 [UCOB.cs] (Online)
 
 ### 06-EndWalker
 - 创造环境极北造物院 [Lv87_KtisisHyperboreia.cs] (Online)
