@@ -25,8 +25,8 @@
     },
     {
         "Name": "UCOB [巴哈姆特绝境战]",
-        "Guid": "d66cf40d-d9f4-4e0a-8782-f2af3d25c355",
-        "Version": "0.3.1",
+        "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
+        "Version": "0.0.0.1",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
         "UpdateInfo": "【未完成！】\n基于原v0.2/0.3版本增加个人风格的修改。\n当前版本修改至“P3五运连击”。"
