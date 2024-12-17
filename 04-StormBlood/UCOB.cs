@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.Draw;
