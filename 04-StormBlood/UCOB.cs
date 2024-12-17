@@ -29,7 +29,7 @@ using Lumina.Excel.GeneratedSheets;
 
 namespace UsamisScript;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "d66cf40d-d9f4-4e0a-8782-f2af3d25c355", version: "0.3.alpha.2", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "d66cf40d-d9f4-4e0a-8782-f2af3d25c355", version: "0.3.1", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     const string noteStr = 
