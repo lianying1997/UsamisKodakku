@@ -37,7 +37,7 @@ public class Ucob
     【未完成！】
     Original code by Joshua, adjustments by Usami. 
     基于原v0.2/0.3 版本增加个人风格的修改。
-    当前版本修改至“P3五运连击”。
+    当前版本修改至“P4”。
     """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
