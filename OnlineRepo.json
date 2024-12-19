@@ -26,9 +26,9 @@
     {
         "Name": "UCOB [巴哈姆特绝境战]",
         "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-        "Version": "0.0.0.1",
+        "Version": "0.0.0.2",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-        "UpdateInfo": "【未完成！】\n基于原v0.2/0.3版本增加个人风格的修改。\n当前版本修改至“P3五运连击”。"
+        "UpdateInfo": "【未完成！】\n1.目前完成P4。\n2.调整一系列技能影响区域。\n3.调整P3旋风生效提示时间。\n4.鸭门。"
     }
     ]
