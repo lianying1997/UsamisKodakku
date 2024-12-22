@@ -31,7 +31,7 @@ using System.Security.AccessControl;
 
 namespace UsamisScript;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.0", author: "Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.0", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     const string noteStr =
