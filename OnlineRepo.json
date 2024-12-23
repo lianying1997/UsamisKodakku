@@ -26,9 +26,9 @@
     {
         "Name": "UCOB [巴哈姆特绝境战]",
         "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-        "Version": "0.0.1.0",
+        "Version": "0.0.1.1",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-        "UpdateInfo": "初版完成，请先按需求检查用户设置参数。鸭门。"
+        "UpdateInfo": "1. 修改了黑球危险区绘图逻辑，改为基于拘束器位置绘图。\n2. 增加双塔与火龙火球分摊范围预警。\n3. P3连击增加每人的陨石流预警。"
     }
     ]

@@ -31,12 +31,23 @@ using System.Security.AccessControl;
 
 namespace UsamisScript;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.0", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.1", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     const string noteStr =
     """
     Original code by Joshua, adjustments by Usami. 
+    v0.0.1.1:
+    1. 修改了黑球危险区绘图逻辑，改为基于拘束器位置绘图。
+    2. 增加双塔与火龙火球分摊范围预警。
+    3. 连击增加每人的陨石流预警。
+    TODO：
+    1. P2火龙分摊视情况把分摊改为“需要吃”和“不需要吃”。
+    2. P3连击与P4的撞球计划添加拘束器指路。
+    TIPS：
+    现在连击玩家身上的圈圈可能有点多，可考虑在用户设置里关闭陨石流预警。
+
+    v0.0.1.0:
     初版完成，请先按需求检查用户设置参数。
     鸭门。
     """;
@@ -272,7 +283,7 @@ public class Ucob
             dp.Name = $"百京核爆预警1{i}";
             dp.Scale = new(6);
             dp.Color = exflareColor.V4.WithW(0.5f);
-            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * (i+1));
+            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * (i + 1));
             dp.Delay = i == 0 ? 0 : 4000 + 1500 * (i - 1);
             dp.DestoryAt = i == 0 ? 4000 : 1500;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
@@ -281,7 +292,7 @@ public class Ucob
             dp.Name = $"百京核爆预警2{i}";
             dp.Scale = new(6);
             dp.Color = exflareColor.V4.WithW(0.25f);
-            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * (i+2));
+            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * (i + 2));
             dp.Delay = i == 0 ? 0 : 4000 + 1500 * (i - 1);
             dp.DestoryAt = i == 0 ? 4000 : 1500;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
@@ -323,11 +334,8 @@ public class Ucob
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         accessory.Method.RemoveDraw($"黑球路径-{sid}");
-        accessory.Method.RemoveDraw($"黑球爆炸范围-{sid}");
     }
 
-    // 添加拘束器位置记录，在需要撞球时绘出危险区，更改条件
-    // 虽然不知道这个有什么用
     [ScriptMethod(name: "【全局】拘束器位置记录（不可控）", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001151", "Operate:Add"], userControl: false)]
     public void RestrictorPosRecord(Event @event, ScriptAccessory accessory)
     {
@@ -347,19 +355,62 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "【全局】黑球爆炸范围", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:8160"])]
+    [ScriptMethod(name: "【全局】黑球爆炸范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9902"])]
     public void BlackOrbField(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         if (!showBlackOrbField) return;
         var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"黑球爆炸范围-{sid}";
-        dp.Scale = new(7.5f);
-        dp.Color = blackOrbFieldColor.V4.WithW(0.5f);
-        dp.Owner = sid;
-        dp.Delay = 3500;
-        dp.DestoryAt = 10000;
+        for (int i = 0; i < restrictorNum; i++)
+        {
+            dp.Name = $"黑球爆炸范围-{i}";
+            dp.Scale = new(7.5f);
+            dp.Color = blackOrbFieldColor.V4.WithW(0.5f);
+            dp.Position = RestrictorPos[i];
+            dp.Delay = 3500;
+            dp.DestoryAt = phase == UCOB_Phase.Tenstrike_5th ? 3500: 10000;     // 连击的两轮绘图时延作特殊处理
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+    }
+
+    [ScriptMethod(name: "【全局】黑球爆炸范围删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9903"], userControl: false)]
+    public void BlackOrbFieldRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        // 连击的两轮绘图不删除
+        if (phase == UCOB_Phase.Tenstrike_5th) return;
+        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+        int minIdx = getNearestOrbField(spos);
+        accessory.Method.RemoveDraw($"黑球爆炸范围-{minIdx}");
+    }
+
+    [ScriptMethod(name: "【全局】旋风危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001168", "Operate:Add"])]
+    public void Twister_Field(Event @event, ScriptAccessory accessory)
+    {
+        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"旋风危险区";
+        dp.Scale = new(1.5f);
+        dp.Position = spos;
+        dp.DestoryAt = 7000;
+        dp.Color = colorRed.V4.WithW(3);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private int getNearestOrbField(Vector3 spos)
+    {
+        int minIdx = 0;
+        float minLength = 999f;
+        for (int i = 0; i < restrictorNum; i++)
+        {
+            float length = new Vector2(spos.X - RestrictorPos[i].X, spos.Z - RestrictorPos[i].Z).Length();
+            if (length < minLength)
+            {
+                minLength = length;
+                minIdx = i;
+            }
+        }
+        return minIdx;
     }
 
     #endregion
@@ -383,31 +434,58 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "【全局】旋风危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001168", "Operate:Add"])]
-    public void Twister_Field(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "P1&P3双塔：双塔火球分摊范围预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0075"])]
+    public void FireBallStackTarget(Event @event, ScriptAccessory accessory)
     {
-        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
         var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"旋风危险区";
-        dp.Scale = new(1.5f);
-        dp.Position = spos;
-        dp.DestoryAt = 7000;
-        dp.Color = colorRed.V4.WithW(3);
+        dp.Name = $"双塔火球分摊范围";
+        dp.Scale = new(4f);
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Owner = tid;
+        dp.DestoryAt = 10000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    [ScriptMethod(name: "P1&P3双塔：双塔火球分摊范围预警删除（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9900", "TargetIndex:1"], userControl: false)]
+    public void FireBallStackTargetRemove(Event @event, ScriptAccessory accessory)
+    {
+        // TMD火球时间还不一样
+        accessory.Method.RemoveDraw($"双塔火球分摊范围");
     }
 
     #endregion
 
     #region P2：奈尔
 
-    [ScriptMethod(name: "P2双塔：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9922"], userControl: false)]
+    [ScriptMethod(name: "P2奈尔：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9922"], userControl: false)]
     public void P2_PhaseChange(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Twintania) return;
         phase = UCOB_Phase.Nael;
     }
 
-    // * 添加
+    // TODO：这里可以做复杂点，比如让第二次变成危险区，找到第二次谁吃的分摊令第三次变危险区，第一次有没有吃火判断要不要补吃第二次
+    [ScriptMethod(name: "P2奈尔：火龙连线分摊范围预警", eventType: EventTypeEnum.Tether, eventCondition: ["Id:0005"])]
+    public void FireBallDragonStackTarget(Event @event, ScriptAccessory accessory)
+    {
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"火龙火球分摊范围";
+        dp.Scale = new(4f);
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Owner = tid;
+        dp.DestoryAt = 10000;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    [ScriptMethod(name: "P2奈尔：火龙连线分摊范围预警删除（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9925", "TargetIndex:1"], userControl: false)]
+    public void FireBallDragonStackTargetRemove(Event @event, ScriptAccessory accessory)
+    {
+        // TMD火线时间还不一样
+        accessory.Method.RemoveDraw($"火龙火球分摊范围");
+    }
+
     [ScriptMethod(name: "P2奈尔：死亡宣告记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:210"], userControl: false)]
     public void DeathSentence_Record(Event @event, ScriptAccessory accessory)
     {
@@ -658,7 +736,7 @@ public class Ucob
 
     #region P2：小龙
 
-    [ScriptMethod(name: "P2：小龙位置记录（不可控）", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(816[34567])$"], userControl: false)]
+    [ScriptMethod(name: "P2奈尔：小龙位置记录（不可控）", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(816[34567])$"], userControl: false)]
     public void CauterizePosRecord(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
@@ -670,7 +748,7 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "P2：小龙俯冲引导预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0014"])]
+    [ScriptMethod(name: "P2奈尔：小龙俯冲引导预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0014"])]
     public void CauterizeTarget(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Nael) return;
@@ -712,7 +790,7 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
     }
 
-    [ScriptMethod(name: "P2：小龙俯冲范围预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(993[12345])$"])]
+    [ScriptMethod(name: "P2奈尔：小龙俯冲范围预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(993[12345])$"])]
     public void CauterizeField(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
@@ -1255,6 +1333,34 @@ public class Ucob
         phase = UCOB_Phase.Tenstrike_5th;
     }
 
+    [ScriptMethod(name: "P3巴哈：【连击】逐个陨石流预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9958"])]
+    public void TenStrikeMeteorStream(Event @event, ScriptAccessory accessory)
+    {
+        Task.Delay(7500).ContinueWith(t =>
+        {
+            if (phase != UCOB_Phase.Tenstrike_5th) return;
+            for (var i = 0; i < 8; i++)
+            {
+                var dp = accessory.Data.GetDefaultDrawProperties();
+                dp.Name = $"陨石流{i}";
+                dp.Scale = new(4);
+                dp.Owner = accessory.Data.PartyList[i];
+                dp.DestoryAt = 15000;
+                dp.Color = accessory.Data.DefaultDangerColor;
+                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            }
+        });
+    }
+
+    [ScriptMethod(name: "P3巴哈：【连击】逐个陨石流预警删除（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9920", "TargetIndex:1"], userControl: false)]
+    public void MB_TyrantsFire(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Tenstrike_5th) return;
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var tidx = getPlayerIdIndex(accessory, tid);
+        accessory.Method.RemoveDraw($"陨石流{tidx}");
+    }
+
     [ScriptMethod(name: "P3巴哈：【连击】大地摇动指路", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
     public void TenstrikeEarthShakerDir(Event @event, ScriptAccessory accessory)
     {
@@ -1443,7 +1549,7 @@ public class Ucob
             accessory.Method.TextInfo("等待奈尔冲锋后，面向场外向【右】跑", 3000);
     }
 
-    [ScriptMethod(name: "P3：【群龙】回中提示、双塔位置及引导提示", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0029"])]
+    [ScriptMethod(name: "P3巴哈：【群龙】回中提示、双塔位置及引导提示", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0029"])]
     public void GrandOctTarget(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.GrandOctet_6th) return;
