@@ -25,30 +25,36 @@ using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using System.Runtime;
 using System.Timers;
-using Lumina.Excel.GeneratedSheets;
+// using Lumina.Excel.GeneratedSheets;
 using System.Diagnostics;
 using System.Security.AccessControl;
 
 namespace UsamisScript;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.1", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.2", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
+    // TODO：
+    // 1. P2火龙分摊视情况把分摊改为“需要吃”和“不需要吃”。
+    // 2. P3连击添加拘束器指路。
+
     const string noteStr =
     """
     Original code by Joshua, adjustments by Usami. 
+    v0.0.1.2:
+    1. 删了一个可能引起国际服编译错误的引用。
+    2. P3连击添加场中-拘束器-场边的三点一线标志。
+    3. P4根据奈尔台词添加了分散/旋风前的方向指引，在用户设置处修改参数。
+    4. P4撞球添加拘束器提示与指路。
+    5. 调淡了一些绘图颜色。
+
     v0.0.1.1:
     1. 修改了黑球危险区绘图逻辑，改为基于拘束器位置绘图。
     2. 增加双塔与火龙火球分摊范围预警。
     3. 连击增加每人的陨石流预警。
-    TODO：
-    1. P2火龙分摊视情况把分摊改为“需要吃”和“不需要吃”。
-    2. P3连击与P4的撞球计划添加拘束器指路。
-    TIPS：
-    现在连击玩家身上的圈圈可能有点多，可考虑在用户设置里关闭陨石流预警。
 
     v0.0.1.0:
-    初版完成，请先按需求检查用户设置参数。
+    初版完成，请先按需求检查并设置“用户设置”参数。
     鸭门。
     """;
 
@@ -69,6 +75,15 @@ public class Ucob
 
     [UserSetting("P2：是否展示其他玩家的小龙俯冲引导路径")]
     public bool showOtherCauterizeRoute { get; set; } = false;
+
+    public enum BahamutFavorNorthTypeEnum
+    {
+        画出12点_ShowTempNorth,
+        画出8条分散方向_ShowRecomDir,
+        不画_DontDraw,
+    }
+    [UserSetting("P4：场中分摊/分散+旋风时以何种形式根据时机画出指向标记")]
+    public BahamutFavorNorthTypeEnum BahamutFavorNorth { get; set; } = BahamutFavorNorthTypeEnum.画出8条分散方向_ShowRecomDir;
 
     [UserSetting("P5：地火爆炸区颜色")]
     public ScriptColor exflareColor { get; set; } = new ScriptColor { V4 = new Vector4(0f, 1.0f, 1.0f, 1.0f) };
@@ -105,10 +120,10 @@ public class Ucob
     UCOB_Phase phase = UCOB_Phase.Twintania;
     int restrictorNum = 0;                          // P1拘束器掉落次数
     Vector3[] RestrictorPos = new Vector3[3];       // P1拘束器位置记录
-    uint MyId = 0;
+    List<bool> GenerateTarget = [false, false, false, false, false, false, false, false];   // 被点名魔力炼成
     List<uint> DeathSentenceTarget = [0, 0, 0];     // P2死宣目标
-    Dictionary<uint, int> P2_CauterizeDragons = new();   // P2小龙字典（id, 位置）
-    int P2_CauterizeTimes = 0;     // P2小龙引导次数
+    Dictionary<uint, int> CauterizeDragons = new();   // P2小龙字典（id, 位置）
+    int CauterizeTimes = 0;     // P2小龙引导次数
     Vector3 QuickMarchPos = new(0, 0, 0);           // P3进军位置
     bool QuickMarchStackDrawn = false;              // P3进军核爆绘图完成记录
     bool QuickMarchEarthShakerDrawn = false;        // P3进军大地摇动绘图完成记录
@@ -120,11 +135,13 @@ public class Ucob
     List<bool> HeavensFallBossPos = [false, false, false, false, false, false, false, false];   // P3天地BOSS所在位置（仅判断左右）
     List<bool> HeavensFallTowerPos = [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];  // P4天地塔位置
     bool HeavensFallTowerDrawn = false;         // P3天地塔目标绘图完成记录
+    bool isTenStrikeTarget = false;              // P3连击玩家是黑球点名目标
     int TenStrikeEarthShakerNum = 0;            // P3连击大地摇动点名次数
     bool isEarthShakerFirstRound = false;       // P3连击大地摇动是否为第一轮
     bool grandOctDrawn = false;                 // P3群龙起始位置绘图完成记录
     int grandOctIconNum = 0;                    // P3群龙点名次数
     List<bool> grandOctTargetChosen = [false, false, false, false, false, false, false, false]; // P3群龙目标选择
+    Vector3 BahamutFavorPos = new(0, 0, 0);     // P4以初始拉怪点为12点（右下）
     int ArkMornNum = 0;                         // P5死亡轮回死刑次数
     int MornAfahNum = 0;                        // P5无尽顿悟分摊次数
 
@@ -137,11 +154,11 @@ public class Ucob
         RestrictorPos[1] = new(0, 0, 0);
         RestrictorPos[2] = new(0, 0, 0);
 
-        MyId = accessory.Data.Me;
+        GenerateTarget = [false, false, false, false, false, false, false, false];   // 被点名魔力炼成
 
         DeathSentenceTarget = [0, 0, 0];        // P2死宣目标
-        P2_CauterizeDragons = new();            // P2小龙字典（id, 位置）
-        P2_CauterizeTimes = 0;                  // P2小龙引导次数
+        CauterizeDragons = new();            // P2小龙字典（id, 位置）
+        CauterizeTimes = 0;                  // P2小龙引导次数
 
         QuickMarchPos = new(0, 0, 0);           // P3进军位置
         QuickMarchStackDrawn = false;           // P3进军核爆绘图完成记录
@@ -158,12 +175,15 @@ public class Ucob
         HeavensFallTowerPos = [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];  // P3天地塔    
         HeavensFallTowerDrawn = false;          // P3天地塔目标绘图完成记录
 
+        isTenStrikeTarget = false;                // P3连击玩家是黑球点名目标
         TenStrikeEarthShakerNum = 0;            // P3连击大地摇动点名次数
-        isEarthShakerFirstRound = false;       // P3连击大地摇动是否为第一轮
+        isEarthShakerFirstRound = false;        // P3连击大地摇动是否为第一轮
 
         grandOctDrawn = false;                  // P3群龙起始位置绘图完成记录
         grandOctIconNum = 0;                    // P3群龙点名次数
         grandOctTargetChosen = [false, false, false, false, false, false, false, false];    // P3群龙目标选择
+
+        BahamutFavorPos = new(0, 0, 0);         // P4以初始拉怪点为12点（右下）
 
         ArkMornNum = 0;
         MornAfahNum = 0;
@@ -190,7 +210,7 @@ public class Ucob
 
         Vector2 v2 = new(point.X - centre.X, point.Z - centre.Z);
 
-        var rot = (MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian);
+        var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
         var length = v2.Length();
         return new(centre.X + MathF.Sin(rot) * length, centre.Y, centre.Z - MathF.Cos(rot) * length);
     }
@@ -200,17 +220,26 @@ public class Ucob
         return new(centre.X + MathF.Sin(radian) * length, centre.Y, centre.Z - MathF.Cos(radian) * length);
     }
 
-    private float FindAngle(Vector3 centre, Vector3 new_point)
+    private float FindRadian(Vector3 centre, Vector3 new_point)
     {
-        float angle_rad = MathF.PI - MathF.Atan2(new_point.X - centre.X, new_point.Z - centre.Z);
-        if (angle_rad < 0)
-            angle_rad += 2 * MathF.PI;
-        return angle_rad;
+        float radian = MathF.PI - MathF.Atan2(new_point.X - centre.X, new_point.Z - centre.Z);
+        if (radian < 0)
+            radian += 2 * MathF.PI;
+        return radian;
     }
-
+    private float angle2Rad(float angle)
+    {
+        float radian = (float)(angle * Math.PI / 180);
+        return radian;
+    }
     private int getPlayerIdIndex(ScriptAccessory accessory, uint pid)
     {
         return accessory.Data.PartyList.IndexOf(pid);
+    }
+
+    private int getMyIndex(ScriptAccessory accessory)
+    {
+        return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
     }
 
     private string getPlayerJobIndex(ScriptAccessory accessory, uint pid)
@@ -329,11 +358,31 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    [ScriptMethod(name: "【全局】黑球路径与爆炸范围消失（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9903"], userControl: false)]
+    [ScriptMethod(name: "【全局】黑球路径删除（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9903"], userControl: false)]
     public void BlackOrbTrackRemove(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         accessory.Method.RemoveDraw($"黑球路径-{sid}");
+    }
+
+    [ScriptMethod(name: "【全局】黑球点名记录（不可控）", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0076"], userControl: false)]
+    public void GenerateTargetRecord(Event @event, ScriptAccessory accessory)
+    {
+        Task.Delay(50).ContinueWith(t =>
+        {
+            if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+            var tidx = getPlayerIdIndex(accessory, tid);
+            GenerateTarget[tidx] = true;
+            if (DebugMode)
+            {
+                var tidjob = getPlayerJobIndex(accessory, tid);
+                accessory.Method.SendChat($"/e 检测到 {tidjob} 被点名魔力炼成。");
+            }
+
+            if (phase != UCOB_Phase.Tenstrike_5th) return;
+            if (tidx == getMyIndex(accessory))
+                isTenStrikeTarget = true;
+        });
     }
 
     [ScriptMethod(name: "【全局】拘束器位置记录（不可控）", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001151", "Operate:Add"], userControl: false)]
@@ -349,10 +398,24 @@ public class Ucob
         RestrictorPos[restrictorNum] = tpos;
         restrictorNum++;
 
+        if (restrictorNum != 3) return;
+        float restrictorRad1 = FindRadian(new(0, 0, 0), RestrictorPos[1]);
+        float restrictorRad2 = FindRadian(new(0, 0, 0), RestrictorPos[2]);
+        float bahamutFavorRad = (restrictorRad1 + restrictorRad2) / 2;
+        BahamutFavorPos = ExtendPoint(new(0, 0, 0), bahamutFavorRad, 24);
+
         if (restrictorNum == 3 && DebugMode)
         {
             accessory.Method.SendChat($"/e 拘束器数量到3，位置记录完毕。");
         }
+    }
+    [ScriptMethod(name: "【全局】刷新黑球点名目标（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9902"], userControl: false)]
+    public void RefreshGenerateTarget(Event @event, ScriptAccessory accessory)
+    {
+        Task.Delay(500).ContinueWith(t =>
+        {
+            GenerateTarget = [false, false, false, false, false, false, false, false];
+        });
     }
 
     [ScriptMethod(name: "【全局】黑球爆炸范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9902"])]
@@ -365,10 +428,10 @@ public class Ucob
         {
             dp.Name = $"黑球爆炸范围-{i}";
             dp.Scale = new(7.5f);
-            dp.Color = blackOrbFieldColor.V4.WithW(0.5f);
+            dp.Color = blackOrbFieldColor.V4.WithW(0.4f);
             dp.Position = RestrictorPos[i];
             dp.Delay = 3500;
-            dp.DestoryAt = phase == UCOB_Phase.Tenstrike_5th ? 3500: 10000;     // 连击的两轮绘图时延作特殊处理
+            dp.DestoryAt = phase == UCOB_Phase.Tenstrike_5th ? 3500 : 10000;     // 连击的两轮绘图时延作特殊处理
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
@@ -377,11 +440,15 @@ public class Ucob
     public void BlackOrbFieldRemove(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
         // 连击的两轮绘图不删除
         if (phase == UCOB_Phase.Tenstrike_5th) return;
         var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
         int minIdx = getNearestOrbField(spos);
+        var tidx = getPlayerIdIndex(accessory, tid);
         accessory.Method.RemoveDraw($"黑球爆炸范围-{minIdx}");
+        accessory.Method.RemoveDraw($"拘束器位置定位{minIdx}");
+        accessory.Method.RemoveDraw($"拘束器撞球玩家{tidx}指路");
     }
 
     [ScriptMethod(name: "【全局】旋风危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001168", "Operate:Add"])]
@@ -417,21 +484,28 @@ public class Ucob
 
     #region P1：双塔
 
-    [ScriptMethod(name: "P1&P4双塔：旋风自身位置预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9898"])]
-    public void Twister_PlayerPosition(Event @event, ScriptAccessory accessory)
+    private void drawTwister(int delay, int destoryAt, ScriptAccessory accessory)
     {
-        accessory.Method.TextInfo("旋风", 2000, true);
+        accessory.Method.TextInfo("旋风", delay, true);
         for (var i = 0; i < 8; i++)
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = $"旋风{i}";
             dp.Scale = new(1.5f);
             dp.Owner = accessory.Data.PartyList[i];
-            dp.DestoryAt = 2000;
+            dp.Delay = delay;
+            dp.DestoryAt = destoryAt;
             dp.ScaleMode = ScaleMode.ByTime;
             dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+
+    }
+
+    [ScriptMethod(name: "P1&P4双塔：旋风自身位置预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9898"])]
+    public void Twister_PlayerPosition(Event @event, ScriptAccessory accessory)
+    {
+        drawTwister(0, 2000, accessory);
     }
 
     [ScriptMethod(name: "P1&P3双塔：双塔火球分摊范围预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0075"])]
@@ -740,11 +814,11 @@ public class Ucob
     public void CauterizePosRecord(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-        lock (P2_CauterizeDragons)
+        lock (CauterizeDragons)
         {
             var pos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
             var dir = PositionTo8Dir(pos, new(0, 0, 0));
-            P2_CauterizeDragons.Add(sid, dir);
+            CauterizeDragons.Add(sid, dir);
         }
     }
 
@@ -753,17 +827,17 @@ public class Ucob
     {
         if (phase != UCOB_Phase.Nael) return;
 
-        P2_CauterizeTimes++;
+        CauterizeTimes++;
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
 
-        // 按照方向（dir）升序排序 P2_CauterizeDragons
-        var sortedDragons = P2_CauterizeDragons
+        // 按照方向（dir）升序排序 CauterizeDragons
+        var sortedDragons = CauterizeDragons
             .OrderBy(d => d.Value)  // 根据dir升序排序
             .ToList();
 
         if (!showOtherCauterizeRoute && tid != accessory.Data.Me) return;
 
-        switch (P2_CauterizeTimes)
+        switch (CauterizeTimes)
         {
             case 1:
                 CauterizeRouteDraw(sortedDragons[0].Key, tid, accessory);
@@ -821,8 +895,6 @@ public class Ucob
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
 
-        accessory.Method.TextInfo("旋风", 4000, true);
-
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "旋风冲范围";
         dp.Scale = new(8, 45);
@@ -832,17 +904,19 @@ public class Ucob
         dp.DestoryAt = 4000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
 
-        dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Scale = new(1.5f);
-        dp.DestoryAt = 5200;
-        dp.ScaleMode = ScaleMode.ByTime;
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
-        for (var i = 0; i < 8; i++)
-        {
-            dp.Name = $"旋风{i}";
-            dp.Owner = accessory.Data.PartyList[i];
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-        }
+        drawTwister(0, 5200, accessory);
+        // accessory.Method.TextInfo("旋风", 4000, true);
+        // dp = accessory.Data.GetDefaultDrawProperties();
+        // dp.Scale = new(1.5f);
+        // dp.DestoryAt = 5200;
+        // dp.ScaleMode = ScaleMode.ByTime;
+        // dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
+        // for (var i = 0; i < 8; i++)
+        // {
+        //     dp.Name = $"旋风{i}";
+        //     dp.Owner = accessory.Data.PartyList[i];
+        //     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        // }
     }
 
     [ScriptMethod(name: "P3巴哈：奈尔月流冲", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9923"])]
@@ -949,7 +1023,7 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
 
         // 核爆分摊位置提示
-        var rad = FindAngle(new(0, 0, 0), QuickMarchPos);
+        var rad = FindRadian(new(0, 0, 0), QuickMarchPos);
         var stackPos = ExtendPoint(new(0, 0, 0), rad, -6);
 
         dp = accessory.Data.GetDefaultDrawProperties();
@@ -1103,16 +1177,6 @@ public class Ucob
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         drawMeteorStream(sid, 0, 4000, accessory);
-
-        // if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        // var dp = accessory.Data.GetDefaultDrawProperties();
-        // dp.Name = $"陨石流{tid}";
-        // dp.Scale = new(4);
-        // dp.ScaleMode = ScaleMode.ByTime;
-        // dp.Owner = tid;
-        // dp.DestoryAt = 4000;
-        // dp.Color = accessory.Data.DefaultDangerColor;
-        // accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
     #endregion
@@ -1161,7 +1225,7 @@ public class Ucob
 
             if (safeIndices.Count() == 2)
             {
-                var MyIndex = getPlayerIdIndex(accessory, accessory.Data.Me);
+                var MyIndex = getMyIndex(accessory);
                 // 检查HeavensFallBossPos中，安全位置的前一个位置
                 foreach (var idx in safeIndices)
                 {
@@ -1251,7 +1315,7 @@ public class Ucob
             var naelIdx = PositionTo16Dir(NaelPosition, new(0, 0, 0));
             var towerJudgeIdx = naelIdx;
             var towerPlayerIdxCount = 0;
-            var MyIndex = getPlayerIdIndex(accessory, accessory.Data.Me);
+            var MyIndex = getMyIndex(accessory);
             List<int> towerPlayerTarget = [7, 0, 6, 1, 5, 2, 4, 3];
 
             for (int i = 0; i < HeavensFallTowerPos.Count(); i++)
@@ -1303,7 +1367,7 @@ public class Ucob
         });
     }
 
-    [ScriptMethod(name: "P3巴哈：【天地】中心塔与击退指示 (Joshua)", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9911"])]
+    [ScriptMethod(name: "P3巴哈：【天地】中心塔与击退指示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9911"])]
     public void HeavensFallMiddleTower(Event @event, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
@@ -1346,8 +1410,30 @@ public class Ucob
                 dp.Scale = new(4);
                 dp.Owner = accessory.Data.PartyList[i];
                 dp.DestoryAt = 15000;
-                dp.Color = accessory.Data.DefaultDangerColor;
+                dp.Color = accessory.Data.DefaultDangerColor.WithW(0.5f);
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            }
+        });
+    }
+
+    [ScriptMethod(name: "P3巴哈：【连击】场中-拘束器-场边三点一线指引", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9958"])]
+    public void TenStrikeOrbTargetRoute(Event @event, ScriptAccessory accessory)
+    {
+        Task.Delay(8500).ContinueWith(t =>
+        {
+            if (phase != UCOB_Phase.Tenstrike_5th) return;
+            var MyIndex = getMyIndex(accessory);
+            for (var i = 0; i < 3; i++)
+            {
+                var dp = accessory.Data.GetDefaultDrawProperties();
+                dp.Name = $"三点一线{i}";
+                dp.Scale = new(2f);
+                dp.ScaleMode = ScaleMode.YByDistance;
+                dp.Position = new(0, 0, 0);
+                dp.TargetPosition = new(RestrictorPos[i].X / RestrictorPos[i].Length() * 24, 0, RestrictorPos[i].Z / RestrictorPos[i].Length() * 24);
+                dp.DestoryAt = 10000;
+                dp.Color = isTenStrikeTarget ? posColorPlayer.V4.WithW(2f) : colorRed.V4.WithW(2f);
+                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
             }
         });
     }
@@ -1476,7 +1562,7 @@ public class Ucob
             var NaelDir = PositionTo8Dir(NaelPosition, new(0, 0, 0));
 
             bool isAdvanced = Math.Abs(BahamutDir - NaelDir) == 4;  // 巴哈对面有奈尔，提前一格
-            bool isTurnLeft = BahamutDir % 2 == 0;      // 巴哈在偶数面向（正点），面向场外往左跑
+            bool isTurnLeft = BahamutDir % 2 == 0;                  // 巴哈在偶数面向（正点），面向场外往左跑
             var startDir = BahamutDir > 3 ? BahamutDir - 4 : BahamutDir + 4;
             if (isAdvanced)
             {
@@ -1556,7 +1642,7 @@ public class Ucob
         Task.Delay(100).ContinueWith(t =>
         {
             if (grandOctIconNum != 7) return;
-            var MyIndex = getPlayerIdIndex(accessory, accessory.Data.Me);
+            var MyIndex = getMyIndex(accessory);
             var TwintaniaTargetIdx = 0;
             for (int i = 0; i < grandOctTargetChosen.Count(); i++)
             {
@@ -1603,8 +1689,130 @@ public class Ucob
 
     #region P4：亿万核爆
 
-    // TODO：这里希望加一个八方分散的指路，根据台词不同出现需求
-    [ScriptMethod(name: "P4奈尔：台词", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(650[4567])$"])]
+    [ScriptMethod(name: "P4双打：阶段记录（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9960", "TargetIndex:2"], userControl: false)]
+    public void P4_PhaseChange(Event @event, ScriptAccessory accessory)
+    {
+        phase = UCOB_Phase.BahamutFavor;
+        if (DebugMode)
+        {
+            accessory.Method.SendChat($"/e 检测到进入P4。");
+        }
+    }
+    private void drawBlackOrbRoute(int pidx, int residx, int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        // pidx: 玩家index
+        // residx：拘束器index
+        if (pidx != getMyIndex(accessory)) return;
+
+        if (residx == 0)
+            accessory.Method.TextInfo("先躲避旋风，后撞球", 3000, false);
+        else
+            accessory.Method.TextInfo("先撞球，后躲避旋风", 3000, false);
+
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"拘束器位置定位{residx}";
+        dp.Scale = new(1.5f);
+        dp.Position = RestrictorPos[residx];
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        dp.Color = posColorPlayer.V4.WithW(3);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+
+        dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Scale = new(0.5f);
+        dp.Name = $"拘束器撞球玩家{pidx}指路";
+        dp.Owner = accessory.Data.Me;
+        dp.TargetPosition = RestrictorPos[residx];
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    [ScriptMethod(name: "P4双塔：踩拘束器指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9902"])]
+    public void BlackOrbDir(Event @event, ScriptAccessory accessory)
+    {
+        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        if (phase != UCOB_Phase.BahamutFavor) return;
+        int trueCount = 0;
+        for (int i = 0; i < GenerateTarget.Count(); i++)
+        {
+            if (GenerateTarget[i])
+                trueCount++;
+        }
+        if (trueCount != 3) return;
+
+        // 判断4/5/6是否为true，如果是，DoSomething(4/5/6)
+        // P4的黑球，D1（B），D2（C），D3（D），D4（补）
+        if (GenerateTarget[4])
+            drawBlackOrbRoute(4, 2, 0, 5500, accessory);
+        else
+            drawBlackOrbRoute(7, 2, 0, 5500, accessory);
+
+        if (GenerateTarget[5])
+            drawBlackOrbRoute(5, 1, 0, 5500, accessory);
+        else
+            drawBlackOrbRoute(7, 1, 0, 5500, accessory);
+
+        if (GenerateTarget[6])
+            drawBlackOrbRoute(6, 0, 0, 5500, accessory);
+        else
+            drawBlackOrbRoute(7, 0, 0, 5500, accessory);
+    }
+
+    private void drawBahamutFavorNorth(int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        switch (BahamutFavorNorth)
+        {
+            case BahamutFavorNorthTypeEnum.画出12点_ShowTempNorth:
+                drawBahamutFavorTempNorth(delay, destoryAt, accessory);
+                break;
+            case BahamutFavorNorthTypeEnum.画出8条分散方向_ShowRecomDir:
+                drawBahamutFavorSpreadDir(delay, destoryAt, accessory);
+                break;
+            case BahamutFavorNorthTypeEnum.不画_DontDraw:
+            default:
+                return;
+        }
+    }
+
+    private void drawBahamutFavorTempNorth(int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"P4的12点标记";
+        dp.Scale = new(1.5f);
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Color = posColorNormal.V4.WithW(2);
+        dp.Position = new(0, 0, 0);
+        dp.TargetPosition = BahamutFavorPos;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+    }
+
+    private void drawBahamutFavorSpreadDir(int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        var initRad = FindRadian(new(0, 0, 0), BahamutFavorPos);
+        List<float> angles = [-20, 20, -105, 105, -60, 60, -150, 150];
+
+        for (int i = 0; i < 8; i++)
+        {
+            dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = $"P4分散方向标记{i}";
+            dp.Scale = new(1.25f);
+            dp.ScaleMode = ScaleMode.YByDistance;
+            dp.Color = i == getMyIndex(accessory) ? posColorPlayer.V4.WithW(5f) : posColorNormal.V4.WithW(5f);
+            dp.Position = new(0, 0, 0);
+            dp.TargetPosition = ExtendPoint(new Vector3(0, 0, 0), initRad + angle2Rad(angles[i]), 20);
+            dp.Delay = delay;
+            dp.DestoryAt = destoryAt;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        }
+    }
+
+    [ScriptMethod(name: "P4奈尔：台词与场中分摊/分散+旋风时方向指引", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(650[4567])$"])]
     public void NaelQuotesP4(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
@@ -1618,6 +1826,8 @@ public class Ucob
                     // 钢铁、分摊、分散
                     drawNaelQuote_Circle(sid, 0, 5000, accessory);
                     drawNaelQuote_Stack(sid, 5000, 3000, accessory);
+                    // 分摊结束后即可指示方向
+                    drawBahamutFavorNorth(8000, 8000, accessory);
                     drawNaelQuote_Spread(sid, 8000, 3000, accessory);
                     break;
                 }
@@ -1628,6 +1838,8 @@ public class Ucob
                     drawNaelQuote_Circle(sid, 0, 5000, accessory);
                     drawNaelQuote_Spread(sid, 5000, 3000, accessory);
                     drawNaelQuote_Stack(sid, 8000, 3000, accessory);
+                    // 分摊结束后即可指示方向
+                    drawBahamutFavorNorth(11000, 5000, accessory);
                     break;
                 }
             case "6506":
@@ -1637,6 +1849,8 @@ public class Ucob
                     drawNaelQuote_Donut(sid, 0, 5000, accessory);
                     drawNaelQuote_Spread(sid, 5000, 3000, accessory);
                     drawNaelQuote_Stack(sid, 8000, 3000, accessory);
+                    // 分摊结束后即可指示方向
+                    drawBahamutFavorNorth(11000, 5000, accessory);
                     break;
                 }
             case "6507":
@@ -1646,6 +1860,7 @@ public class Ucob
                     drawNaelQuote_Donut(sid, 0, 5000, accessory);
                     drawNaelQuote_Circle(sid, 5000, 3000, accessory);
                     drawNaelQuote_Spread(sid, 5000, 3000, accessory);
+                    // 无需指示方向
                     break;
                 }
         }
@@ -1689,7 +1904,7 @@ public class Ucob
         if (showStackBusterNum)
             accessory.Method.TextInfo($"死亡轮回（死刑）#{ArkMornNum}", 4000, true);
 
-        var MyIndex = getPlayerIdIndex(accessory, accessory.Data.Me);
+        var MyIndex = getMyIndex(accessory);
         var isTank = MyIndex == 0 || MyIndex == 1;
 
         var dp = accessory.Data.GetDefaultDrawProperties();
