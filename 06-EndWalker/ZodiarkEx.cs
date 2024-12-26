@@ -32,12 +32,12 @@ using System.Security.AccessControl;
 
 namespace UsamisScript;
 
-[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.2", author: "Usami", note: noteStr)]
 public class ZodiarkEx
 {
     const string noteStr =
     """
-    v0.0.0.1:
+    v0.0.0.2:
     鸭门。
     """;
 
@@ -138,7 +138,7 @@ public class ZodiarkEx
         var msg = @event["Message"].ToString();
         accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
 
-        drawQuadrant(1, 0, 2000, accessory);
+        drawQuadrant(0, 0, 2001, accessory);
     }
 
     [ScriptMethod(name: "【全局】范式次数记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:26559"], userControl: false)]
@@ -496,14 +496,15 @@ public class ZodiarkEx
         Vector3 bias;
         switch (posIdx)
         {
+            // rotation中0居然是下方，dp的rotation是从“下”逆时针转动。
             case 0:
-                bias = new Vector3(0, 0, 1.5f);
+                bias = new Vector3(0, 0, -1.5f);
                 break;
             case 1:
                 bias = new Vector3(-1.5f, 0, 0);
                 break;
             case 2:
-                bias = new Vector3(0, 0, -1.5f);
+                bias = new Vector3(0, 0, 1.5f);
                 break;
             case 3:
                 bias = new Vector3(1.5f, 0, 0);
