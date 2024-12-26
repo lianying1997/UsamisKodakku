@@ -23,8 +23,16 @@ namespace UsamisUsefulFunc
     public class Func
     {
 
+        [UserSetting("Debug模式，非开发用请关闭")]
+        public bool DebugMode { get; set; } = false;
         public ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
         public ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
+
+        private void DebugMsg(string str, ScriptAccessory accessory)
+        {
+            if (!DebugMode) return;
+            accessory.Method.SendChat(str);
+        }
 
         /// <summary>
         /// 将场地分为四象限，右上为0，右下为1，左下为2，左上为3

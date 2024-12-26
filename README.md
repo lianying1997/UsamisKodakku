@@ -8,6 +8,7 @@ A repository contains scripts for the Dalamud KodakkuAssist plugin, created by a
 
 ### 06-EndWalker
 - 创造环境极北造物院 [Lv87_KtisisHyperboreia.cs] (Online)
+- 佐迪亚克暝暗歼灭战 [ZodiarkEx.cs] (Online)
 - 零式万魔殿 炼净之狱4 [p8s.cs] (Online)
 - （未完成）零式万魔殿 荒天之狱4 [p12s.cs] (Online)
 
