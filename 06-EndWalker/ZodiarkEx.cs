@@ -29,20 +29,27 @@ using System.Timers;
 // using Lumina.Excel.GeneratedSheets;
 using System.Diagnostics;
 using System.Security.AccessControl;
+using Lumina.Excel.GeneratedSheets;
 
 namespace UsamisScript;
 
-[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.2", author: "Usami", note: noteStr)]
+[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.3", author: "Usami", note: noteStr)]
 public class ZodiarkEx
 {
     const string noteStr =
     """
-    v0.0.0.2:
+    v0.0.0.3:
+    1. 增加分摊区标记。
+    2. 调整了转场星蚀与秘纹的出现时机，增加星蚀指路。
     鸭门。
     """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public bool DebugMode { get; set; } = false;
+
+    // TODO
+    // 加一个阶段指示，转场。转场的秘纹绘图时间调整一下
+    // 以及，星落部分，不要让画面过乱。根据地图特效直接绘出星落安全区。
 
     int ParadeigmaNum = 0;      // 范式次数
     Vector3[] BirdOrBeastPos = new Vector3[4];    // Quetzalcoatl & Behemoth，记录四个角落月环鸟鸟/钢铁贝贝的位置
@@ -52,7 +59,11 @@ public class ZodiarkEx
     public ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
     public ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1f, 0f, 0f, 1.0f) };
     bool isTurnLeft = false;                      // 爸爸转哪儿
-
+    bool isStarFall = false;                      // 转场阶段，为三重秘纹绘图
+    Dictionary<string, (int, int)>? AstralMapping = null;
+    int AstralNum = 0;          // 星落次数
+    int AstralType = 0;         // 星落安全区类型
+    Vector3[] AstralSafePos = new Vector3[6];   // 星落6个安全点
     public void Init(ScriptAccessory accessory)
     {
         ParadeigmaNum = 0;      // 范式次数
@@ -102,9 +113,30 @@ public class ZodiarkEx
         SnakePosTarget[14] = SnakePos[5];
         SnakePosTarget[15] = SnakePos[4];
 
+        // 星落6个安全点
+        AstralSafePos[0] = new(86, 0, 86);
+        AstralSafePos[1] = new(100, 0, 86);
+        AstralSafePos[2] = new(114, 0, 86);
+        AstralSafePos[3] = new(86, 0, 100);
+        AstralSafePos[4] = new(100, 0, 100);
+        AstralSafePos[5] = new(114, 0, 100);
+
         EsoterikosSourceIds = [];          // 已记录的秘纹ID
 
         isTurnLeft = false;                // 爸爸转哪儿
+        isStarFall = false;                // 转场阶段，为三重秘纹绘图
+
+        // 星落字典
+        AstralMapping = new Dictionary<string, (int val1, int val2)>
+        {
+            {"00020001", (1, 1)},
+            {"00800040", (10, 10)},
+            {"10000800", (2, 20)},
+            {"00200010", (3, 30)}
+        };
+
+        AstralNum = 0;          // 星落次数
+        AstralType = 0;         // 星落安全区类型
 
         accessory.Method.RemoveDraw(".*");
     }
@@ -138,7 +170,14 @@ public class ZodiarkEx
         var msg = @event["Message"].ToString();
         accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
 
-        drawQuadrant(0, 0, 2001, accessory);
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"钢铁";
+        dp.Scale = new(3f);
+        dp.Position = new(86f, 0, 86f);
+        dp.Delay = 0;
+        dp.DestoryAt = 2000;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
     [ScriptMethod(name: "【全局】范式次数记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:26559"], userControl: false)]
@@ -146,6 +185,7 @@ public class ZodiarkEx
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         ParadeigmaNum++;
+        isStarFall = false;     // 同时取消转场阶段
         DebugMsg($"/e [DEBUG] 发现范式次数增加：{ParadeigmaNum}。", accessory);
     }
     private void drawBirdDonut(int birdIdx, int delay, int destoryAt, ScriptAccessory accessory)
@@ -232,6 +272,22 @@ public class ZodiarkEx
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
 
+    [ScriptMethod(name: "分摊标记（不可控）", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:013C"], userControl: false)]
+    public void GenerateTargetRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        DebugMsg($"/e 检测到 {tid} 被点名分摊。", accessory);
+
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"分摊{tid}";
+        dp.Scale = new(5);
+        dp.Owner = tid;
+        dp.Delay = 0;
+        dp.DestoryAt = 12000;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
     [ScriptMethod(name: "秘纹（三角、半场、直线）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:regex:^(1371[123])$"])]
     public void Exoterikos(Event @event, ScriptAccessory accessory)
     {
@@ -259,7 +315,10 @@ public class ZodiarkEx
             switch (sdid)
             {
                 case 13711:
-                    drawLine(sid, 0, 25000, accessory);
+                    if (isStarFall)
+                        drawLine(sid, 5000, 25000, accessory);
+                    else
+                        drawLine(sid, 0, 25000, accessory);
                     break;
                 case 13712:
                     drawHalfCleave(sid, 0, 25000, accessory);
@@ -273,16 +332,17 @@ public class ZodiarkEx
         }
     }
 
-    [ScriptMethod(name: "悼念（佐迪亚克有病）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:26601"], userControl: false)]
+    [ScriptMethod(name: "悼念", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:26601"], userControl: false)]
     public void OrbsDownSync(Event @event, ScriptAccessory accessory)
     {
         Task.Delay(50).ContinueWith(t =>
         {
-            // 就很神奇，他在四黑球阶段最后一波秘纹，Set一次Obj又再Set了一次，把我逻辑干崩了，不得不再删一次
+            // 避免该阶段有某一波秘纹没放出来就被压掉了
             EsoterikosSourceIds = [];
+            // 进入转场阶段标志
+            isStarFall = true;
             accessory.Method.RemoveDraw(".*");
         });
-
     }
 
     [ScriptMethod(name: "痛苦（斜向冲锋）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:26606"])]
@@ -452,6 +512,101 @@ public class ZodiarkEx
         }
     }
 
+    [ScriptMethod(name: "星蚀指路", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:80034E71", "Index:regex:^(0000000[678])$"])]
+    public void AstralDir(Event @event, ScriptAccessory accessory)
+    {
+        // pattern 1: W, mid, NE  (00020001, 00200010, 00800040)
+        // pattern 2: NW, W, N    (10000800, 00800040, 00020001)
+        // pattern 3: W, N, mid   (00020001, 10000800, 00200010)
+        // pattern 4: NW, mid, NE (10000800, 00200010, 00800040)
+        // pattern 5: NW, N, NE   (00200010, 10000800, 00800040)
+        // pattern 6: NW, W, N    (00200010, 00800040, 00020001)
+
+        if (AstralNum == 2) return;
+        AstralNum++;
+        var id = @event["Id"].ToString();
+        if (AstralMapping.ContainsKey(id))
+        {
+            var (val1, val2) = AstralMapping[id];
+            AstralType = AstralType + (AstralNum == 1 ? val1 : val2);
+        }
+
+        if (AstralNum != 2) return;
+        DebugMsg($"/e 获得AstralType: {AstralType}", accessory);
+        switch (AstralType)
+        {
+            case 31:
+                drawAstralDir(3, 4, 2, accessory);
+                break;
+            case 12:
+                drawAstralDir(0, 3, 1, accessory);
+                break;
+            case 21:
+                drawAstralDir(3, 1, 4, accessory);
+                break;
+            case 32:
+                drawAstralDir(0, 4, 2, accessory);
+                break;
+            case 23:
+                drawAstralDir(0, 1, 2, accessory);
+                break;
+            case 13:
+                drawAstralDir(0, 3, 1, accessory);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void drawAstralDir(int safeIdx1, int safeIdx2, int safeIdx3, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"星落安全区1";
+        dp.Scale = new(3f);
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Position = AstralSafePos[safeIdx1];
+        dp.Delay = 0;
+        dp.DestoryAt = 11000;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+
+        dp.Name = $"星落安全区2";
+        dp.Position = AstralSafePos[safeIdx2];
+        dp.Delay = 0;
+        dp.DestoryAt = 15000;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+
+        dp.Name = $"星落安全区3";
+        dp.Position = AstralSafePos[safeIdx3];
+        dp.Delay = 0;
+        dp.DestoryAt = 19000;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        
+        dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"星落指路标记1";
+        dp.Scale = new(0.5f);
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Owner = accessory.Data.Me;
+        dp.TargetPosition = AstralSafePos[safeIdx1];
+        dp.Delay = 0;
+        dp.DestoryAt = 11000;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+        dp.Name = $"星落指路标记2";
+        dp.TargetPosition = AstralSafePos[safeIdx2];
+        dp.Delay = 11000;
+        dp.DestoryAt = 4000;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+        dp.Name = $"星落指路标记2";
+        dp.TargetPosition = AstralSafePos[safeIdx3];
+        dp.Delay = 15000;
+        dp.DestoryAt = 4000;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        
+    }
+
     [ScriptMethod(name: "火线安全区", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:80034E71", "Id:regex:^(00020001|00400020)$", "Index:00000005"])]
     public async void Firebar(Event @event, ScriptAccessory accessory)
     {
@@ -524,8 +679,6 @@ public class ZodiarkEx
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
 
-    // [ScriptMethod(name: "鸟鸟月环消失", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:80034E71", "Id:40000004", "Index:regex:^(0000001[5678])$"], userControl: false)]
-
     [ScriptMethod(name: "鸟鸟月环消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26593"], userControl: false)]
     public void BirdDonutRemove(Event @event, ScriptAccessory accessory)
     {
@@ -533,7 +686,6 @@ public class ZodiarkEx
         accessory.Method.RemoveDraw(@$"四象限\d+$");
     }
 
-    // [ScriptMethod(name: "贝贝钢铁消失", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:80034E71", "Id:40000004", "Index:regex:^(0000000[9ABC])$"], userControl: false)]
     [ScriptMethod(name: "贝贝钢铁消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26594"], userControl: false)]
     public void BeastCircleRemove(Event @event, ScriptAccessory accessory)
     {
@@ -541,7 +693,6 @@ public class ZodiarkEx
         accessory.Method.RemoveDraw(@$"四象限\d+$");
     }
 
-    // [ScriptMethod(name: "蛇蛇直线消失", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:80034E71", "Id:40000004", "Index:regex:^(000000(0[DEF]|(1[01234])))$"], userControl: false)]
     [ScriptMethod(name: "蛇蛇直线消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26595"], userControl: false)]
     public void SnakeLineRemove(Event @event, ScriptAccessory accessory)
     {
@@ -725,6 +876,12 @@ public class ZodiarkEx
 
     // 80034E71     00200010    00000006    00000000    星落 左 星星排列1
     //              00400004    00000006                星落 左 星星排列2
+    //              00800040    00000006
+    //              10000800    00000006
+    //              00080004    00000006                星落 左 星星消失
+
+
+
     // 80034E71     00200010    00000007    00000000    星落 下 星星排列1
     // 80034E71     00200010    00000008    00000000    星落 右 星星排列1
     // 80034E71     00200010    00000009    00000000    左上 贝贝出现
