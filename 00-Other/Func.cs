@@ -16,6 +16,30 @@ using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
+namespace UsamisScript;
+
+[ScriptType(name: "SampleScript", territorys: [12345], guid: "12345", version: "0.0.0.0", author: "Usami", note: noteStr)]
+
+public class Hello
+{
+    const string noteStr =
+    """
+    Hello Koda.
+    """;
+
+    [UserSetting("Debug模式，非开发用请关闭")]
+    public static bool DebugMode { get; set; } = false;
+
+    public void Init(ScriptAccessory accessory)
+    {
+        ScriptColor asd = ColorHelper.colorRed;
+        DebugHelper.DebugMsg($"/e Init Success.", accessory);
+        // accessory.Method.MarkClear();
+        accessory.Method.RemoveDraw(".*");
+    }
+}
+
+#region 函数集
 public static class EventExtensions
 {
     private static bool ParseHexId(string? idStr, out uint id)
@@ -137,39 +161,38 @@ public static class IbcHelper
         return (IEnumerable<IBattleChara>)Svc.Objects.Where(x => x.DataId == dataId);
     }
 
-    private static uint GetCharHpcur(uint id)
+    public static uint GetCharHpcur(uint id)
     {
         // 如果null，返回0
         var hp = GetById(id)?.CurrentHp ?? 0;
         return hp;
     }
-
 }
 
 public static class DirectionCalc
 {
-    private static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
+    public static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
     {
         // 正分割，0°为分界线，将360°分为dirs份
         var r = Math.Floor(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
         return (int)r;
     }
 
-    private static int PositionRoundToDirs(Vector3 point, Vector3 center, int dirs)
+    public static int PositionRoundToDirs(Vector3 point, Vector3 center, int dirs)
     {
         // 斜分割，0° return 0，将360°分为dirs份
         var r = Math.Round(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
         return (int)r;
     }
 
-    private static float angle2Rad(float angle)
+    public static float angle2Rad(float angle)
     {
         // 输入角度转为弧度
         float radian = (float)(angle * Math.PI / 180);
         return radian;
     }
 
-    private static Vector3 RotatePoint(Vector3 point, Vector3 center, float radian)
+    public static Vector3 RotatePoint(Vector3 point, Vector3 center, float radian)
     {
         // 围绕某点顺时针旋转某弧度
         Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
@@ -178,13 +201,13 @@ public static class DirectionCalc
         return new(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
     }
 
-    private static Vector3 ExtendPoint(Vector3 center, float radian, float length)
+    public static Vector3 ExtendPoint(Vector3 center, float radian, float length)
     {
         // 令某点以某弧度延伸一定长度
         return new(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
     }
 
-    private static float FindRadian(Vector3 center, Vector3 new_point)
+    public static float FindRadian(Vector3 center, Vector3 new_point)
     {
         // 找到某点到中心的弧度
         float radian = MathF.PI - MathF.Atan2(new_point.X - center.X, new_point.Z - center.Z);
@@ -196,18 +219,18 @@ public static class DirectionCalc
 
 public static class IndexHelper
 {
-    private static int getPlayerIdIndex(ScriptAccessory accessory, uint pid)
+    public static int getPlayerIdIndex(ScriptAccessory accessory, uint pid)
     {
         // 获得玩家 IDX
         return accessory.Data.PartyList.IndexOf(pid);
     }
 
-    private static int getMyIndex(ScriptAccessory accessory)
+    public static int getMyIndex(ScriptAccessory accessory)
     {
         return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
     }
 
-    private static string getPlayerJobIndex(ScriptAccessory accessory, uint pid)
+    public static string getPlayerJobIndex(ScriptAccessory accessory, uint pid)
     {
         // 获得玩家职能简称
         var a = accessory.Data.PartyList.IndexOf(pid);
@@ -225,3 +248,39 @@ public static class IndexHelper
         }
     }
 }
+
+public static class DebugHelper
+{
+    public static void DebugMsg(string str, ScriptAccessory accessory)
+    {
+        if (!Hello.DebugMode) return;
+        accessory.Method.SendChat(str);
+    }
+}
+
+public static class ColorHelper
+{
+    public static ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
+    public static ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
+    public static ScriptColor colorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 1f, 1.0f) };
+}
+
+#endregion
+
+#region 测试区
+// --------------------------------------
+public static class ClassTest
+{
+    public static int Counting = 0;
+
+    public static void classTestMethod(Event @event, ScriptAccessory accessory)
+    {
+        accessory.Method.SendChat($"/e counting: {Counting++}");
+    }
+}
+
+// 事件调用
+// [ScriptMethod(name: "Test Class", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:133"])]
+// public void StartCasting(Event @event, ScriptAccessory accessory) => ClassTest.classTestMethod(@event, accessory);
+
+#endregion
