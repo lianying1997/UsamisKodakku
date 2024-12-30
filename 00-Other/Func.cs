@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
+using System.Threading;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures.InfoProxy;
@@ -14,158 +15,213 @@ using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using Lumina.Excel.GeneratedSheets2;
 
-namespace UsamisUsefulFunc
+public static class EventExtensions
 {
-
-
-    public class Func
+    private static bool ParseHexId(string? idStr, out uint id)
     {
-
-        [UserSetting("DebugÄ£Ê½£¬·Ç¿ª·¢ÓÃÇë¹Ø±Õ")]
-        public bool DebugMode { get; set; } = false;
-        public ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
-        public ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
-
-        private void DebugMsg(string str, ScriptAccessory accessory)
+        id = 0;
+        if (string.IsNullOrEmpty(idStr)) return false;
+        try
         {
-            if (!DebugMode) return;
-            accessory.Method.SendChat(str);
+            var idStr2 = idStr.Replace("0x", "");
+            id = uint.Parse(idStr2, System.Globalization.NumberStyles.HexNumber);
+            return true;
         }
-
-        /// <summary>
-        /// ½«³¡µØ·ÖÎªËÄÏóÏŞ£¬ÓÒÉÏÎª0£¬ÓÒÏÂÎª1£¬×óÏÂÎª2£¬×óÉÏÎª3
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="centre"></param>
-        /// <returns></returns>
-        private int PositionFloorTo4Dir(Vector3 point, Vector3 centre)
+        catch (Exception)
         {
-            // Dirs: NE = 0, SE = 1, SW = 2, NW = 3
-            var r = Math.Floor(2 - 2 * Math.Atan2(point.X - centre.X, point.Z - centre.Z) / Math.PI) % 4;
-            return (int)r;
+            return false;
         }
+    }
 
-        /// <summary>
-        /// ½«³¡µØÓÃX×Ö·ÖÎªËÄÏóÏŞ£¬ÉÏÎª0£¬ÓÒÎª1£¬ÏÂÎª2£¬×óÎª3
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="centre"></param>
-        /// <returns></returns>
-        private int PositionRoundTo4Dir(Vector3 point, Vector3 centre)
+    public static uint ActionId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["ActionId"]);
+    }
+
+    public static uint SourceId(this Event @event)
+    {
+        return ParseHexId(@event["SourceId"], out var id) ? id : 0;
+    }
+
+    public static uint TargetId(this Event @event)
+    {
+        return ParseHexId(@event["TargetId"], out var id) ? id : 0;
+    }
+
+    public static Vector3 SourcePosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+    }
+
+    public static Vector3 TargetPosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
+    }
+
+    public static Vector3 EffectPosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
+    }
+
+    public static float SourceRotation(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
+    }
+
+    public static float TargetRotation(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<float>(@event["TargetRotation"]);
+    }
+
+    public static string SourceName(this Event @event)
+    {
+        return @event["SourceName"];
+    }
+
+    public static string TargetName(this Event @event)
+    {
+        return @event["TargetName"];
+    }
+
+    public static uint DurationMilliseconds(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
+    }
+
+    public static uint Index(this Event @event)
+    {
+        return ParseHexId(@event["Index"], out var id) ? id : 0;
+    }
+
+    public static uint State(this Event @event)
+    {
+        return ParseHexId(@event["State"], out var id) ? id : 0;
+    }
+
+    public static uint DirectorId(this Event @event)
+    {
+        return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
+    }
+
+    public static uint StatusId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["StatusId"]);
+    }
+
+    public static uint StackCount(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["StackCount"]);
+    }
+
+    public static uint Param(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["Param"]);
+    }
+}
+
+public static class IbcHelper
+{
+    public static IBattleChara? GetById(uint id)
+    {
+        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+    }
+
+    public static IBattleChara? GetMe()
+    {
+        return Svc.ClientState.LocalPlayer;
+    }
+
+    public static IEnumerable<IBattleChara> GetByDataId(uint dataId)
+    {
+        return (IEnumerable<IBattleChara>)Svc.Objects.Where(x => x.DataId == dataId);
+    }
+
+    private static uint GetCharHpcur(uint id)
+    {
+        // å¦‚æœnullï¼Œè¿”å›0
+        var hp = GetById(id)?.CurrentHp ?? 0;
+        return hp;
+    }
+
+}
+
+public static class DirectionCalc
+{
+    private static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
+    {
+        // æ­£åˆ†å‰²ï¼Œ0Â°ä¸ºåˆ†ç•Œçº¿ï¼Œå°†360Â°åˆ†ä¸ºdirsä»½
+        var r = Math.Floor(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
+        return (int)r;
+    }
+
+    private static int PositionRoundToDirs(Vector3 point, Vector3 center, int dirs)
+    {
+        // æ–œåˆ†å‰²ï¼Œ0Â° return 0ï¼Œå°†360Â°åˆ†ä¸ºdirsä»½
+        var r = Math.Round(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
+        return (int)r;
+    }
+
+    private static float angle2Rad(float angle)
+    {
+        // è¾“å…¥è§’åº¦è½¬ä¸ºå¼§åº¦
+        float radian = (float)(angle * Math.PI / 180);
+        return radian;
+    }
+
+    private static Vector3 RotatePoint(Vector3 point, Vector3 center, float radian)
+    {
+        // å›´ç»•æŸç‚¹é¡ºæ—¶é’ˆæ—‹è½¬æŸå¼§åº¦
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
+        var length = v2.Length();
+        return new(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
+    }
+
+    private static Vector3 ExtendPoint(Vector3 center, float radian, float length)
+    {
+        // ä»¤æŸç‚¹ä»¥æŸå¼§åº¦å»¶ä¼¸ä¸€å®šé•¿åº¦
+        return new(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
+    }
+
+    private static float FindRadian(Vector3 center, Vector3 new_point)
+    {
+        // æ‰¾åˆ°æŸç‚¹åˆ°ä¸­å¿ƒçš„å¼§åº¦
+        float radian = MathF.PI - MathF.Atan2(new_point.X - center.X, new_point.Z - center.Z);
+        if (radian < 0)
+            radian += 2 * MathF.PI;
+        return radian;
+    }
+}
+
+public static class IndexHelper
+{
+    private static int getPlayerIdIndex(ScriptAccessory accessory, uint pid)
+    {
+        // è·å¾—ç©å®¶ IDX
+        return accessory.Data.PartyList.IndexOf(pid);
+    }
+
+    private static int getMyIndex(ScriptAccessory accessory)
+    {
+        return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+    }
+
+    private static string getPlayerJobIndex(ScriptAccessory accessory, uint pid)
+    {
+        // è·å¾—ç©å®¶èŒèƒ½ç®€ç§°
+        var a = accessory.Data.PartyList.IndexOf(pid);
+        switch (a)
         {
-            // Dirs: N = 0, E = 1, S = 2, W = 3
-            var r = Math.Round(2 - 2 * Math.Atan2(point.X - centre.X, point.Z - centre.Z) / Math.PI) % 4;
-            return (int)r;
+            case 0: return "MT";
+            case 1: return "ST";
+            case 2: return "H1";
+            case 3: return "H2";
+            case 4: return "D1";
+            case 5: return "D2";
+            case 6: return "D3";
+            case 7: return "D4";
+            default: return "unknown";
         }
-
-        /// <summary>
-        /// Ã¿45¡ãÎª1¸ñ£¬´ÓÕı±±¿ªÊ¼Ë³Ê±Õë£¬0~7
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="centre"></param>
-        /// <returns></returns>
-        private int PositionTo8Dir(Vector3 point, Vector3 centre)
-        {
-            // Dirs: N = 0, NE = 1, ..., NW = 7
-            var r = Math.Round(4 - 4 * Math.Atan2(point.X - centre.X, point.Z - centre.Z) / Math.PI) % 8;
-            return (int)r;
-
-        }
-
-        /// <summary>
-        /// Ã¿30¡ãÎª1¸ñ£¬´ÓÕı±±¿ªÊ¼Ë³Ê±Õë£¬0~11
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="centre"></param>
-        /// <returns></returns>
-        private int PositionTo12Dir(Vector3 point, Vector3 centre)
-        {
-            // Dirs: N = 0, NE = 1, ..., NW = 7
-            var r = Math.Round(6 - 6 * Math.Atan2(point.X - centre.X, point.Z - centre.Z) / Math.PI) % 12;
-            return (int)r;
-        }
-
-        /// <summary>
-        /// Ã¿22.5¡ãÎª1¸ñ£¬´ÓÕı±±¿ªÊ¼Ë³Ê±Õë£¬0~15
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="centre"></param>
-        /// <returns></returns>
-        private int PositionTo16Dir(Vector3 point, Vector3 centre)
-        {
-            var r = Math.Round(8 - 8 * Math.Atan2(point.X - centre.X, point.Z - centre.Z) / Math.PI) % 16;
-            return (int)r;
-        }
-
-        /// <summary>
-        /// Î§ÈÆÄ³µãĞı×ªÌØ¶¨½Ç¶È
-        /// </summary>
-        /// <param name="point"></param>
-        /// <param name="centre"></param>
-        /// <param name="radian"></param>
-        /// <returns></returns>
-        private Vector3 RotatePoint(Vector3 point, Vector3 centre, float radian)
-        {
-
-            Vector2 v2 = new(point.X - centre.X, point.Z - centre.Z);
-
-            var rot = (MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian);
-            var length = v2.Length();
-            return new(centre.X + MathF.Sin(rot) * length, centre.Y, centre.Z - MathF.Cos(rot) * length);
-        }
-
-        /// <summary>
-        /// ´ÓÄ³µã³ö·¢£¬Ö¸¶¨³¤¶ÈÓëĞı×ª½Ç¶È£¬»ñµÃĞÂµã
-        /// </summary>
-        /// <param name="centre"></param>
-        /// <param name="radian"></param>
-        /// <param name="length"></param>
-        /// <returns></returns>
-        private Vector3 ExtendPoint(Vector3 centre, float radian, float length)
-        {
-            return new(centre.X + MathF.Sin(radian) * length, centre.Y, centre.Z - MathF.Cos(radian) * length);
-        }
-
-        private float FindAngle(Vector3 centre, Vector3 new_point)
-        {
-            float angle_rad = MathF.PI - MathF.Atan2(new_point.X - centre.X, new_point.Z - centre.Z);
-            if (angle_rad < 0)
-                angle_rad += 2 * MathF.PI;
-            return angle_rad;
-        }
-
-        // ²éÑªÁ¿
-        private void getCharHpcur(Event @event, ScriptAccessory accessory)
-        {
-            var actor = (IBattleChara?)accessory.Data.Objects.SearchById(12345);
-            var hp = actor.CurrentHp;
-        }
-
-        // »ñµÃÍæ¼Ò IDX
-        private int getPlayerIdIndex(ScriptAccessory accessory, uint pid)
-        {
-            return accessory.Data.PartyList.IndexOf(pid);
-        }
-
-        // »ñµÃÍæ¼ÒÖ°ÄÜ¼ò³Æ
-        private string getPlayerJobIndex(ScriptAccessory accessory, uint pid)
-        {
-            var a = accessory.Data.PartyList.IndexOf(pid);
-            switch (a)
-            {
-                case 0: return "MT";
-                case 1: return "ST";
-                case 2: return "H1";
-                case 3: return "H2";
-                case 4: return "D1";
-                case 5: return "D2";
-                case 6: return "D3";
-                case 7: return "D4";
-                default: return "unknown";
-            }
-        }
-
     }
 }
