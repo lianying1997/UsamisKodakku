@@ -21,7 +21,7 @@ using System.Formats.Asn1;
 
 namespace UsamisScript.EndWalker.RubicanteEx;
 
-[ScriptType(name: "Rubicante-Ex [卢比坎特歼殛战]", territorys: [1096], guid: "59862528-bc76-4d8b-a739-e946445ff0e8", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "Rubicante-Ex [卢比坎特歼殛战]", territorys: [1096], guid: "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d", version: "0.0.0.1", author: "Usami", note: noteStr)]
 
 public class RubicanteEx
 {
