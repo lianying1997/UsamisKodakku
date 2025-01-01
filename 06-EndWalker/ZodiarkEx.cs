@@ -31,13 +31,16 @@ using System.Diagnostics;
 using System.Security.AccessControl;
 using Lumina.Excel.GeneratedSheets;
 
-namespace UsamisScript;
+namespace UsamisScript.EndWalker.ZodiarkEx;
 
-[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.4", author: "Usami", note: noteStr)]
 public class ZodiarkEx
 {
     const string noteStr =
     """
+    v0.0.0.4:
+    1. 我忘了，反正改了点什么东西。
+
     v0.0.0.3:
     1. 增加分摊区标记。
     2. 调整了转场星蚀与秘纹的出现时机，增加星蚀指路。
@@ -272,7 +275,7 @@ public class ZodiarkEx
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
 
-    [ScriptMethod(name: "分摊标记（不可控）", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:013C"], userControl: false)]
+    [ScriptMethod(name: "分摊标记", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:013C"])]
     public void GenerateTargetRecord(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;

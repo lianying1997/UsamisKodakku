@@ -33,9 +33,23 @@ public class Hello
     public void Init(ScriptAccessory accessory)
     {
         ScriptColor asd = ColorHelper.colorRed;
-        DebugHelper.DebugMsg($"/e Init Success.", accessory);
+        DebugMsg($"/e Init Success.", accessory);
         // accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
+    }
+
+    public static void DebugMsg(string str, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
+    }
+
+    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
+    public void EchoDebug(Event @event, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        var msg = @event["Message"].ToString();
+        accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
     }
 }
 
@@ -66,6 +80,11 @@ public static class EventExtensions
     public static uint SourceId(this Event @event)
     {
         return ParseHexId(@event["SourceId"], out var id) ? id : 0;
+    }
+
+    public static uint SourceDataId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["SourceDataId"]);
     }
 
     public static uint TargetId(this Event @event)
@@ -171,6 +190,40 @@ public static class IbcHelper
 
 public static class DirectionCalc
 {
+    // 以北为0建立list
+    // InnGame      List    Dir
+    // 0            - 4     pi
+    // 0.25 pi      - 3     0.75pi
+    // 0.5 pi       - 2     0.5pi
+    // 0.75 pi      - 1     0.25pi
+    // pi           - 0     0
+    // 1.25 pi      - 7     1.75pi
+    // 1.5 pi       - 6     1.5pi
+    // 1.75 pi      - 5     1.25pi
+    // Dir = Pi - InnGame (+ 2pi)
+    public static float BaseInnGame2DirRad(float radian)
+    {
+        float r = (float)Math.PI - radian;
+        if (r < 0) r = (float)(r + 2 * Math.PI);
+        if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
+        return r;
+    }
+
+    public static float BaseDirRad2InnGame(float radian)
+    {
+        float r = (float)Math.PI - radian;
+        if (r < Math.PI) r = (float)(r + 2 * Math.PI);
+        if (r > Math.PI) r = (float)(r - 2 * Math.PI);
+        return r;
+    }
+
+    public static int DirRadRoundToDirs(float radian, int dirs)
+    {
+        var r = Math.Round(radian / (2f / dirs * Math.PI));
+        if (r == dirs) r = r - dirs;
+        return (int)r;
+    }
+
     public static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
     {
         // 正分割，0°为分界线，将360°分为dirs份
@@ -249,20 +302,11 @@ public static class IndexHelper
     }
 }
 
-public static class DebugHelper
-{
-    public static void DebugMsg(string str, ScriptAccessory accessory)
-    {
-        if (!Hello.DebugMode) return;
-        accessory.Method.SendChat(str);
-    }
-}
-
 public static class ColorHelper
 {
     public static ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
     public static ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
-    public static ScriptColor colorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 1f, 1.0f) };
+    public static ScriptColor colorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 0.8f, 1.0f) };
 }
 
 #endregion
@@ -282,5 +326,9 @@ public static class ClassTest
 // 事件调用
 // [ScriptMethod(name: "Test Class", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:133"])]
 // public void StartCasting(Event @event, ScriptAccessory accessory) => ClassTest.classTestMethod(@event, accessory);
+
+// List内数据打印
+// string rotateDirStr = string.Join(", ", RotateCircleDir);
+// DebugMsg(rotateDirStr, accessory);
 
 #endregion
