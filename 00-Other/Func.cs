@@ -177,6 +177,7 @@ public static class IbcHelper
 
     public static IEnumerable<IBattleChara> GetByDataId(uint dataId)
     {
+        //! 不确定是否有用
         return (IEnumerable<IBattleChara>)Svc.Objects.Where(x => x.DataId == dataId);
     }
 
@@ -252,6 +253,9 @@ public static class DirectionCalc
         var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
         var length = v2.Length();
         return new(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
+
+        // TODO 另一种方案待验证
+        // var nextPos = Vector3.Transform((point - center), Matrix4x4.CreateRotationY(radian)) + center;
     }
 
     public static Vector3 ExtendPoint(Vector3 center, float radian, float length)
