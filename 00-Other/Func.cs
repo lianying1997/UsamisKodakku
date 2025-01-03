@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures.InfoProxy;
@@ -147,9 +148,9 @@ public static class EventExtensions
         return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
     }
 
-    public static uint StatusId(this Event @event)
+    public static uint StatusID(this Event @event)
     {
-        return JsonConvert.DeserializeObject<uint>(@event["StatusId"]);
+        return JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
     }
 
     public static uint StackCount(this Event @event)

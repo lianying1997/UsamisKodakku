@@ -21,13 +21,16 @@ using System.Formats.Asn1;
 
 namespace UsamisScript.EndWalker.RubicanteEx;
 
-[ScriptType(name: "Rubicante-Ex [卢比坎特歼殛战]", territorys: [1096], guid: "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "Rubicante-Ex [卢比坎特歼殛战]", territorys: [1096], guid: "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d", version: "0.0.0.2", author: "Usami", note: noteStr)]
 
 public class RubicanteEx
 {
     const string noteStr =
     """
-    v0.0.0.1
+    v0.0.0.2:
+    1. 我忘了，反正改了点什么东西。
+
+    v0.0.0.1:
     很遗憾，大转盘必须Imgui。
     鸭门。
     """;
@@ -664,9 +667,9 @@ public static class EventExtensions
         return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
     }
 
-    public static uint StatusId(this Event @event)
+    public static uint StatusID(this Event @event)
     {
-        return JsonConvert.DeserializeObject<uint>(@event["StatusId"]);
+        return JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
     }
 
     public static uint StackCount(this Event @event)

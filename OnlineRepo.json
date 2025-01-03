@@ -42,9 +42,9 @@
     {
         "Name": "Rubicante-Ex [卢比坎特歼殛战]",
         "Guid": "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d",
-        "Version": "0.0.0.1",
+        "Version": "0.0.0.2",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/RubicanteEx.cs",
-        "UpdateInfo": "大转盘必须Imgui。\n鸭门。"
+        "UpdateInfo": "1. 我忘了，反正改了点什么东西。"
     }
     ]
