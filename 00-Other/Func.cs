@@ -277,7 +277,7 @@ public static class DirectionCalc
 
 public static class IndexHelper
 {
-    public static int getPlayerIdIndex(ScriptAccessory accessory, uint pid)
+    public static int getPlayerIdIndex(uint pid, ScriptAccessory accessory)
     {
         // 获得玩家 IDX
         return accessory.Data.PartyList.IndexOf(pid);
@@ -288,9 +288,9 @@ public static class IndexHelper
         return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
     }
 
-    public static string getPlayerJobIndex(ScriptAccessory accessory, uint pid)
+    public static string getPlayerJobIndex(uint pid, ScriptAccessory accessory)
     {
-        // 获得玩家职能简称
+        // 获得玩家职能简称，无用处，仅作DEBUG输出
         var a = accessory.Data.PartyList.IndexOf(pid);
         switch (a)
         {
