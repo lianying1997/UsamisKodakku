@@ -26,10 +26,10 @@
     {
         "Name": "UCOB [巴哈姆特绝境战]",
         "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-        "Version": "0.0.1.2",
+        "Version": "0.0.1.3",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-        "UpdateInfo": "1. 删了一个可能引起国际服编译错误的引用。\n2. P3连击添加场中-拘束器-场边的三点一线标志。\n3. P4根据奈尔台词添加了分散/旋风前的方向指引，在用户设置处修改参数。\n4. P4撞球添加拘束器提示与指路。\n5. 调淡了一些绘图颜色。"
+        "UpdateInfo": "1. 添加了P2火龙分摊吃火/不吃火的情况判断。"
     },
     {
         "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",

@@ -17,6 +17,7 @@ using KodakkuAssist.Module.GameOperate;
 using System.Security.Cryptography;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.ComponentModel;
+// using System.DirectoryServices.ActiveDirectory;
 using System.Collections;
 using System.ComponentModel.DataAnnotations.Schema;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
@@ -29,18 +30,22 @@ using System.Timers;
 using System.Diagnostics;
 using System.Security.AccessControl;
 
-namespace UsamisScript;
+namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.2", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.3", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     // TODO：
-    // 1. P2火龙分摊视情况把分摊改为“需要吃”和“不需要吃”。
-    // 2. P3连击添加拘束器指路。
+    // 1. P3连击添加拘束器指路。
 
     const string noteStr =
     """
-    Original code by Joshua, adjustments by Usami. 
+    Original code by Joshua, adjustments by Usami.
+    Great Thanks to Contributor @BLACKMAGE. 
+    v0.0.1.3:
+    感谢BLACKMAGE佬的帮助，孩子抄代码抄的很开心！
+    1. 添加了P2火龙分摊吃火/不吃火的情况判断
+
     v0.0.1.2:
     1. 删了一个可能引起国际服编译错误的引用。
     2. P3连击添加场中-拘束器-场边的三点一线标志。
@@ -122,6 +127,8 @@ public class Ucob
     Vector3[] RestrictorPos = new Vector3[3];       // P1拘束器位置记录
     List<bool> GenerateTarget = [false, false, false, false, false, false, false, false];   // 被点名魔力炼成
     List<uint> DeathSentenceTarget = [0, 0, 0];     // P2死宣目标
+    List<int> FireBallStatus = [0, 0, 0, 0, 0, 0, 0, 0];    // P2火buff状态
+    int FireBallTimes = 0;  // P2火球分摊次数
     Dictionary<uint, int> CauterizeDragons = new();   // P2小龙字典（id, 位置）
     int CauterizeTimes = 0;     // P2小龙引导次数
     Vector3 QuickMarchPos = new(0, 0, 0);           // P3进军位置
@@ -145,6 +152,7 @@ public class Ucob
     int ArkMornNum = 0;                         // P5死亡轮回死刑次数
     int MornAfahNum = 0;                        // P5无尽顿悟分摊次数
 
+
     public void Init(ScriptAccessory accessory)
     {
         phase = UCOB_Phase.Twintania;
@@ -157,6 +165,8 @@ public class Ucob
         GenerateTarget = [false, false, false, false, false, false, false, false];   // 被点名魔力炼成
 
         DeathSentenceTarget = [0, 0, 0];        // P2死宣目标
+        FireBallStatus = [0, 0, 0, 0, 0, 0, 0, 0];    // P2火buff状态
+        FireBallTimes = 0;  // P2火球分摊次数
         CauterizeDragons = new();            // P2小龙字典（id, 位置）
         CauterizeTimes = 0;                  // P2小龙引导次数
 
@@ -539,17 +549,35 @@ public class Ucob
         phase = UCOB_Phase.Nael;
     }
 
-    // TODO：这里可以做复杂点，比如让第二次变成危险区，找到第二次谁吃的分摊令第三次变危险区，第一次有没有吃火判断要不要补吃第二次
     [ScriptMethod(name: "P2奈尔：火龙连线分摊范围预警", eventType: EventTypeEnum.Tether, eventCondition: ["Id:0005"])]
     public void FireBallDragonStackTarget(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        FireBallTimes++;
+        var MyIndex = getMyIndex(accessory);
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = $"火龙火球分摊范围";
         dp.Scale = new(4f);
-        dp.Color = accessory.Data.DefaultSafeColor;
         dp.Owner = tid;
         dp.DestoryAt = 10000;
+        switch (FireBallTimes)
+        {
+            case 1:
+                // 去吃1火
+                dp.Color = FireBallStatus[MyIndex] != 1 ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+                break;
+            case 2:
+                // 如果目标是我 或 我有冰状态，去吃2火
+                dp.Color = (tid == accessory.Data.Me) | (FireBallStatus[MyIndex] == -1) ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+                break;
+            case 3:
+            case 4:
+                // 如果目标是我 或 我无火状态，去吃3/4火
+                dp.Color = (tid == accessory.Data.Me) | (FireBallStatus[MyIndex] != 1) ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+                break;
+            default:
+                return;
+        }
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
@@ -558,6 +586,27 @@ public class Ucob
     {
         // TMD火线时间还不一样
         accessory.Method.RemoveDraw($"火龙火球分摊范围");
+    }
+    [ScriptMethod(name: "P2奈尔：冰火状态记录添加", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(465|464)$"],userControl: false)]
+    public void FireBallStatusAddRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Nael) return;
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var stid = JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
+        var idx = getPlayerIdIndex(accessory, tid);
+        if (stid == 465)
+            // -1为冰，+1为火
+            FireBallStatus[idx] = -1;
+        else
+            FireBallStatus[idx] = 1;
+    }
+    [ScriptMethod(name: "P2奈尔：冰火状态记录移除", eventType: EventTypeEnum.StatusRemove, eventCondition: ["StatusID:regex:^(465|464)$"],userControl: false)]
+    public void FireBallStatusRemoveRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != UCOB_Phase.Nael) return;
+        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var idx = getPlayerIdIndex(accessory, tid);
+        FireBallStatus[idx] = 0;
     }
 
     [ScriptMethod(name: "P2奈尔：死亡宣告记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:210"], userControl: false)]
