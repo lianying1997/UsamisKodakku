@@ -42,9 +42,17 @@
     {
         "Name": "Rubicante-Ex [卢比坎特歼殛战]",
         "Guid": "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d",
-        "Version": "0.0.0.2",
+        "Version": "0.0.0.3",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/RubicanteEx.cs",
-        "UpdateInfo": "1. 我忘了，反正改了点什么东西。"
+        "UpdateInfo": "1. 修改了一个不影响绘图的程序编写bug。\n2. 修改了中圈旋转时可能不绘图的bug。"
+    },
+    {
+        "Name": "Rubicante [卢比坎特歼灭战]",
+        "Guid": "dd6bb7eb-c051-4406-8ec3-ff3523c753ee",
+        "Version": "0.0.0.1",
+        "Author": "Usami",
+        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Rubicante.cs",
+        "UpdateInfo": "大转盘必须Imgui。鸭门。"
     }
     ]

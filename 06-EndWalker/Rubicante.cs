@@ -19,33 +19,31 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Runtime.Intrinsics.Arm;
 using System.Formats.Asn1;
 
-namespace UsamisScript.EndWalker.RubicanteEx;
+namespace UsamisScript.EndWalker.Rubicante;
 
-[ScriptType(name: "Rubicante-Ex [卢比坎特歼殛战]", territorys: [1096], guid: "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "Rubicante [卢比坎特歼灭战]", territorys: [1095], guid: "dd6bb7eb-c051-4406-8ec3-ff3523c753ee", version: "0.0.0.1", author: "Usami", note: noteStr)]
 
-public class RubicanteEx
+public class Rubicante
 {
     const string noteStr =
     """
-    v0.0.0.3:
-    1. 修改了一个不影响绘图的程序编写bug。
-    2. 修改了中圈旋转时可能不绘图的bug。
-
     v0.0.0.1:
-    很遗憾，大转盘必须Imgui。
     鸭门。
     """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
-    
+
     const uint CLOCKWISE = 0x00020001;    // EnvControl State 代表顺时针旋转
     const uint COUNTER = 0x00200010;        // EnvControl State 代表逆时针旋转
     const uint INNER = 0x00000001;    // EnvControl Index 代表内圈魔法阵
     const uint MIDDLE = 0x00000002;    // EnvControl Index 代表中圈魔法阵
     const uint OUTER = 0x00000003;    // EnvControl Index 代表外圈魔法阵
-    const uint HALF_CLEAVE = 15760; // 外围魔法阵红色半场刀 SourceDataId
-    const uint FAN = 15759;     // 外围魔法阵蓝色扇形 SourceDataId
+    // const uint HALF_CLEAVE = 15759; // 外围魔法阵红色半场刀 SourceDataI
+    const uint FAN = 15750;     // 外围魔法阵蓝色扇形 SourceDataId
+    const uint INN = 15765;     // 内圈魔法阵 SourceDataId
+    const uint MID = 15766;     // 中圈魔法阵 SourceDataId
+    const uint OUT = 15767;     // 外圈魔法阵 SourceDataId
     const uint SINGLE_LINE = 542;   // EnvControl Param 内圈魔法阵是单线
     const uint V_SHAPE = 543;       // EnvControl Param 内圈魔法阵是V字
     const uint DOUBLE_LINE = 544;   // EnvControl Param 内圈魔法阵是双线
@@ -83,11 +81,10 @@ public class RubicanteEx
     }
 
     #region 大转盘
-    [ScriptMethod(name: "炼狱魔阵外圈类型记录（不可控）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:regex:^(157(59|60))$"], userControl: false)]
+    [ScriptMethod(name: "炼狱魔阵外圈类型记录（不可控）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:15750"], userControl: false)]
     public void MagicCircleOuterTypeRecord(Event @event, ScriptAccessory accessory)
     {
-        // 15760 红 半场刀
-        // 15759 蓝 扇形
+        // 15750 蓝 扇形
         var srot = @event.SourceRotation();
         var sdid = @event.SourceDataId();
         var sdir = DirectionCalc.DirRadRoundToDirs(DirectionCalc.BaseInnGame2DirRad(srot), 8);
@@ -182,7 +179,7 @@ public class RubicanteEx
         DebugMsg($"检测到{_pos}魔法阵类型：{_type}，逻辑方向{logic_dir}", accessory);
     }
 
-    [ScriptMethod(name: "大转盘算法", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33001"], userControl: false)]
+    [ScriptMethod(name: "大转盘算法", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31940|33000)$"], userControl: false)]
     public void PurgationAlgorithm(Event @event, ScriptAccessory accessory)
     {
         Task.Delay(100).ContinueWith(t =>
@@ -248,6 +245,10 @@ public class RubicanteEx
         int startPos2;
         switch (innType)
         {
+            case INN:
+                startPos1 = innDir;
+                startPos2 = -1;
+                break;
             case SINGLE_LINE:
                 startPos1 = innDir;
                 startPos2 = -1;
@@ -272,10 +273,11 @@ public class RubicanteEx
 
     public static List<int> rotateNekoResponse(int nekoDir)
     {
-        // if (nekoDir > 7 | nekoDir < 0) return [-1, -1, -1, -1, -1, -1, -1, -1];
         var nekoDirVar = nekoDir;
         if (nekoDir > 7) nekoDirVar = nekoDirVar - 8;
         if (nekoDir < 0) nekoDirVar = nekoDirVar + 8;
+        // if (nekoDir > 7 | nekoDir < 0) return [-1, -1, -1, -1, -1, -1, -1, -1];
+
         // List<int> nekoResponse = [0, 1, -1, 2, 4, 6, -1, 7];
         List<int> nekoResponse = new List<int>(NekoOutputAtDir0);
 
@@ -294,7 +296,7 @@ public class RubicanteEx
         return nekoResponse;
     }
 
-    [ScriptMethod(name: "大转盘参数初始化（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:33001"], userControl: false)]
+    [ScriptMethod(name: "大转盘参数初始化（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31940|33000)$"], userControl: false)]
     public void PurgationInit(Event @event, ScriptAccessory accessory)
     {
         // 初始化参数
@@ -307,73 +309,6 @@ public class RubicanteEx
 
         DebugMsg($"- 大转盘参数初始化。", accessory);
 
-    }
-
-    #endregion
-    #region 烈风火焰流
-
-    [ScriptMethod(name: "烈风火焰流：分散、双人分摊、四人分摊", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3200[234])$"])]
-    public void SpreadFlame(Event @event, ScriptAccessory accessory)
-    {
-        var tid = @event.TargetId();
-        var aid = @event.ActionId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"烈风火焰流{tid}";
-        dp.Owner = tid;
-        dp.ScaleMode = ScaleMode.ByTime;
-        dp.Delay = 0;
-        dp.DestoryAt = 5000;
-
-        var aidMapping = new Dictionary<uint, (float scale, Vector4 color)>
-        {
-            { 32002, (5f, ColorHelper.colorPink.V4) },   // 单人分散
-            { 32003, (6f, accessory.Data.DefaultSafeColor) }, // 四人分摊
-            { 32004, (4f, accessory.Data.DefaultSafeColor) }  // 二人分摊
-        };
-
-        if (aidMapping.ContainsKey(aid))
-        {
-            var properties = aidMapping[aid];
-            dp.Scale = new(properties.scale);
-            dp.Color = properties.color;
-        }
-
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-    }
-
-    [ScriptMethod(name: "烈风火焰流：扇形分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31998"])]
-    public void FanSpread(Event @event, ScriptAccessory accessory)
-    {
-        var sid = @event.SourceId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Owner = sid;
-        dp.Radian = float.Pi / 6;
-        dp.Scale = new(30);
-        dp.Delay = 0;
-        dp.DestoryAt = 7000;
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(1.5f);
-        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
-        {
-            dp.Name = $"放散火流{i}";
-            dp.TargetObject = accessory.Data.PartyList[i];
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
-        }
-    }
-
-    [ScriptMethod(name: "扇形死刑", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:00E6"], userControl: false)]
-    public void Dualfire(Event @event, ScriptAccessory accessory)
-    {
-        var tid = @event.TargetId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"扇形死刑{tid}";
-        dp.Scale = new(60);
-        dp.Position = new(100, 0, 100);
-        dp.TargetObject = tid;
-        dp.Radian = (float)Math.PI / 1.5f;
-        dp.Delay = 0;
-        dp.DestoryAt = 5000;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
 
     #endregion
@@ -425,128 +360,6 @@ public class RubicanteEx
             dp.Rotation = (float)Math.PI / 2;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
         }
-    }
-
-    [ScriptMethod(name: "炀火之咒Buff分散", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3485"])]
-    public void FlamespireSpreadBuff(Event @event, ScriptAccessory accessory)
-    {
-        var tid = @event.TargetId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"炀火之咒Buff分散";
-        dp.Owner = tid;
-        dp.Delay = 10000;
-        dp.DestoryAt = 5000;
-        dp.Scale = new(6);
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(1.5f);
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-    }
-
-    [ScriptMethod(name: "火焰流圆形分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:32016"])]
-    public void InfernoSpread(Event @event, ScriptAccessory accessory)
-    {
-        var tid = @event.TargetId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"火焰流圆形分散";
-        dp.Owner = tid;
-        dp.DestoryAt = 5000;
-        dp.Scale = new(5);
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(1.5f);
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-    }
-
-    [ScriptMethod(name: "环火烽火钢月分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3203[67])$"])]
-    public void ScaldingFleet(Event @event, ScriptAccessory accessory)
-    {
-        var sid = @event.SourceId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"环烽火";
-        dp.Owner = sid;
-        dp.Delay = 0;
-        dp.DestoryAt = 5000;
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(1.5f);
-
-        if (@event.ActionId() == 32036)
-        {
-            // 烽火钢铁
-            dp.Scale = new(10);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-        }
-        else
-        {
-            // 环火月环
-            dp.Scale = new(20);
-            dp.InnerScale = new(10);
-            dp.Radian = float.Pi * 2;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
-        }
-
-        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
-        {
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Owner = sid;
-            dp.Name = $"迅火预备{i}";
-            dp.Scale = new(6, 40);
-            dp.TargetObject = accessory.Data.PartyList[i];
-            dp.Delay = 0;
-            dp.DestoryAt = 6500;
-            dp.Color = ColorHelper.colorPink.V4.WithW(1.5f);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
-        }
-    }
-
-    [ScriptMethod(name: "赤灭热波迅火回返", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:32039"])]
-    public void ImmolationChargeBack(Event @event, ScriptAccessory accessory)
-    {
-        var sid = @event.SourceId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"迅火回返";
-        dp.Owner = sid;
-        dp.Delay = 0;
-        dp.DestoryAt = 6500;
-        dp.Scale = new(6, 60);
-        dp.Color = ColorHelper.colorCyan.V4;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
-
-    }
-
-    [ScriptMethod(name: "赤灭热波分摊分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3203[45])$"])]
-    public void ImmolationSpreadStack(Event @event, ScriptAccessory accessory)
-    {
-        var tid = @event.TargetId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"赤灭热波分摊分散";
-        dp.Owner = tid;
-        dp.Delay = 0;
-        dp.DestoryAt = 7500;
-
-        if (@event.ActionId() == 32035)
-        {
-            // 分摊
-            dp.Scale = new(6);
-            dp.Color = accessory.Data.DefaultSafeColor.WithW(1.5f);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-        }
-        else
-        {
-            // 分散
-            dp.Scale = new(5);
-            dp.Color = accessory.Data.DefaultDangerColor.WithW(1.5f);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-        }
-    }
-
-    [ScriptMethod(name: "赤灭热波半场刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3203[23])$"])]
-    public void ImmolationHalfCleave(Event @event, ScriptAccessory accessory)
-    {
-        var sid = @event.SourceId();
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"赤灭热波半场刀";
-        dp.Owner = sid;
-        dp.Delay = 0;
-        dp.DestoryAt = 7000;
-        dp.Scale = new(40, 20);
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(3f);
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
     #endregion
 
