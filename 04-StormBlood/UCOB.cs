@@ -32,19 +32,26 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.3", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.4", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
-    // TODO：
-    // 1. P3连击添加拘束器指路。
+    // TODO
+    // 暂无，硬要说的话，添加双塔垂直下落范围
 
     const string noteStr =
     """
+    请先按需求检查并设置“用户设置”栏目。
+
     Original code by Joshua, adjustments by Usami.
     Great Thanks to Contributor @BLACKMAGE. 
+    v0.0.1.4:
+    1. 修复P4月环-钢铁-分散，分散预警绘图出现时机问题，并添加相对北提示。
+    2. 增加了P3连击拘束器撞球与截球的提示与指路。
+    3. 修复了一些不可控方法可被玩家关闭的设置错误。
+
     v0.0.1.3:
     感谢BLACKMAGE佬的帮助，孩子抄代码抄的很开心！
-    1. 添加了P2火龙分摊吃火/不吃火的情况判断
+    1. 添加了P2火龙分摊吃火/不吃火的情况判断。
 
     v0.0.1.2:
     1. 删了一个可能引起国际服编译错误的引用。
@@ -59,7 +66,7 @@ public class Ucob
     3. 连击增加每人的陨石流预警。
 
     v0.0.1.0:
-    初版完成，请先按需求检查并设置“用户设置”参数。
+    初版完成。
     鸭门。
     """;
 
@@ -143,6 +150,7 @@ public class Ucob
     List<bool> HeavensFallTowerPos = [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];  // P4天地塔位置
     bool HeavensFallTowerDrawn = false;         // P3天地塔目标绘图完成记录
     bool isTenStrikeTarget = false;              // P3连击玩家是黑球点名目标
+    bool TenStrikeBlackOrbDrawn = false;        // P3连击黑球指路绘图完成记录
     int TenStrikeEarthShakerNum = 0;            // P3连击大地摇动点名次数
     bool isEarthShakerFirstRound = false;       // P3连击大地摇动是否为第一轮
     bool grandOctDrawn = false;                 // P3群龙起始位置绘图完成记录
@@ -186,6 +194,7 @@ public class Ucob
         HeavensFallTowerDrawn = false;          // P3天地塔目标绘图完成记录
 
         isTenStrikeTarget = false;                // P3连击玩家是黑球点名目标
+        TenStrikeBlackOrbDrawn = false;        // P3连击黑球指路绘图完成记录
         TenStrikeEarthShakerNum = 0;            // P3连击大地摇动点名次数
         isEarthShakerFirstRound = false;        // P3连击大地摇动是否为第一轮
 
@@ -587,7 +596,7 @@ public class Ucob
         // TMD火线时间还不一样
         accessory.Method.RemoveDraw($"火龙火球分摊范围");
     }
-    [ScriptMethod(name: "P2奈尔：冰火状态记录添加", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(465|464)$"],userControl: false)]
+    [ScriptMethod(name: "P2奈尔：冰火状态记录添加", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(465|464)$"], userControl: false)]
     public void FireBallStatusAddRecord(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Nael) return;
@@ -600,7 +609,7 @@ public class Ucob
         else
             FireBallStatus[idx] = 1;
     }
-    [ScriptMethod(name: "P2奈尔：冰火状态记录移除", eventType: EventTypeEnum.StatusRemove, eventCondition: ["StatusID:regex:^(465|464)$"],userControl: false)]
+    [ScriptMethod(name: "P2奈尔：冰火状态记录移除", eventType: EventTypeEnum.StatusRemove, eventCondition: ["StatusID:regex:^(465|464)$"], userControl: false)]
     public void FireBallStatusRemoveRecord(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Nael) return;
@@ -609,7 +618,7 @@ public class Ucob
         FireBallStatus[idx] = 0;
     }
 
-    [ScriptMethod(name: "P2奈尔：死亡宣告记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:210"], userControl: false)]
+    [ScriptMethod(name: "P2奈尔：死亡宣告记录（不可控）", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:210"], userControl: false)]
     public void DeathSentence_Record(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
@@ -635,7 +644,7 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "P2奈尔：救世之翼", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9930"])]
+    [ScriptMethod(name: "P2奈尔：救世之翼预警与指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9930"])]
     public void WingsOfSalvation_Position(Event @event, ScriptAccessory accessory)
     {
         Task.Delay(2000).ContinueWith(t =>
@@ -681,7 +690,7 @@ public class Ucob
         });
     }
 
-    [ScriptMethod(name: "P2奈尔：雷光链(Joshua)", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9927"])]
+    [ScriptMethod(name: "P2奈尔：雷点名范围预警", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9927"])]
     public void ChainLightening(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
@@ -871,7 +880,7 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "P2奈尔：小龙俯冲引导预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0014"])]
+    [ScriptMethod(name: "P2奈尔：小龙俯冲引导范围预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0014"])]
     public void CauterizeTarget(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Nael) return;
@@ -913,7 +922,7 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
     }
 
-    [ScriptMethod(name: "P2奈尔：小龙俯冲范围预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(993[12345])$"])]
+    [ScriptMethod(name: "P2奈尔：小龙俯冲实际范围预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(993[12345])$"])]
     public void CauterizeField(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
@@ -954,18 +963,6 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
 
         drawTwister(0, 5200, accessory);
-        // accessory.Method.TextInfo("旋风", 4000, true);
-        // dp = accessory.Data.GetDefaultDrawProperties();
-        // dp.Scale = new(1.5f);
-        // dp.DestoryAt = 5200;
-        // dp.ScaleMode = ScaleMode.ByTime;
-        // dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
-        // for (var i = 0; i < 8; i++)
-        // {
-        //     dp.Name = $"旋风{i}";
-        //     dp.Owner = accessory.Data.PartyList[i];
-        //     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-        // }
     }
 
     [ScriptMethod(name: "P3巴哈：奈尔月流冲", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9923"])]
@@ -1012,7 +1009,7 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "P3巴哈：大地摇动范围预警(Joshua)", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
+    [ScriptMethod(name: "P3巴哈：大地摇动范围预警", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
     public void EarthShaker(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
@@ -1035,7 +1032,7 @@ public class Ucob
         QuickMarchPos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
     }
 
-    [ScriptMethod(name: "P3巴哈：【进军】12点位置标记", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"])]
+    [ScriptMethod(name: "P3巴哈：【进军】临时北（俯冲起始点）指向提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9953"])]
     public void MegaFlareDiveNorth(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Quickmarch_1st) return;
@@ -1230,7 +1227,7 @@ public class Ucob
 
     #endregion
 
-    #region P3：巴哈（天地~群龙）
+    #region P3：巴哈（天地）
 
     [ScriptMethod(name: "P3巴哈：【天地】阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9957"], userControl: false)]
     public void P3_PhaseChange_4th(Event @event, ScriptAccessory accessory)
@@ -1239,7 +1236,7 @@ public class Ucob
         phase = UCOB_Phase.Heavensfall_4th;
     }
 
-    [ScriptMethod(name: "P3巴哈：【天地】起始位置记录（不可控）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:regex:^(8161|8159|8168)$"])]
+    [ScriptMethod(name: "P3巴哈：【天地】起始位置记录（不可控）", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:regex:^(8161|8159|8168)$"], userControl: false)]
     public void HeavensFallPosRecord(Event @event, ScriptAccessory accessory)
     {
         if (phase != UCOB_Phase.Heavensfall_4th) return;
@@ -1439,6 +1436,9 @@ public class Ucob
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp2);
     }
 
+    #endregion
+    #region P3：巴哈（连击）
+
     [ScriptMethod(name: "P3巴哈：【连击】阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9958"], userControl: false)]
     public void P3_PhaseChange_5th(Event @event, ScriptAccessory accessory)
     {
@@ -1494,6 +1494,175 @@ public class Ucob
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
         var tidx = getPlayerIdIndex(accessory, tid);
         accessory.Method.RemoveDraw($"陨石流{tidx}");
+    }
+
+    [ScriptMethod(name: "P3巴哈：【连击】撞球截球提示与指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9902"])]
+    public void TenStrikeBlackOrbDir(Event @event, ScriptAccessory accessory)
+    {
+        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        if (phase != UCOB_Phase.Tenstrike_5th) return;
+        if (TenStrikeBlackOrbDrawn) return;
+
+        int trueCount = 0;
+        for (int i = 0; i < GenerateTarget.Count(); i++)
+        {
+            if (GenerateTarget[i])
+                trueCount++;
+        }
+        if (trueCount != 3) return;
+        TenStrikeBlackOrbDrawn = true;
+
+        // 算出每组黑球玩家数目，给出提示信息
+        List<int> TenStrikeBlackOrbGroupTargetNum = calcTenStrikeGroupTargetNum(GenerateTarget);
+        if (DebugMode)
+        {
+            string tenStrikeTargetNum = string.Join(", ", TenStrikeBlackOrbGroupTargetNum);
+            accessory.Method.SendChat($"/e 每组黑球玩家数：{tenStrikeTargetNum}");
+        }
+        showTenStrikeBlackOrbMsg(TenStrikeBlackOrbGroupTargetNum, accessory);
+
+        // 计算撞球与截球优先级，输出任务List
+        // 注意，截球优先级并无唯一规则，需要观察场上情况灵活变通，这也是给出提示信息的理由
+        if (DebugMode)
+        {
+            string GenerateTargetStr = string.Join(", ", GenerateTarget);
+            accessory.Method.SendChat($"/e 黑球点名BOOL LIST：{GenerateTargetStr}");
+        }
+        List<int> missionList = judgeTenStrikeBlackOrbRoute(GenerateTarget);
+        if (DebugMode)
+        {
+            string mission_record = "";
+            mission_record += $"H1组：撞球{getPlayerJobIndexByIdx(missionList[0])}, 截球{getPlayerJobIndexByIdx(missionList[1])}\n";
+            mission_record += $"H2组：撞球{getPlayerJobIndexByIdx(missionList[2])}, 截球{getPlayerJobIndexByIdx(missionList[3])}\n";
+            mission_record += $"D3D4组：撞球{getPlayerJobIndexByIdx(missionList[4])}, 截球{getPlayerJobIndexByIdx(missionList[5])}\n";
+            accessory.Method.SendChat($"/e {mission_record}");
+        }
+
+        // TODO 测试时间
+        int routeDestoryTime1 = 5000;   // 第一次指路持续时间 & 第二次指路出现时间
+        int routeDestoryTime2 = 5000;   // 第二次指路（截球人）持续时间
+        // 拘束器idx：0为H1组D，1为D3D4组C，2为H2组B
+        drawBlackOrbRoute(missionList[0], 0, 0, routeDestoryTime1, true, accessory);
+        drawBlackOrbRoute(missionList[1], 0, 0, routeDestoryTime1, false, accessory);
+        drawBlackOrbRoute(missionList[1], 0, routeDestoryTime1, routeDestoryTime2, true, accessory);
+        drawBlackOrbRoute(missionList[2], 2, 0, routeDestoryTime1, true, accessory);
+        drawBlackOrbRoute(missionList[3], 2, 0, routeDestoryTime1, false, accessory);
+        drawBlackOrbRoute(missionList[3], 2, routeDestoryTime1, routeDestoryTime2, true, accessory);
+        drawBlackOrbRoute(missionList[4], 1, 0, routeDestoryTime1, true, accessory);
+        drawBlackOrbRoute(missionList[5], 1, 0, routeDestoryTime1, false, accessory);
+        drawBlackOrbRoute(missionList[5], 1, routeDestoryTime1, routeDestoryTime2, true, accessory);
+
+    }
+
+    private List<int> calcTenStrikeGroupTargetNum(List<bool> targets)
+    {
+        List<int> TenStrikeBlackOrbGroupTargetNum = [0, 0, 0];
+        for (int i = 0; i < 8; i++)
+        {
+            if (targets[i])
+            {
+                if (i == 0 | i == 2 | i == 4)
+                    TenStrikeBlackOrbGroupTargetNum[0]++;
+                else if (i == 1 | i == 3 | i == 5)
+                    TenStrikeBlackOrbGroupTargetNum[1]++;
+                else if (i == 6 | i == 7)
+                    TenStrikeBlackOrbGroupTargetNum[2]++;
+            }
+        }
+        return TenStrikeBlackOrbGroupTargetNum;
+    }
+
+    private void showTenStrikeBlackOrbMsg(List<int> targetNum, ScriptAccessory accessory)
+    {
+        // TODO 确认消息持续时间
+        int msgDuration = 8000;
+        switch (targetNum)
+        {
+            case [1, 1, 1]:
+                accessory.Method.TextInfo($"每组1人，无需换位", msgDuration, false);
+                break;
+            case [2, 1, 0]:
+                accessory.Method.TextInfo($"H1组2人，换位至D3D4组", msgDuration, true);
+                break;
+            case [2, 0, 1]:
+                accessory.Method.TextInfo($"H1组2人，换位至H2组", msgDuration, true);
+                break;
+            case [1, 2, 0]:
+                accessory.Method.TextInfo($"H2组2人，换位至D3D4组", msgDuration, true);
+                break;
+            case [0, 2, 1]:
+                accessory.Method.TextInfo($"H2组2人，换位至H1组", msgDuration, true);
+                break;
+            case [1, 0, 2]:
+                accessory.Method.TextInfo($"D3D4组2人，换位至H1组，补截球D3D4组", msgDuration, true);
+                break;
+            case [0, 1, 2]:
+                accessory.Method.TextInfo($"D3D4组2人，换位至H1组，补截球D3D4组", msgDuration, true);
+                break;
+            case [3, 0, 0]:
+                accessory.Method.TextInfo($"H1组3人，换位至其他两组，补截球H1组", msgDuration, true);
+                break;
+            case [0, 3, 0]:
+                accessory.Method.TextInfo($"H2组3人，换位至其他两组，补截球H2组", msgDuration, true);
+                break;
+        }
+    }
+
+    private List<int> judgeTenStrikeBlackOrbRoute(List<bool> targets)
+    {
+        // 计算任务分配
+        // [H1组拘束器撞球，截球，H2组拘束器撞球，截球，D3D4组拘束器撞球，截球]
+        List<int> missionList = [-1, -1, -1, -1, -1, -1];
+
+        // 三组撞球与截球的优先级
+        // H1 MT D1 D3 ST D4 D2 H2
+        List<int> priority_group1 = [2, 0, 4, 6, 1, 7, 5, 3];
+        // H2 ST D2 D4 MT D3 D1 H1
+        List<int> priority_group2 = [3, 1, 5, 7, 0, 6, 4, 2];
+        // D3 D4 D1 D2 MT ST H1 H2
+        List<int> priority_group3 = [6, 7, 4, 5, 0, 1, 2, 3];
+
+        // 第一轮判断 撞球人
+        for (int i = 0; i < 8; i++)
+        {
+            // 如果 判断目标被黑球点名 & 判断目标不在被分配任务的list中 & 对应黑球位置目标仍未确定
+            if (targets[priority_group1[i]] && !missionList.Contains(priority_group1[i]) && missionList[0] == -1)
+                missionList[0] = priority_group1[i];
+            if (targets[priority_group2[i]] && !missionList.Contains(priority_group2[i]) && missionList[2] == -1)
+                missionList[2] = priority_group2[i];
+            if (targets[priority_group3[i]] && !missionList.Contains(priority_group3[i]) && missionList[4] == -1)
+                missionList[4] = priority_group3[i];
+        }
+
+        // 第二轮判断 截球人
+        for (int i = 0; i < 8; i++)
+        {
+            // 如果 判断目标未被黑球点名 & 判断目标不在被分配任务的list中 & 对应截球位置目标仍未确定
+            if (!targets[priority_group1[i]] && !missionList.Contains(priority_group1[i]) && missionList[1] == -1)
+                missionList[1] = priority_group1[i];
+            if (!targets[priority_group2[i]] && !missionList.Contains(priority_group2[i]) && missionList[3] == -1)
+                missionList[3] = priority_group2[i];
+            if (!targets[priority_group3[i]] && !missionList.Contains(priority_group3[i]) && missionList[5] == -1)
+                missionList[5] = priority_group3[i];
+        }
+
+        return missionList;
+    }
+
+    public static string getPlayerJobIndexByIdx(int idx)
+    {
+        switch (idx)
+        {
+            case 0: return "MT";
+            case 1: return "ST";
+            case 2: return "H1";
+            case 3: return "H2";
+            case 4: return "D1";
+            case 5: return "D2";
+            case 6: return "D3";
+            case 7: return "D4";
+            default: return "unknown";
+        }
     }
 
     [ScriptMethod(name: "P3巴哈：【连击】大地摇动指路", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0028"])]
@@ -1560,7 +1729,10 @@ public class Ucob
         });
     }
 
-    [ScriptMethod(name: "P3巴哈：【群龙】阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9959"])]
+    #endregion
+    #region P3：巴哈（群龙）
+
+    [ScriptMethod(name: "P3巴哈：【群龙】阶段记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9959"], userControl: false)]
     public void P3_PhaseChange_6th(Event @event, ScriptAccessory accessory)
     {
         // if (phase != UCOB_Phase.Heavensfall_5th) return;
@@ -1747,16 +1919,19 @@ public class Ucob
             accessory.Method.SendChat($"/e 检测到进入P4。");
         }
     }
-    private void drawBlackOrbRoute(int pidx, int residx, int delay, int destoryAt, ScriptAccessory accessory)
+    private void drawBlackOrbRoute(int pidx, int residx, int delay, int destoryAt, bool isSafe, ScriptAccessory accessory)
     {
         // pidx: 玩家index
         // residx：拘束器index
         if (pidx != getMyIndex(accessory)) return;
 
-        if (residx == 0)
-            accessory.Method.TextInfo("先躲避旋风，后撞球", 3000, false);
-        else
-            accessory.Method.TextInfo("先撞球，后躲避旋风", 3000, false);
+        if (phase == UCOB_Phase.BahamutFavor)
+        {
+            if (residx == 0)
+                accessory.Method.TextInfo("先躲避旋风，后撞球", 3000, false);
+            else
+                accessory.Method.TextInfo("先撞球，后躲避旋风", 3000, false);
+        }
 
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = $"拘束器位置定位{residx}";
@@ -1773,7 +1948,7 @@ public class Ucob
         dp.Owner = accessory.Data.Me;
         dp.TargetPosition = RestrictorPos[residx];
         dp.ScaleMode = ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Color = isSafe ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
         dp.Delay = delay;
         dp.DestoryAt = destoryAt;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
@@ -1795,19 +1970,19 @@ public class Ucob
         // 判断4/5/6是否为true，如果是，DoSomething(4/5/6)
         // P4的黑球，D1（B），D2（C），D3（D），D4（补）
         if (GenerateTarget[4])
-            drawBlackOrbRoute(4, 2, 0, 5500, accessory);
+            drawBlackOrbRoute(4, 2, 0, 5500, true, accessory);
         else
-            drawBlackOrbRoute(7, 2, 0, 5500, accessory);
+            drawBlackOrbRoute(7, 2, 0, 5500, true, accessory);
 
         if (GenerateTarget[5])
-            drawBlackOrbRoute(5, 1, 0, 5500, accessory);
+            drawBlackOrbRoute(5, 1, 0, 5500, true, accessory);
         else
-            drawBlackOrbRoute(7, 1, 0, 5500, accessory);
+            drawBlackOrbRoute(7, 1, 0, 5500, true, accessory);
 
         if (GenerateTarget[6])
-            drawBlackOrbRoute(6, 0, 0, 5500, accessory);
+            drawBlackOrbRoute(6, 0, 0, 5500, true, accessory);
         else
-            drawBlackOrbRoute(7, 0, 0, 5500, accessory);
+            drawBlackOrbRoute(7, 0, 0, 5500, true, accessory);
     }
 
     private void drawBahamutFavorNorth(int delay, int destoryAt, ScriptAccessory accessory)
@@ -1861,7 +2036,7 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "P4奈尔：台词与场中分摊/分散+旋风时方向指引", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(650[4567])$"])]
+    [ScriptMethod(name: "P4奈尔：台词与临时北方向指引", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(650[4567])$"])]
     public void NaelQuotesP4(Event @event, ScriptAccessory accessory)
     {
         if (!ParseObjectId(@event["SourceId"], out var sid)) return;
@@ -1908,8 +2083,9 @@ public class Ucob
                     // 月环、钢铁、分散
                     drawNaelQuote_Donut(sid, 0, 5000, accessory);
                     drawNaelQuote_Circle(sid, 5000, 3000, accessory);
-                    drawNaelQuote_Spread(sid, 5000, 3000, accessory);
-                    // 无需指示方向
+                    // 分摊结束后即可指示方向
+                    drawBahamutFavorNorth(8000, 8000, accessory);
+                    drawNaelQuote_Spread(sid, 8000, 3000, accessory);
                     break;
                 }
         }
@@ -2003,5 +2179,3 @@ public class Ucob
 
     #endregion
 }
-
-// Hello Koda!
