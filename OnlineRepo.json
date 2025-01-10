@@ -54,5 +54,13 @@
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Rubicante.cs",
         "UpdateInfo": "大转盘必须Imgui。鸭门。"
+    },
+    {
+        "Name": "Zodiark [佐迪亚克歼灭战]",
+        "Guid": "ed3f32fe-fc12-4485-baa4-bec6c357e70b",
+        "Version": "0.0.0.1",
+        "Author": "Usami",
+        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Zodiark.cs",
+        "UpdateInfo": "鸭门。"
     }
     ]

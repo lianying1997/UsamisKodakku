@@ -4,17 +4,18 @@ A repository contains scripts for the Dalamud KodakkuAssist plugin, created by a
 ## Scripts
 
 ### 04-StormBlood
-- å·´å“ˆå§†ç‰¹ç»å¢ƒæˆ˜ [UCOB.cs] (Online)
+- °Í¹şÄ·ÌØ¾ø¾³Õ½ [UCOB.cs] (Online)
 
 ### 06-EndWalker
-- åˆ›é€ ç¯å¢ƒæåŒ—é€ ç‰©é™¢ [Lv87_KtisisHyperboreia.cs] (Online)
-- ä½è¿ªäºšå…‹æšæš—æ­¼ç­æˆ˜ [ZodiarkEx.cs] (Online)
-- å¢æ¯”åç‰¹æ­¼ç­æˆ˜ [Rubicante.cs] (Online)
-- å¢æ¯”åç‰¹æ­¼æ®›æˆ˜ [RubicanteEx.cs] (Online)
-- é›¶å¼ä¸‡é­”æ®¿ ç‚¼å‡€ä¹‹ç‹±4 [p8s.cs] (Online)
-- ï¼ˆæœªå®Œæˆï¼‰é›¶å¼ä¸‡é­”æ®¿ è’å¤©ä¹‹ç‹±4 [p12s.cs] (Online)
+- ´´Ôì»·¾³¼«±±ÔìÎïÔº [Lv87_KtisisHyperboreia.cs] (Online)
+- ×ôµÏÑÇ¿ËêÔ°µ¼ßÃğÕ½ [ZodiarkEx.cs] (Online)
+- ×ôµÏÑÇ¿Ë¼ßÃğÕ½ [Zodiark.cs] (Online)
+- Â¬±È¿²ÌØ¼ßÃğÕ½ [Rubicante.cs] (Online)
+- Â¬±È¿²ÌØ¼ßéêÕ½ [RubicanteEx.cs] (Online)
+- ÁãÊ½ÍòÄ§µî Á¶¾»Ö®Óü4 [p8s.cs] (Online)
+- £¨Î´Íê³É£©ÁãÊ½ÍòÄ§µî »ÄÌìÖ®Óü4 [p12s.cs] (Online)
 
 ### 07-DawnTrail
-- é˜¿å¡ç‹„äºšé›¶å¼ç™»å¤©æ–—æŠ€åœº è½»é‡çº§1 [M1sç»˜å›¾_Usami.cs] (Local)
-- é˜¿å¡ç‹„äºšé›¶å¼ç™»å¤©æ–—æŠ€åœº è½»é‡çº§3 [M3sç»˜å›¾_Usami.cs] (Local)
-- é˜¿å¡ç‹„äºšé›¶å¼ç™»å¤©æ–—æŠ€åœº è½»é‡çº§4 [M4sç»˜å›¾_Usami.cs] (Local)
+- °¢¿¨µÒÑÇÁãÊ½µÇÌì¶·¼¼³¡ ÇáÁ¿¼¶1 [M1s»æÍ¼_Usami.cs] (Local)
+- °¢¿¨µÒÑÇÁãÊ½µÇÌì¶·¼¼³¡ ÇáÁ¿¼¶3 [M3s»æÍ¼_Usami.cs] (Local)
+- °¢¿¨µÒÑÇÁãÊ½µÇÌì¶·¼¼³¡ ÇáÁ¿¼¶4 [M4s»æÍ¼_Usami.cs] (Local)
