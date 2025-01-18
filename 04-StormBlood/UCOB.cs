@@ -32,7 +32,7 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.4", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.5", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     // TODO
@@ -44,10 +44,14 @@ public class Ucob
 
     Original code by Joshua, adjustments by Usami.
     Great Thanks to Contributor @BLACKMAGE. 
+    v0.0.1.5:
+    1. 修复P3连击拘束器撞球全局提示的一条提示文字Bug。
+    2. 增加P3连击拘束器撞球全局提示信息的开关可选项。
+
     v0.0.1.4:
     1. 修复P4月环-钢铁-分散，分散预警绘图出现时机问题，并添加相对北提示。
     2. 增加了P3连击拘束器撞球与截球的提示与指路。
-    3. 修复了一些不可控方法可被玩家关闭的设置错误。
+    3. 修复了一些不可控函数可被玩家关闭的设置错误。
 
     v0.0.1.3:
     感谢BLACKMAGE佬的帮助，孩子抄代码抄的很开心！
@@ -88,12 +92,16 @@ public class Ucob
     [UserSetting("P2：是否展示其他玩家的小龙俯冲引导路径")]
     public bool showOtherCauterizeRoute { get; set; } = false;
 
+    [UserSetting("P3：【连击】是否提示全局撞球/截球信息")]
+    public bool showGlobalTenStrikeBlackOrbMsg { get; set; } = true;
+
     public enum BahamutFavorNorthTypeEnum
     {
         画出12点_ShowTempNorth,
         画出8条分散方向_ShowRecomDir,
         不画_DontDraw,
     }
+
     [UserSetting("P4：场中分摊/分散+旋风时以何种形式根据时机画出指向标记")]
     public BahamutFavorNorthTypeEnum BahamutFavorNorth { get; set; } = BahamutFavorNorthTypeEnum.画出8条分散方向_ShowRecomDir;
 
@@ -1519,17 +1527,14 @@ public class Ucob
             string tenStrikeTargetNum = string.Join(", ", TenStrikeBlackOrbGroupTargetNum);
             accessory.Method.SendChat($"/e 每组黑球玩家数：{tenStrikeTargetNum}");
         }
-        showTenStrikeBlackOrbMsg(TenStrikeBlackOrbGroupTargetNum, accessory);
+
+        if (showGlobalTenStrikeBlackOrbMsg)
+            showTenStrikeBlackOrbMsg(TenStrikeBlackOrbGroupTargetNum, accessory);
 
         // 计算撞球与截球优先级，输出任务List
-        // 注意，截球优先级并无唯一规则，需要观察场上情况灵活变通，这也是给出提示信息的理由
-        if (DebugMode)
-        {
-            string GenerateTargetStr = string.Join(", ", GenerateTarget);
-            accessory.Method.SendChat($"/e 黑球点名BOOL LIST：{GenerateTargetStr}");
-        }
+        // 注意，截球优先级并无唯一规则，需要观察场上情况灵活变通。
         List<int> missionList = judgeTenStrikeBlackOrbRoute(GenerateTarget);
-        if (DebugMode)
+        if (showGlobalTenStrikeBlackOrbMsg)
         {
             string mission_record = "";
             mission_record += $"H1组：撞球{getPlayerJobIndexByIdx(missionList[0])}, 截球{getPlayerJobIndexByIdx(missionList[1])}\n";
@@ -1551,7 +1556,6 @@ public class Ucob
         drawBlackOrbRoute(missionList[4], 1, 0, routeDestoryTime1, true, accessory);
         drawBlackOrbRoute(missionList[5], 1, 0, routeDestoryTime1, false, accessory);
         drawBlackOrbRoute(missionList[5], 1, routeDestoryTime1, routeDestoryTime2, true, accessory);
-
     }
 
     private List<int> calcTenStrikeGroupTargetNum(List<bool> targets)
@@ -1579,31 +1583,31 @@ public class Ucob
         switch (targetNum)
         {
             case [1, 1, 1]:
-                accessory.Method.TextInfo($"每组1人，无需换位", msgDuration, false);
+                accessory.Method.TextInfo($"每组1人黑球，无需换位", msgDuration, false);
                 break;
             case [2, 1, 0]:
-                accessory.Method.TextInfo($"H1组2人，换位至D3D4组", msgDuration, true);
+                accessory.Method.TextInfo($"【H1组】：2人黑球，换位至【D3D4组】", msgDuration, true);
                 break;
             case [2, 0, 1]:
-                accessory.Method.TextInfo($"H1组2人，换位至H2组", msgDuration, true);
+                accessory.Method.TextInfo($"【H1组】：2人黑球，换位至【H2组】", msgDuration, true);
                 break;
             case [1, 2, 0]:
-                accessory.Method.TextInfo($"H2组2人，换位至D3D4组", msgDuration, true);
+                accessory.Method.TextInfo($"【H2组】：2人黑球，换位至【D3D4组】", msgDuration, true);
                 break;
             case [0, 2, 1]:
-                accessory.Method.TextInfo($"H2组2人，换位至H1组", msgDuration, true);
+                accessory.Method.TextInfo($"【H2组】：2人黑球，换位至【H1组】", msgDuration, true);
                 break;
             case [1, 0, 2]:
-                accessory.Method.TextInfo($"D3D4组2人，换位至H1组，补截球D3D4组", msgDuration, true);
+                accessory.Method.TextInfo($"【D3D4组】：2人黑球，换位至【H2组】\n【H1/H2组】：补截球【D3D4组】", msgDuration, true);
                 break;
             case [0, 1, 2]:
-                accessory.Method.TextInfo($"D3D4组2人，换位至H1组，补截球D3D4组", msgDuration, true);
+                accessory.Method.TextInfo($"【D3D4组】：2人黑球，换位至【H1组】\n【H1/H2组】：补截球【D3D4组】", msgDuration, true);
                 break;
             case [3, 0, 0]:
-                accessory.Method.TextInfo($"H1组3人，换位至其他两组，补截球H1组", msgDuration, true);
+                accessory.Method.TextInfo($"【H1组】：3人黑球，换位至其他两组\n【H2/D3D4组】：补截球【H1组】", msgDuration, true);
                 break;
             case [0, 3, 0]:
-                accessory.Method.TextInfo($"H2组3人，换位至其他两组，补截球H2组", msgDuration, true);
+                accessory.Method.TextInfo($"【H2组】：3人黑球，换位至其他两组\n【H1/D3D4组】：补截球【H2组】", msgDuration, true);
                 break;
         }
     }
@@ -1626,11 +1630,11 @@ public class Ucob
         for (int i = 0; i < 8; i++)
         {
             // 如果 判断目标被黑球点名 & 判断目标不在被分配任务的list中 & 对应黑球位置目标仍未确定
-            if (targets[priority_group1[i]] && !missionList.Contains(priority_group1[i]) && missionList[0] == -1)
+            if (targets[i] & !missionList.Contains(priority_group1[i]) & missionList[0] == -1)
                 missionList[0] = priority_group1[i];
-            if (targets[priority_group2[i]] && !missionList.Contains(priority_group2[i]) && missionList[2] == -1)
+            if (targets[i] & !missionList.Contains(priority_group2[i]) & missionList[2] == -1)
                 missionList[2] = priority_group2[i];
-            if (targets[priority_group3[i]] && !missionList.Contains(priority_group3[i]) && missionList[4] == -1)
+            if (targets[i] & !missionList.Contains(priority_group3[i]) & missionList[4] == -1)
                 missionList[4] = priority_group3[i];
         }
 
@@ -1638,11 +1642,11 @@ public class Ucob
         for (int i = 0; i < 8; i++)
         {
             // 如果 判断目标未被黑球点名 & 判断目标不在被分配任务的list中 & 对应截球位置目标仍未确定
-            if (!targets[priority_group1[i]] && !missionList.Contains(priority_group1[i]) && missionList[1] == -1)
+            if (!targets[i] & !missionList.Contains(priority_group1[i]) & missionList[1] == -1)
                 missionList[1] = priority_group1[i];
-            if (!targets[priority_group2[i]] && !missionList.Contains(priority_group2[i]) && missionList[3] == -1)
+            if (!targets[i] & !missionList.Contains(priority_group2[i]) & missionList[3] == -1)
                 missionList[3] = priority_group2[i];
-            if (!targets[priority_group3[i]] && !missionList.Contains(priority_group3[i]) && missionList[5] == -1)
+            if (!targets[i] & !missionList.Contains(priority_group3[i]) & missionList[5] == -1)
                 missionList[5] = priority_group3[i];
         }
 
