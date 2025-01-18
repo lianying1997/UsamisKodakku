@@ -26,10 +26,10 @@
     {
         "Name": "UCOB [巴哈姆特绝境战]",
         "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-        "Version": "0.0.1.4",
+        "Version": "0.0.1.5",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-        "UpdateInfo": "1. 修复P4月环-钢铁-分散，分散预警绘图出现时机问题，并添加相对北提示。\n2. 增加了P3连击拘束器撞球与截球的提示与指路。\n3. 修复了一些不可控方法可被玩家关闭的设置错误。"
+        "UpdateInfo": "1. 修复P3连击拘束器撞球全局提示的一条提示文字Bug。\n2. 增加P3连击拘束器撞球全局提示信息的开关可选项。"
     },
     {
         "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",
