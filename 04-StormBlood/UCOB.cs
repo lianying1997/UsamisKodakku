@@ -32,7 +32,7 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.5", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.6", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     // TODO
@@ -44,6 +44,9 @@ public class Ucob
 
     Original code by Joshua, adjustments by Usami.
     Great Thanks to Contributor @BLACKMAGE. 
+    v0.0.1.6:
+    【重要】1. 修复P3连击BUG。
+
     v0.0.1.5:
     1. 修复P3连击拘束器撞球全局提示的一条提示文字Bug。
     2. 增加P3连击拘束器撞球全局提示信息的开关可选项。
@@ -309,50 +312,57 @@ public class Ucob
         var msg = @event["Message"].ToString();
         accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
 
-        var srot = -0.79f;
-        var spos = new Vector3(11.31f, 0, -16.97f);
 
-        var dp0 = accessory.Data.GetDefaultDrawProperties();
-        dp0.Name = $"百京核爆面向";
-        dp0.Scale = new(2, 10);
-        dp0.Rotation = srot;
-        dp0.ScaleMode = ScaleMode.ByTime;
-        dp0.Color = exflareColor.V4.WithW(5);
-        dp0.Delay = 0;
-        dp0.DestoryAt = 2000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp0);
+        // 测试
+        // MT ST D2
+        GenerateTarget = [true, true, false, false, false, true, false, false];
 
-        for (int i = 0; i < 6; i++)
+        if (TenStrikeBlackOrbDrawn) return;
+
+        int trueCount = 0;
+        for (int i = 0; i < GenerateTarget.Count(); i++)
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"百京核爆{i}";
-            dp.Scale = new(6);
-            dp.Rotation = 0;
-            dp.ScaleMode = ScaleMode.ByTime;
-            dp.Color = exflareColor.V4.WithW(3);
-            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * i);
-            dp.Delay = i == 0 ? 0 : 4000 + 1500 * (i - 1);
-            dp.DestoryAt = i == 0 ? 4000 : 1500;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"百京核爆预警1{i}";
-            dp.Scale = new(6);
-            dp.Color = exflareColor.V4.WithW(0.5f);
-            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * (i + 1));
-            dp.Delay = i == 0 ? 0 : 4000 + 1500 * (i - 1);
-            dp.DestoryAt = i == 0 ? 4000 : 1500;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"百京核爆预警2{i}";
-            dp.Scale = new(6);
-            dp.Color = exflareColor.V4.WithW(0.25f);
-            dp.Position = ExtendPoint(spos, float.Pi - srot, 8 * (i + 2));
-            dp.Delay = i == 0 ? 0 : 4000 + 1500 * (i - 1);
-            dp.DestoryAt = i == 0 ? 4000 : 1500;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            if (GenerateTarget[i])
+                trueCount++;
         }
+        if (trueCount != 3) return;
+        TenStrikeBlackOrbDrawn = true;
+
+        // 算出每组黑球玩家数目，给出提示信息
+        List<int> TenStrikeBlackOrbGroupTargetNum = calcTenStrikeGroupTargetNum(GenerateTarget);
+        if (DebugMode)
+        {
+            string tenStrikeTargetNum = string.Join(", ", TenStrikeBlackOrbGroupTargetNum);
+            accessory.Method.SendChat($"/e 每组黑球玩家数：{tenStrikeTargetNum}");
+        }
+
+        if (showGlobalTenStrikeBlackOrbMsg)
+            showTenStrikeBlackOrbMsg(TenStrikeBlackOrbGroupTargetNum, accessory);
+
+        // 计算撞球与截球优先级，输出任务List
+        // 注意，截球优先级并无唯一规则，需要观察场上情况灵活变通。
+        List<int> missionList = judgeTenStrikeBlackOrbRoute(GenerateTarget);
+        if (showGlobalTenStrikeBlackOrbMsg)
+        {
+            string mission_record = "";
+            mission_record += $"H1组：撞球{getPlayerJobIndexByIdx(missionList[0])}, 截球{getPlayerJobIndexByIdx(missionList[1])}\n";
+            mission_record += $"H2组：撞球{getPlayerJobIndexByIdx(missionList[2])}, 截球{getPlayerJobIndexByIdx(missionList[3])}\n";
+            mission_record += $"D3D4组：撞球{getPlayerJobIndexByIdx(missionList[4])}, 截球{getPlayerJobIndexByIdx(missionList[5])}\n";
+            accessory.Method.SendChat($"/e {mission_record}");
+        }
+
+        int routeDestoryTime1 = 5000;   // 第一次指路持续时间 & 第二次指路出现时间
+        int routeDestoryTime2 = 5000;   // 第二次指路（截球人）持续时间
+        // 拘束器idx：0为H1组D，1为D3D4组C，2为H2组B
+        drawBlackOrbRoute(missionList[0], 0, 0, routeDestoryTime1, true, accessory);
+        drawBlackOrbRoute(missionList[1], 0, 0, routeDestoryTime1, false, accessory);
+        drawBlackOrbRoute(missionList[1], 0, routeDestoryTime1, routeDestoryTime2, true, accessory);
+        drawBlackOrbRoute(missionList[2], 2, 0, routeDestoryTime1, true, accessory);
+        drawBlackOrbRoute(missionList[3], 2, 0, routeDestoryTime1, false, accessory);
+        drawBlackOrbRoute(missionList[3], 2, routeDestoryTime1, routeDestoryTime2, true, accessory);
+        drawBlackOrbRoute(missionList[4], 1, 0, routeDestoryTime1, true, accessory);
+        drawBlackOrbRoute(missionList[5], 1, 0, routeDestoryTime1, false, accessory);
+        drawBlackOrbRoute(missionList[5], 1, routeDestoryTime1, routeDestoryTime2, true, accessory);
 
     }
 
@@ -1543,7 +1553,6 @@ public class Ucob
             accessory.Method.SendChat($"/e {mission_record}");
         }
 
-        // TODO 测试时间
         int routeDestoryTime1 = 5000;   // 第一次指路持续时间 & 第二次指路出现时间
         int routeDestoryTime2 = 5000;   // 第二次指路（截球人）持续时间
         // 拘束器idx：0为H1组D，1为D3D4组C，2为H2组B
@@ -1630,11 +1639,11 @@ public class Ucob
         for (int i = 0; i < 8; i++)
         {
             // 如果 判断目标被黑球点名 & 判断目标不在被分配任务的list中 & 对应黑球位置目标仍未确定
-            if (targets[i] & !missionList.Contains(priority_group1[i]) & missionList[0] == -1)
+            if (targets[priority_group1[i]] && !missionList.Contains(priority_group1[i]) && missionList[0] == -1)
                 missionList[0] = priority_group1[i];
-            if (targets[i] & !missionList.Contains(priority_group2[i]) & missionList[2] == -1)
+            if (targets[priority_group2[i]] && !missionList.Contains(priority_group2[i]) && missionList[2] == -1)
                 missionList[2] = priority_group2[i];
-            if (targets[i] & !missionList.Contains(priority_group3[i]) & missionList[4] == -1)
+            if (targets[priority_group3[i]] && !missionList.Contains(priority_group3[i]) && missionList[4] == -1)
                 missionList[4] = priority_group3[i];
         }
 
@@ -1642,11 +1651,11 @@ public class Ucob
         for (int i = 0; i < 8; i++)
         {
             // 如果 判断目标未被黑球点名 & 判断目标不在被分配任务的list中 & 对应截球位置目标仍未确定
-            if (!targets[i] & !missionList.Contains(priority_group1[i]) & missionList[1] == -1)
+            if (!targets[priority_group1[i]] && !missionList.Contains(priority_group1[i]) && missionList[1] == -1)
                 missionList[1] = priority_group1[i];
-            if (!targets[i] & !missionList.Contains(priority_group2[i]) & missionList[3] == -1)
+            if (!targets[priority_group2[i]] && !missionList.Contains(priority_group2[i]) && missionList[3] == -1)
                 missionList[3] = priority_group2[i];
-            if (!targets[i] & !missionList.Contains(priority_group3[i]) & missionList[5] == -1)
+            if (!targets[priority_group3[i]] && !missionList.Contains(priority_group3[i]) && missionList[5] == -1)
                 missionList[5] = priority_group3[i];
         }
 
