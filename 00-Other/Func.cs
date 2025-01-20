@@ -305,7 +305,24 @@ public static class IndexHelper
             default: return "unknown";
         }
     }
-    public static string getPlayerJobIndexByIdx(int idx)
+    public static string getPlayerJobByID(uint pid, ScriptAccessory accessory)
+    {
+        // 获得玩家职能简称，无用处，仅作DEBUG输出
+        var a = accessory.Data.PartyList.IndexOf(pid);
+        switch (a)
+        {
+            case 0: return "MT";
+            case 1: return "ST";
+            case 2: return "H1";
+            case 3: return "H2";
+            case 4: return "D1";
+            case 5: return "D2";
+            case 6: return "D3";
+            case 7: return "D4";
+            default: return "unknown";
+        }
+    }
+    public static string getPlayerJobByIndex(int idx)
     {
         switch (idx)
         {
