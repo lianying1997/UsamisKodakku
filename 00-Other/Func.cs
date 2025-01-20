@@ -92,6 +92,10 @@ public static class EventExtensions
     {
         return ParseHexId(@event["TargetId"], out var id) ? id : 0;
     }
+    public static uint TargetIndex(this Event @event)
+    {
+        return ParseHexId(@event["TargetIndex"], out var idx) ? idx : 0;
+    }
 
     public static Vector3 SourcePosition(this Event @event)
     {
