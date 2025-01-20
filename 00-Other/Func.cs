@@ -180,10 +180,9 @@ public static class IbcHelper
         return Svc.ClientState.LocalPlayer;
     }
 
-    public static IEnumerable<IBattleChara> GetByDataId(uint dataId)
+    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
     {
-        //! 不确定是否有用
-        return (IEnumerable<IBattleChara>)Svc.Objects.Where(x => x.DataId == dataId);
+        return Svc.Objects.Where(x => x.DataId == dataId);
     }
 
     public static uint GetCharHpcur(uint id)
