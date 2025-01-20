@@ -305,6 +305,21 @@ public static class IndexHelper
             default: return "unknown";
         }
     }
+    public static string getPlayerJobIndexByIdx(int idx)
+    {
+        switch (idx)
+        {
+            case 0: return "MT";
+            case 1: return "ST";
+            case 2: return "H1";
+            case 3: return "H2";
+            case 4: return "D1";
+            case 5: return "D2";
+            case 6: return "D3";
+            case 7: return "D4";
+            default: return "unknown";
+        }
+    }
 }
 
 public static class ColorHelper
