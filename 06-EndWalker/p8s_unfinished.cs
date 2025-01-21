@@ -890,6 +890,7 @@ public class p8s
     [ScriptMethod(name: "本体：一分摊分散", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(48[02])$"])]
     public void MB_ForceStackSpread(Event @event, ScriptAccessory accessory)
     {
+        if (mb_conceptFinNum != 0) return;
         var isStackFirst = @event.Param() == 480;
         var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
         if (mb_isNATarget[myIndex])
