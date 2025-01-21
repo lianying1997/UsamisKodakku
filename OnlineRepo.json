@@ -5,7 +5,7 @@
         "Version": "0.0.0.2",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
-        "UpdateInfo": "门神一分身结束，本体万象结束。"
+        "UpdateInfo": "1. 重构了部分代码（白费工夫。\n2. 增加了门神一车指路。\n3. 增加了本体分散位置指路。\n4. 加快了本体一冰火指路的出现时间。"
     },
     {
         "Name": "P12S [零式万魔殿 荒天之狱4]",
