@@ -639,4 +639,32 @@ public static class ClassTest
 // string rotateDirStr = string.Join(", ", RotateCircleDir);
 // DebugMsg(rotateDirStr, accessory);
 
+// CLASS
+public class Blade
+{
+    public UInt32 Id { get; set; }
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Rotation { get; set; }
+    public Blade(UInt32 id, double x, double y, double rotation)
+    {
+        Id = id;
+        X = x;
+        Y = y;
+        Rotation = rotation;
+    }
+}
+
+// ConcurrentBag 和 List 的区别：
+// Thread Safety: ConcurrentBag is designed to be used in multi-threaded scenarios.
+// It allows multiple threads to add and remove items concurrently
+
+// private ConcurrentBag<Blade> blades = new ConcurrentBag<Blade>();
+// blades.Add(new Blade(
+//     id: Convert.ToUInt32(@event["SourceId"], 16),
+//     x: Convert.ToDouble(pos.X),
+//     y: Convert.ToDouble(pos.Z),
+//     rotation: Convert.ToDouble(@event["SourceRotation"])
+// ));
+
 #endregion
