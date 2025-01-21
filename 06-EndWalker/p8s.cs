@@ -10,6 +10,8 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ECommons;
+using ECommons.DalamudServices;
+using ECommons.GameFunctions;
 using System.Linq;
 using ImGuiNET;
 using static Dalamud.Interface.Utility.Raii.ImRaii;
@@ -24,14 +26,41 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using KodakkuAssist.Module.Draw.Manager;
 using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using System.Security.AccessControl;
+using System.Timers;
+using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+// using Lumina.Data.Parsing.Scd;
+// using Lumina.Excel.GeneratedSheets;
 
-namespace UsamisScript;
+namespace UsamisScript.EndWalker.p8s;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.1", author: "Usami", note: "门神仅到一分身，本体仅到万象")]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.2", author: "Usami", note: noteStr)]
 public class p8s
 {
+    const string noteStr =
+    """
+    v0.0.0.2:
+    1. 重构了部分代码（白费工夫。
+    2. 增加了门神一车指路。
+    3. 增加了本体分散位置指路。
+    4. 加快了本体一冰火指路的出现时间。
+
+    v0.0.0.1:
+    初版完成，门神一分身结束，本体万象结束。
+    鸭门。
+    """;
+
+    [UserSetting("Debug模式，非开发用请关闭")]
+    public static bool DebugMode { get; set; } = false;
+
     [UserSetting("启用本体一运塔[小队频道]发宏")]
-    public bool HC1_ChatGuidance { get; set; } = false;
+    public static bool HC1_ChatGuidance { get; set; } = false;
+
+    [UserSetting("站位提示圈绘图-普通颜色")]
+    public static ScriptColor posColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
+
+    [UserSetting("站位提示圈绘图-玩家站位颜色")]
+    public static ScriptColor posColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
 
     // 门神 记录分摊分散
     bool db_isStack;
@@ -44,11 +73,6 @@ public class p8s
     uint db_gorgonTarget;
     int db_gorgonTargetPos;
 
-    // 门神 龙龙凤凤延迟危险区颜色，紫色
-    Vector4 DelayDangerColor = new Vector4(1f, 0.2f, 1f, 1.5f);
-    // 门神 蛇蛇位置颜色
-    Vector4 GorgonColor = new Vector4(1f, 1f, 1f, 2f);
-
     List<uint> db_upliftOrder = [];
     List<uint> db_flareTarget = [];
     bool[] db_isFirstRound = [false, false, false, false, false, false, false, false];
@@ -56,6 +80,17 @@ public class p8s
     List<int> db_GorgonPosition = [];
     List<uint> db_GorgonSid = [];
 
+    public enum MB_Phase
+    {
+        Opening,
+        NA1,
+        HC1,
+        LD,
+        NA2,
+        HC2,
+    }
+    MB_Phase mb_phase = MB_Phase.Opening;
+    static bool mb_isLeftCleave = false;   // 本体，是左半场刀
     // 本体，是紫圈目标
     bool[] mb_isNATarget = [false, false, false, false, false, false, false, false];
 
@@ -94,6 +129,9 @@ public class p8s
         db_GorgonPosition = [];
         db_GorgonSid = [];
 
+        mb_phase = MB_Phase.Opening;
+
+        mb_isLeftCleave = false;   // 本体，是左半场刀
         mb_isNATarget = [false, false, false, false, false, false, false, false];
 
         mb_hc1_sid = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -113,79 +151,38 @@ public class p8s
         mb_NA1_isLine1Safe = false;
 
         accessory.Method.RemoveDraw(".*");
-
-        // // 若未手动设置过位置，令自己的Index为可达鸭默认配置
-        // if (!manualIndex) {
-        //     accessory.Method.SendChat($"/e 获得玩家位置（默认设置）：{accessory.Data.PartyList.IndexOf(accessory.Data.Me)}");
-        // } else {
-        //     accessory.Method.SendChat($"/e 获得玩家位置：{myIndex}");
-        // }
     }
-
-    private static bool ParseObjectId(string? idStr, out uint id)
+    public static void DebugMsg(string str, ScriptAccessory accessory)
     {
-        id = 0;
-        if (string.IsNullOrEmpty(idStr)) return false;
-        try
-        {
-            var idStr2 = idStr.Replace("0x", "");
-            id = uint.Parse(idStr2, System.Globalization.NumberStyles.HexNumber);
-            return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    public static int PositionMatchesTo8Dir(Vector3 point, Vector3 center)
-    {
-        float x = point.X - center.X;
-        float z = point.Z - center.Z;
-
-        int direction = (int)Math.Round(4 - 4 * Math.Atan2(x, z) / Math.PI) % 8;
-
-        // Dirs: N = 0, NE = 1, ..., NW = 7
-        return (direction + 8) % 8; // 防止负值出现
+        if (!DebugMode) return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
 
     [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
     public void EchoDebug(Event @event, ScriptAccessory accessory)
     {
+        if (!DebugMode) return;
         var msg = @event["Message"].ToString();
         accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
 
-        var dp = accessory.Data.GetDefaultDrawProperties();
+        mb_mentionTxt = "Line1";
+        accessory.Method.SendChat($"/e {mb_mentionTxt}");
+        mb_mentionTxt = "Line2";
+        accessory.Method.SendChat($"/e {mb_mentionTxt}");
+        mb_mentionTxt = "Line3";
+        accessory.Method.SendChat($"/e {mb_mentionTxt}");
 
-        // 三人冰，两组
-        dp.Name = $"一紫圈冰";
-        dp.Scale = new(6);
-        dp.Owner = accessory.Data.Me;
-        dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = 0;
-        dp.DestoryAt = 3000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-
-        // int asd0 = PositionMatchesTo8Dir(new(100, 0, 90), new(100, 0, 100));
-        // int asd1 = PositionMatchesTo8Dir(new(110, 0, 90), new(100, 0, 100));
-        // int asd2 = PositionMatchesTo8Dir(new(110, 0, 100), new(100, 0, 100));
-        // int asd3 = PositionMatchesTo8Dir(new(110, 0, 110), new(100, 0, 100));
-        // int asd4 = PositionMatchesTo8Dir(new(100, 0, 110), new(100, 0, 100));
-        // int asd5 = PositionMatchesTo8Dir(new(90, 0, 110), new(100, 0, 100));
-        // int asd6 = PositionMatchesTo8Dir(new(90, 0, 100), new(100, 0, 100));
-        // int asd7 = PositionMatchesTo8Dir(new(90, 0, 90), new(100, 0, 100));
-        // accessory.Method.SendChat($"/e {asd0} {asd1} {asd2} {asd3} {asd4} {asd5} {asd6} {asd7}");
     }
 
     [ScriptMethod(name: "防击退删除画图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(7559|7548|7389)$"], userControl: false)]
     // 沉稳咏唱|亲疏自行|原初的解放
     public void RemoveLine(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["SourceId"], out var id)) return;
-        if (id == accessory.Data.Me)
+        var sid = @event.SourceId();
+        if (sid == accessory.Data.Me)
         {
             accessory.Method.RemoveDraw("^(可防击退-.*)$");
-            // accessory.Method.SendChat($"/e 检测到防击退，并删除画图");
+            // DebugMsg($"/e 检测到防击退，删除击退标志", accessory);
         }
     }
 
@@ -196,161 +193,216 @@ public class p8s
     {
         // 30996 分散（八分核爆之念）
         // 30997 分摊（四分核爆之念）
-        db_isStack = @event["ActionId"] == "30996";
-        // accessory.Method.SendChat($"/e 已记录下【{(db_isStack ? "分散": "分摊")}】……");
+        db_isStack = @event.ActionId() == 30996;
+        DebugMsg($"已记录下【{(db_isStack ? "分散" : "分摊")}】。", accessory);
     }
 
     [ScriptMethod(name: "门神：蓝线范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31015"])]
     public void DB_TorchFlame(Event @event, ScriptAccessory accessory)
     {
         // if (db_torchFlameNum >= 12) return;
-        db_torchFlameNum++;
         // accessory.Method.SendChat($"/e db_torchFlameNum {db_torchFlameNum}……");
 
-        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
-
+        db_torchFlameNum++;
+        var spos = @event.SourcePosition();
+        var dp = assignDp_TorchFlame(spos, 0, 10000, $"灼炎{db_torchFlameNum}", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+    }
+    private static DrawPropertiesEdit assignDp_TorchFlame(Vector3 pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
         var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"灼炎";
+        dp.Name = name;
         dp.Scale = new(10, 10);
         dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Position = spos - new Vector3(0, 0, 5);
-        dp.Delay = 0;
-        dp.DestoryAt = 10000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        dp.Position = pos - new Vector3(0, 0, 5);
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
     }
 
     [ScriptMethod(name: "门神：龙龙凤凤", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3099[45])$"])]
     public void DB_Sunforge(Event @event, ScriptAccessory accessory)
     {
-        var epos = JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
+        var epos = @event.EffectPosition();
+        var srot = @event.SourceRotation();
+        // var epos = JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
         // var tpos = JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
-        var srot = JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
+        // var srot = JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
+        // var isHotTail = @event["ActionId"] == "30994";
 
-        var isHotWing = @event["ActionId"] == "30994";
+        var isDragon = @event.ActionId() == 30994;
+        var isOpening = db_torchFlameNum == 12;
 
-        if (isHotWing)
+        // 开场会先出蓝火，后出龙凤，因此使用两种颜色区分。
+        if (isDragon)
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"龙龙";
-            dp.Scale = new(14, 45);
-            dp.Color = db_torchFlameNum == 12 ? DelayDangerColor : accessory.Data.DefaultDangerColor;
-            dp.Position = epos;
-            dp.Rotation = srot;
-            dp.Delay = db_torchFlameNum == 12 ? 3000 : 0;
-            dp.DestoryAt = db_torchFlameNum == 12 ? 4700 : 7700;
+            var dp = assignDp_DragonLine(epos, srot, 0, 7700, $"龙龙{db_torchFlameNum}", accessory);
+            dp.Delay = isOpening ? 3000 : 0;
+            dp.DestoryAt = isOpening ? 4700 : 7700;
+            dp.Color = isOpening ? ColorHelper.DelayDangerColor.V4 : accessory.Data.DefaultDangerColor;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
         }
         else
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"凤凤";
-            dp.Scale = new(45, 20);
-            dp.Color = db_torchFlameNum == 12 ? DelayDangerColor : accessory.Data.DefaultDangerColor;
-            dp.Position = epos;
-            dp.Rotation = srot;
-            dp.Delay = db_torchFlameNum == 12 ? 3000 : 0;
-            dp.DestoryAt = db_torchFlameNum == 12 ? 4700 : 7700;
+            var dp = assignDp_PhoenixWing(epos, srot, 0, 7700, $"凤凤{db_torchFlameNum}", accessory);
+            dp.Color = isOpening ? ColorHelper.DelayDangerColor.V4 : accessory.Data.DefaultDangerColor;
+            dp.Delay = isOpening ? 3000 : 0;
+            dp.DestoryAt = isOpening ? 4700 : 7700;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
         }
         accessory.Method.TextInfo($"即将【{(db_isStack ? "分散" : "分摊")}】……", 8000, true);
     }
 
+    private static DrawPropertiesEdit assignDp_DragonLine(Vector3 pos, float rot, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(14, 45);
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Position = pos;
+        dp.Rotation = rot;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+    private static DrawPropertiesEdit assignDp_PhoenixWing(Vector3 pos, float rot, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(45, 20);
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Position = pos;
+        dp.Rotation = rot;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
     [ScriptMethod(name: "门神：死刑", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31045"])]
     public void DB_TankBuster(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var sid = @event.SourceId();
+        var tid = @event.TargetId();
+        // if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        // if (!ParseObjectId(@event["TargetId"], out var tid)) return;
 
+        var dp1 = assignDp_TankBusterLine(sid, 0, 6000, $"直线死刑-目标", accessory);
+        dp1.TargetObject = tid;
+
+        var dp2 = assignDp_TankBusterLine(sid, 0, 9000, $"直线死刑-一仇", accessory);
+        dp2.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
+
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp1);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp2);
+    }
+
+    private static DrawPropertiesEdit assignDp_TankBusterLine(uint sid, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
         var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"一仇直线死刑-1";
-        dp.Scale = new(5, 40);
+        dp.Name = name;
         dp.Owner = sid;
-        dp.TargetObject = tid;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.DestoryAt = 6000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
-
-        dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"一仇直线死刑-2";
         dp.Scale = new(5, 40);
-        dp.Owner = sid;
-        dp.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
         dp.Color = accessory.Data.DefaultDangerColor;
-        dp.DestoryAt = 9000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
     }
 
     [ScriptMethod(name: "门神：变身", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3105[12])$"])]
     public void DB_Reforge(Event @event, ScriptAccessory accessory)
     {
-        var isSnake = @event["ActionId"] == "31052";
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        var isSnake = @event.ActionId() == 31052;
+        var sid = @event.SourceId();
 
         if (isSnake)
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"蛇蛇钢铁";
-            dp.Scale = new(10);
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Owner = sid;
-            dp.Delay = 0;
-            dp.DestoryAt = 11500;
+            var dp = assignDp_ReforgeSnakeCircle(sid, 0, 11500, $"蛇蛇钢铁", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
         else
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"可防击退-车车击退";
-            dp.Scale = new(2, 20);
+            var dp = assignDp_ReforgeBeastKB(sid, 4000, 6000, $"车车击退", accessory);
             dp.Color = accessory.Data.DefaultDangerColor.WithW(3);
-            dp.Owner = accessory.Data.Me;
-            dp.TargetObject = sid;
-            dp.Rotation = float.Pi;
-            dp.Delay = 4000;
-            dp.DestoryAt = 6000;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
         }
+    }
+    private static DrawPropertiesEdit assignDp_ReforgeSnakeCircle(uint sid, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(10);
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = sid;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    private static DrawPropertiesEdit assignDp_ReforgeBeastKB(uint sid, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(2, 20);
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = accessory.Data.Me;
+        dp.Rotation = float.Pi;
+        dp.TargetObject = sid;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
     }
 
     #endregion
 
     #region 门神：一车
 
-    // 1170.3 "Footprint" Ability { id: "7109", source: "Hephaistos" } window 100,100
-    // 击退后，令每名玩家身上出现范围圈，以互相分散
     [ScriptMethod(name: "门神：一车分散提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31027"])]
     public void DB_BeastSpread(Event @event, ScriptAccessory accessory)
     {
-        var dp = accessory.Data.GetDefaultDrawProperties();
         for (int i = 0; i < 8; i++)
         {
-            dp.Name = $"一车分散-{i}";
+            var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 0, 13000, $"一车分散告警{i}", accessory);
             dp.Scale = new(5);
-            dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Delay = 0;
-            dp.DestoryAt = 13000;
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(0.6f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+        drawSpreadPos(accessory);
     }
 
-    // 309.7 "Uplift 1" #Ability { id: "7935", source: "Hephaistos" }
-    // 311.8 "Uplift 2" #Ability { id: "7935", source: "Hephaistos" }
-    // 314.0 "Uplift 3" #Ability { id: "7935", source: "Hephaistos" }
-    // 316.1 "Uplift 4" #Ability { id: "7935", source: "Hephaistos" }
+    private static void drawSpreadPos(ScriptAccessory accessory)
+    {
+        Vector3[] safePos = new Vector3[8];
+        safePos[0] = new Vector3(100, 0, 90);
+        safePos[1] = new Vector3(100, 0, 110);
+        safePos[2] = new Vector3(90, 0, 100);
+        safePos[3] = new Vector3(110, 0, 100);
+        safePos[4] = new Vector3(90, 0, 110);
+        safePos[5] = new Vector3(110, 0, 110);
+        safePos[6] = new Vector3(90, 0, 90);
+        safePos[7] = new Vector3(110, 0, 90);
+
+        var myIndex = IndexHelper.getMyIndex(accessory);
+
+        for (int i = 0; i < 8; i++)
+        {
+            var dp = AssignDp.drawStatic(safePos[i], 0, 0, 6000, $"一车起始定点{i}", accessory);
+            dp.Scale = new(1.5f);
+            dp.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+        var dp0 = AssignDp.dirPos(safePos[myIndex], 0, 6000, $"一车起始指路{myIndex}", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+    }
+
     // 决定受击顺序
     [ScriptMethod(name: "门神：一车受击顺序记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31029"], userControl: false)]
     public void DB_UpliftRecord(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        if (@event["TargetIndex"] != "1") return;
+        var tid = @event.TargetId();
+        if (@event.TargetIndex() != 1) return;
         db_upliftOrder.Add(tid);
     }
 
-    // 322.5 "Stomp Dead 1" #Ability { id: "7937", source: "Hephaistos" }
-    // 324.8 "Stomp Dead 2" #Ability { id: "7937", source: "Hephaistos" }
-    // 327.1 "Stomp Dead 3" #Ability { id: "7937", source: "Hephaistos" }
-    // 329.3 "Stomp Dead 4" #Ability { id: "7937", source: "Hephaistos" }
     // 决定引导顺序
     [ScriptMethod(name: "门神：一车引导", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31030"])]
     public void DB_Stomp(Event @event, ScriptAccessory accessory)
@@ -360,7 +412,8 @@ public class p8s
             accessory.Method.TextInfo("自求多福吧……", 8000, true);
             return;
         }
-        var myTurn = Math.Floor((double)db_upliftOrder.IndexOf(accessory.Data.Me) / 2) + 1;
+        var myTurn = db_upliftOrder.IndexOf(accessory.Data.Me) / 2 + 1;
+        drawBeastStompRouteDir(myTurn, accessory);
         switch (myTurn)
         {
             case 1: accessory.Method.TextInfo("第一轮，先【左上1点引导】，后【A/D躲避】", 8000, true); return;
@@ -370,13 +423,45 @@ public class p8s
             default: accessory.Method.TextInfo("似乎赫淮斯托斯没有注意到你……", 8000, true); return;
         }
     }
+    private static void drawBeastStompRouteDir(int myTurn, ScriptAccessory accessory)
+    {
+        // 左上，正上，正左，中
+        Vector3[] beastStompPos = [new(90, 0, 90), new(100, 0, 90), new(90, 0, 100), new(100, 0, 100)];
+        for (int i = 0; i < 4; i++)
+        {
+            var dp = AssignDp.drawStatic(beastStompPos[i], 0, 0, 8000, $"一车位置{i}", accessory);
+            dp.Scale = new(1.5f);
+            dp.Color = posColorNormal.V4.WithW(0.6f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+
+        List<int> stompIdx = myTurn switch
+        {
+            1 => new List<int> { 0, 1, 1, 1 },
+            2 => new List<int> { 3, 3, 2, 2 },
+            3 => new List<int> { 1, 0, 0, 1 },
+            4 => new List<int> { 1, 1, 3, 3 },
+            _ => new List<int> { -1, -1, -1, -1 }
+        };
+
+        List<int> delayTime = [0, 5250, 7750, 10250];
+        List<int> destoryTime = [5250, 2500, 2500, 2500];
+
+        for (int i = 0; i < 4; i++)
+        {
+            var dp_a = AssignDp.dirPos(beastStompPos[stompIdx[i]], delayTime[i], destoryTime[i], $"指路{i}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_a);
+
+            if (i + 1 == 4) break;
+            var dp_b = AssignDp.dirPos2Pos(beastStompPos[stompIdx[i]], beastStompPos[stompIdx[i + 1]], delayTime[i], destoryTime[i], $"准备就位{i}", accessory);
+            dp_b.Color = accessory.Data.DefaultDangerColor;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_b);
+        }
+    }
 
     #endregion
 
     #region 门神：一蛇
-
-    // TODO
-    // 还需测试：毒圈范围
 
     // 177.3 "Gorgomanteia" Ability { id: "791A", source: "Hephaistos" }
     // 记录玩家buff
@@ -387,36 +472,33 @@ public class p8s
     [ScriptMethod(name: "门神：一蛇记录Buff", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(3004|3005|3351|3326)$"], userControl: false)]
     public void DB_BRC_Gorgomanteia(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        var index = accessory.Data.PartyList.IndexOf(tid);
+        var tid = @event.TargetId();
+        var index = IndexHelper.getPlayerIdIndex(tid, accessory);
         if (index == -1) return;
 
-        if (@event["StatusID"] == "3004" || @event["StatusID"] == "3005")
-        {
-            db_isFirstRound[index] = @event["StatusID"] == "3004";
-        }
-
+        if (@event.StatusID() == 3004 || @event.StatusID() == 3005)
+            db_isFirstRound[index] = @event.StatusID() == 3004;
         else
-        {
-            db_isGorgonEye[index] = @event["StatusID"] == "3351";
-        }
+            db_isGorgonEye[index] = @event.StatusID() == 3351;
+
     }
 
     // 可能存在一蛇BUFF时掉人，躺着的没有BUFF……
     [ScriptMethod(name: "门神：一蛇找队友", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31018"], userControl: false)]
     public void DB_GorgonPartnerRecord(Event @event, ScriptAccessory accessory)
     {
-        var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+        var MyIndex = IndexHelper.getMyIndex(accessory);
         for (int i = 0; i < 8; i++)
         {
-            bool isSameRound = db_isFirstRound[i] == db_isFirstRound[myIndex];
-            bool isSameGorgonEye = db_isGorgonEye[i] == db_isGorgonEye[myIndex];
-            bool isNotMyself = i != myIndex;
+            // 在8个玩家中，寻找：与自己同一轮，与自己拥有同类型buff的玩家，且不能是自己
+            bool isSameRound = db_isFirstRound[i] == db_isFirstRound[MyIndex];
+            bool isSameGorgonEye = db_isGorgonEye[i] == db_isGorgonEye[MyIndex];
+            bool isNotMyself = i != MyIndex;
 
             if (isSameRound && isSameGorgonEye && isNotMyself)
             {
                 db_gorgonPartnerIdx = i;
-                accessory.Method.SendChat($"/e 找到你的搭档：{db_gorgonPartnerIdx}");
+                DebugMsg($"找到你的搭档: {IndexHelper.getPlayerJobByIndex(i)}", accessory);
                 break;  // 找到一个符合条件的队友，退出循环
             }
         }
@@ -425,36 +507,50 @@ public class p8s
     [ScriptMethod(name: "门神：一蛇记录位置", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31019"], userControl: false)]
     public void DB_GorgonPositionRecord(Event @event, ScriptAccessory accessory)
     {
-        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-        db_GorgonPosition.Add(PositionMatchesTo8Dir(spos, new(100, 0, 100)));
+        var spos = @event.SourcePosition();
+        var sid = @event.SourceId();
+        // db_GorgonPosition与db_GorgonSid两个list，同一个index记录下同一蛇的SourceID与八向逻辑方位
+        db_GorgonPosition.Add(DirectionCalc.PositionRoundToDirs(spos, new(100, 0, 100), 8));
         db_GorgonSid.Add(sid);
     }
 
     [ScriptMethod(name: "门神：一蛇视线范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31019"])]
     public void DB_Petrifaction(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-        var spos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
 
         // 绘制蛇蛇出现地点
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"蛇蛇出现地点";
-        dp.Scale = new(2);
-        dp.Color = GorgonColor;
-        dp.Position = spos;
-        dp.Delay = 0;
-        dp.DestoryAt = 10000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        var dp1 = assignDp_SnakeAppearPos(spos, 0, 10000, $"蛇蛇{sid}出现地点", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
 
         // 绘制背对蛇蛇
-        dp = accessory.Data.GetDefaultDrawProperties();
+        var dp2 = assignDp_SnakeSightAvoid(spos, 0, 10000, $"蛇蛇{sid}背对", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.SightAvoid, dp2);
+    }
+
+    private static DrawPropertiesEdit assignDp_SnakeAppearPos(Vector3 pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(2);
+        dp.Color = ColorHelper.GorgonColor.V4;
+        dp.Position = pos;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    private static DrawPropertiesEdit assignDp_SnakeSightAvoid(Vector3 tpos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.Owner = accessory.Data.Me;
-        dp.TargetPosition = spos;
-        dp.Delay = 0;
-        dp.DestoryAt = 10000;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.SightAvoid, dp);
+        dp.TargetPosition = tpos;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
     }
 
     [ScriptMethod(name: "门神：一蛇优先级记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31019"], userControl: false)]
@@ -464,7 +560,7 @@ public class p8s
         {
             // 蛇释放石化后计数
             db_gorgonIdx++;
-            var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+            var myIndex = IndexHelper.getMyIndex(accessory);
             if (db_gorgonIdx != 2 && db_gorgonIdx != 4) return;
             if (db_gorgonIdx == 2 && !db_isFirstRound[myIndex]) return;
             if (db_gorgonIdx == 4 && db_isFirstRound[myIndex]) return;
@@ -472,6 +568,7 @@ public class p8s
             // 寻找目标蛇
             // 分辨与搭档的优先级
             bool isHighPriority = myIndex < db_gorgonPartnerIdx ? true : false;
+            DebugMsg($"我的优先级是【{(isHighPriority ? "高" : "低")}】", accessory);
 
             // accessory.Method.SendChat($"/e 我的优先级是{(isHighPriority ? "高" : "低")}……");
             uint gorgon_HighPriority;
@@ -495,12 +592,10 @@ public class p8s
                 gorgon_LowPriority = db_GorgonSid[2] == gorgon_HighPriority ? db_GorgonSid[3] : db_GorgonSid[2];
             }
 
-            // accessory.Method.SendChat($"/e 高优先级蛇在{gorgon_HighPriorityPosition}，低优先级蛇在{gorgon_LowPriorityPosition}");
+            DebugMsg($"高优先级蛇在{gorgon_HighPriorityPosition}，低优先级蛇在{gorgon_LowPriorityPosition}", accessory);
 
             db_gorgonTarget = isHighPriority ? gorgon_HighPriority : gorgon_LowPriority;
             db_gorgonTargetPos = isHighPriority ? gorgon_HighPriorityPosition : gorgon_LowPriorityPosition;
-
-            // accessory.Method.SendChat($"/e db_gorgonTarget: {db_gorgonTarget}，gorgon_target_position: {db_gorgonTargetPos}");
         }
     }
 
@@ -511,7 +606,7 @@ public class p8s
     {
         Task.Delay(50).ContinueWith(t =>
         {
-            var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+            var myIndex = IndexHelper.getMyIndex(accessory);
 
             if (!db_isGorgonEye[myIndex]) return;
             if (db_gorgonIdx != 2 && db_gorgonIdx != 4) return;
@@ -519,36 +614,15 @@ public class p8s
             if (db_gorgonIdx == 4 && db_isFirstRound[myIndex]) return;
 
             // 绘制石化眼扇形
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"石化眼扇形{db_gorgonIdx}";
-            dp.Scale = new(50);
-            dp.Radian = float.Pi / 4;
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Owner = accessory.Data.Me;
-            dp.Delay = 0;
-            dp.DestoryAt = 5000;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+            var dp1 = assignDp_GorgonEyeFan(0, 5000, $"石化眼{db_gorgonIdx}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp1);
 
             // 绘制石化眼目标蛇蛇
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"蛇蛇目标{db_gorgonIdx}";
-            dp.Scale = new(2);
-            dp.Color = accessory.Data.DefaultSafeColor;
-            dp.Owner = db_gorgonTarget;
-            dp.Delay = 0;
-            dp.DestoryAt = 10000;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            var dp2 = assignDp_SnakeTarget(db_gorgonTarget, 0, 10000, $"蛇蛇目标{db_gorgonIdx}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
 
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"指向目标蛇蛇{db_gorgonIdx}";
-            dp.Scale = new(0.5f);
-            dp.Owner = accessory.Data.Me;
-            dp.TargetObject = db_gorgonTarget;
-            dp.ScaleMode = ScaleMode.YByDistance;
-            dp.Color = accessory.Data.DefaultSafeColor;
-            dp.Delay = 0;
-            dp.DestoryAt = 5000;
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            var dp3 = AssignDp.dirTarget(db_gorgonTarget, 0, 5000, $"指向目标蛇蛇{db_gorgonIdx}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp3);
 
             // 传输信息
             string gorgon_target_position_txt = "未知位置";  // 默认值
@@ -566,6 +640,30 @@ public class p8s
             accessory.Method.TextInfo($"控制住【{gorgon_target_position_txt}】点蛇的行动……", 8000, true);
         });
     }
+    private static DrawPropertiesEdit assignDp_GorgonEyeFan(int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(50);
+        dp.Radian = float.Pi / 4;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = accessory.Data.Me;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    private static DrawPropertiesEdit assignDp_SnakeTarget(uint tid, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(2);
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Owner = tid;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
 
     // 204.2 "Blood of the Gorgon 1" Ability { id: "792F", source: "Hephaistos" }
     // 玩家放毒范围提示
@@ -574,7 +672,7 @@ public class p8s
     {
         Task.Delay(50).ContinueWith(t =>
         {
-            var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+            var myIndex = IndexHelper.getMyIndex(accessory);
 
             if (db_isGorgonEye[myIndex]) return;
             if (db_gorgonIdx != 2 && db_gorgonIdx != 4) return;
@@ -582,35 +680,15 @@ public class p8s
             if (db_gorgonIdx == 4 && db_isFirstRound[myIndex]) return;
 
             // 绘制放毒圆形
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"放毒圆形{db_gorgonIdx}";
-            dp.Scale = new(4);
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Owner = accessory.Data.Me;
-            dp.Delay = 0;
-            dp.DestoryAt = 5000;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            var dp1 = assignDp_PoisonCircle(accessory.Data.Me, 0, 5000, $"放毒圆形{db_gorgonIdx}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
 
             // 绘制放毒目标蛇蛇
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"蛇蛇目标{db_gorgonIdx}";
-            dp.Scale = new(2);
-            dp.Color = accessory.Data.DefaultSafeColor;
-            dp.Owner = db_gorgonTarget;
-            dp.Delay = 0;
-            dp.DestoryAt = 10000;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            var dp2 = assignDp_SnakeTarget(db_gorgonTarget, 0, 10000, $"蛇蛇目标{db_gorgonIdx}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
 
-            dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"指向目标蛇蛇{db_gorgonIdx}";
-            dp.Scale = new(0.5f);
-            dp.Owner = accessory.Data.Me;
-            dp.TargetObject = db_gorgonTarget;
-            dp.ScaleMode = ScaleMode.YByDistance;
-            dp.Color = accessory.Data.DefaultSafeColor;
-            dp.Delay = 0;
-            dp.DestoryAt = 10000;
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            var dp3 = AssignDp.dirTarget(db_gorgonTarget, 0, 10000, $"指向目标蛇蛇{db_gorgonIdx}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp3);
 
             // 传输信息
             string gorgon_target_position_txt = "未知位置";  // 默认值
@@ -629,6 +707,19 @@ public class p8s
         });
     }
 
+    private static DrawPropertiesEdit assignDp_PoisonCircle(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(4);
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = owner_id;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        return dp;
+    }
+
     #endregion
 
     #region 门神：一分身
@@ -637,32 +728,24 @@ public class p8s
     public void DB_IllusorySunforge(Event @event, ScriptAccessory accessory)
     {
         db_illusorySunforgeTimes++;
-        var epos = JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
-        // var tpos = JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
-        var srot = JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
+        var epos = @event.EffectPosition();
+        var srot = @event.SourceRotation();
 
-        var isHotWing = @event["ActionId"] == "31058";
+        var isDragon = @event.ActionId() == 31058;
 
-        if (isHotWing)
+        if (isDragon)
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"龙龙";
-            dp.Scale = new(14, 45);
-            dp.Color = DelayDangerColor;
-            dp.Position = epos;
-            dp.Rotation = srot;
+            var dp = assignDp_DragonLine(epos, srot, 0, 7700, $"龙龙分身", accessory);
+            dp.Color = ColorHelper.DelayDangerColor.V4;
             dp.Delay = db_illusorySunforgeTimes < 3 ? 0 : 1000;
             dp.DestoryAt = 7500;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
         }
         else
         {
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"凤凤";
+            var dp = assignDp_PhoenixWing(epos, srot, 0, 7700, $"凤凤分身", accessory);
             dp.Scale = new(90, 20);
-            dp.Color = DelayDangerColor;
-            dp.Position = epos;
-            dp.Rotation = srot;
+            dp.Color = ColorHelper.DelayDangerColor.V4;
             dp.Delay = db_illusorySunforgeTimes < 3 ? 0 : 1000;
             dp.DestoryAt = 7500;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
@@ -673,23 +756,28 @@ public class p8s
     [ScriptMethod(name: "门神：一分身分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31009"])]
     public void DB_ManifoldFlames(Event @event, ScriptAccessory accessory)
     {
-        var dp = accessory.Data.GetDefaultDrawProperties();
         for (int i = 0; i < 8; i++)
         {
-            dp.Name = $"一分身分散-{i}";
-            dp.Scale = new(5);
-            dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Delay = 0;
-            dp.DestoryAt = 6500;
+            var dp = assignDp_IllusionSpread(accessory.Data.PartyList[i], 0, 6500, $"一分身分散{i}", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+    }
+    private static DrawPropertiesEdit assignDp_IllusionSpread(uint sid, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5);
+        dp.Owner = sid;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
     }
 
     [ScriptMethod(name: "门神：一分身易伤收集", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:29390"], userControl: false)]
     public void DB_HemitheosFlare(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var tid = @event.TargetId();
         db_flareTarget.Add(tid);
     }
 
@@ -699,114 +787,94 @@ public class p8s
         Task.Delay(6000).ContinueWith(t =>
         {
             var hasDebuff = db_flareTarget.Contains(accessory.Data.Me);
+            var sid = @event.SourceId();
 
-            if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            for (int i = 1; i < 5; i++)
+            for (uint i = 1; i < 5; i++)
             {
-                dp.Name = $"一分身引导-{i}";
+                var dp = AssignDp.drawTargetOrder(sid, i, 0, 4000, $"一分身引导-{i}", accessory);
                 dp.Scale = new(5, 40);
-                dp.Owner = sid;
-                dp.TargetResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
-                dp.TargetOrderIndex = (uint)i;
+                dp.TargetOrderIndex = i;
                 dp.Color = hasDebuff ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
-                dp.DestoryAt = 4000;
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
             }
 
             if (hasDebuff)
-            {
                 accessory.Method.TextInfo("正点远离避开引导", 4000, true);
-            }
             else
-            {
                 accessory.Method.TextInfo("斜点靠近引导", 4000, true);
-            }
         });
     }
 
     [ScriptMethod(name: "门神：一分身分摊分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3100[67])$"])]
     public void DB_EmergentFlare(Event @event, ScriptAccessory accessory)
     {
-        var isSpread = @event["ActionId"] == "31007";
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-        var dp = accessory.Data.GetDefaultDrawProperties();
-
+        var isSpread = @event.ActionId() == 31007;
+        var sid = @event.SourceId();
         if (isSpread)
         {
             for (int i = 0; i < 8; i++)
             {
-                dp.Name = $"一分身分散-{i}";
+                var dp = AssignDp.drawOwner2Target(sid, accessory.Data.PartyList[i], 0, 6000, $"一分身分散直线{i}", accessory);
                 dp.Scale = new(5, 40);
-                dp.Owner = sid;
-                dp.TargetObject = accessory.Data.PartyList[i];
-                dp.Color = accessory.Data.DefaultDangerColor;
-                dp.DestoryAt = 6000;
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
             }
         }
         else
         {
             int[] parterner = [6, 7, 4, 5, 2, 3, 0, 1];
-            var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+            var myIndex = IndexHelper.getMyIndex(accessory);
             for (int i = 0; i < 4; i++)
             {
                 var ii = myIndex > 3 ? i + 4 : i;
-                dp.Name = $"一分身分摊-{ii}";
+                var dp = AssignDp.drawCircle(accessory.Data.PartyList[ii], 0, 6000, $"一分身分摊{ii}", accessory);
                 dp.Scale = new(5);
-                dp.Owner = accessory.Data.PartyList[ii];
                 dp.Color = myIndex == ii || myIndex == parterner[ii] ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
-                dp.Delay = 0;
-                dp.DestoryAt = 6000;
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
             }
         }
-
     }
-
     #endregion
 
-    // TODO: 本体的所有时间都需要校对
-    // TODO：门神始终没遇到一分身分摊情况……一蛇毒也没遇到过，需要验证
 
     #region 本体：基础
 
-    // 5064.6 "Ashing Blaze" Ability { id: ["79D7", "79D8"], source: "Hephaistos" }
     [ScriptMethod(name: "本体：半场刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"])]
     public void MB_SideCleave(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-        var isleft = @event["ActionId"] == "31191";
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = "本体半场刀";
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.DestoryAt = 5700;
-        dp.Position = isleft ? new(90, 0, 80) : new(110, 0, 80);
+        var isleft = @event.ActionId() == 31191;
+        mb_isLeftCleave = isleft;
+        var dp = AssignDp.drawStatic(new Vector3(100, 0, 100), float.Pi, 0, 5700, $"本体半场刀{isleft}", accessory);
         dp.Scale = new(20, 40);
+        dp.Position = isleft ? new(90, 0, 80) : new(110, 0, 80);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
 
     [ScriptMethod(name: "本体：半场刀增加阶段", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"], userControl: false)]
     public void MB_PhaseAdd(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
         mb_sideCleaveNum++;
+    }
+
+    [ScriptMethod(name: "本体：阶段（术式记录）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31163"], userControl: false)]
+    public void MB_PhaseChange_NA(Event @event, ScriptAccessory accessory)
+    {
+        mb_phase = mb_phase switch
+        {
+            MB_Phase.Opening => MB_Phase.NA1,
+            MB_Phase.NA1 => MB_Phase.NA2,
+            _ => MB_Phase.NA1
+        };
     }
 
     #endregion
 
     #region 本体：一术士
 
-    // 5040.4 "Natural Alignment 1" Ability { id: "79BB", source: "Hephaistos" } window 20,20
-    // 术式记录，出现紫圈
-    // type: 'GainsEffect',
-    // netRegex: { effectId: '9F8', count: '209', capture: false },
-    // 9F8 == 2552
-    // * 按理说应该加一个初始化mb_isNATarget的代码段，判断条件为开始读条NA1，但是因为根本见不到二术士的情况，省略
     [ScriptMethod(name: "本体：一紫圈记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2552"], userControl: false)]
     public void MB_NaturalAlignment(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        if (mb_phase != MB_Phase.NA1) return;
+        var tid = @event.TargetId();
         var tidx = accessory.Data.PartyList.IndexOf(tid);
         if (tidx == -1) return;
         mb_isNATarget[tidx] = true;
@@ -820,88 +888,135 @@ public class p8s
     [ScriptMethod(name: "本体：黄圈引导", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31369"])]
     public void MB_TyrantFlare(Event @event, ScriptAccessory accessory)
     {
-        var dp = accessory.Data.GetDefaultDrawProperties();
         for (int i = 0; i < 8; i++)
         {
-            dp.Name = $"黄圈引导";
+            var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 0, 3000, $"黄圈引导{i}", accessory);
             dp.Scale = new(6);
             dp.ScaleMode = ScaleMode.ByTime;
-            dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = DelayDangerColor;
-            dp.Delay = 0;
-            dp.DestoryAt = 3000;
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(0.6f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
-
-
-    // const ids = {
-    //   fireThenIce: '1DC',        476
-    //   iceThenFire: '1DE',        478
-    //   stackThenSpread: '1E0',    480
-    //   spreadThenStack: '1E2',    482
-    // } as const;
-
-    // 5049.5 "Twist Nature" Ability { id: "79BC", source: "Hephaistos" }
-    // 5055.6 "Tyrant's Flare" Ability { id: "7A89", source: "Hephaistos" } 脚下出黄圈/分摊分散伤害判定
-    // 5058.6 "Forcible Fire III/Forcible Fire II" Ability { id: ["79BF", "79C0"], source: "Hephaistos" }
     // 强制咏唱，出现分摊分散/冰火顺序图案
     [ScriptMethod(name: "本体：一分摊分散", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(48[02])$"])]
     public void MB_ForceStackSpread(Event @event, ScriptAccessory accessory)
     {
-        var isStackFirst = @event["Param"] == "480";
-        // accessory.Method.SendChat($"/e [DEBUG] 先{(isStackFirst ? "分摊" : "分散")}");
+        if (mb_phase != MB_Phase.NA1) return;
+        var isStackFirst = @event.Param() == 480;
         var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
         if (mb_isNATarget[myIndex])
-        {
             accessory.Method.TextInfo($"先【{(isStackFirst ? "避开分摊" : "分散")}】，后【{(isStackFirst ? "分散" : "避开分摊")}】", 5000, true);
-        }
         else
-        {
             accessory.Method.TextInfo($"先【{(isStackFirst ? "分摊" : "分散")}】，后【{(isStackFirst ? "分散" : "分摊")}】", 5000, true);
-        }
-
-        var dp = accessory.Data.GetDefaultDrawProperties();
 
         // 绘制分散
+        drawForceSpread(isStackFirst, mb_isNATarget, accessory);
+        drawSpreadDir(isStackFirst, myIndex, accessory);
+        // 绘制分摊
+        drawForceStack(isStackFirst, myIndex, mb_isNATarget[myIndex], accessory);
+    }
+    private static void drawForceSpread(bool isStackFirst, bool[] naTargetList, ScriptAccessory accessory)
+    {
+        var spreadTime = isStackFirst ? 6100 : 3000;
+
         for (int i = 0; i < 8; i++)
         {
-            if (mb_isNATarget[i]) continue;
-            dp.Name = $"一紫圈分散-{i}";
+            if (naTargetList[i]) continue;
+            var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], spreadTime, spreadTime, $"一紫圈分散{i}", accessory);
             dp.Scale = new(6);
-            dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Delay = isStackFirst ? 6100 : 3000;
-            dp.DestoryAt = isStackFirst ? 6100 : 3000;
+            dp.ScaleMode = ScaleMode.ByTime;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+    }
 
-        // 绘制分摊
-        dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"一紫圈分摊";
+    private static void drawForceStack(bool isStackFirst, int myIndex, bool isTarget, ScriptAccessory accessory)
+    {
+        var stackTime = isStackFirst ? 3000 : 6100;
+        var stackOwner = myIndex < 4 ? accessory.Data.PartyList[myIndex + 4] : accessory.Data.PartyList[myIndex - 4];
+        var owner_id = isTarget ? stackOwner : accessory.Data.Me;
+        var dp = AssignDp.drawCircle(owner_id, stackTime, stackTime, $"一紫圈分摊{myIndex}", accessory);
         dp.Scale = new(6);
-        if (mb_isNATarget[myIndex])
+        dp.ScaleMode = ScaleMode.ByTime;
+        dp.Color = isTarget ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private async static void drawSpreadDir(bool isStackFirst, int myIndex, ScriptAccessory accessory)
+    {
+        var spreadTime = isStackFirst ? 6100 : 3000;
+
+        if (isStackFirst)
         {
-            dp.Owner = myIndex < 4 ? accessory.Data.PartyList[myIndex + 4] : accessory.Data.PartyList[myIndex - 4];
-            dp.Color = accessory.Data.DefaultDangerColor;
+            await Task.Delay(6500);
+            DebugMsg($"开始绘制分散位置", accessory);
+            drawSpreadPos(mb_isLeftCleave, spreadTime - 400, myIndex, accessory);
         }
         else
-        {
-            dp.Owner = accessory.Data.Me;
-            dp.Color = accessory.Data.DefaultSafeColor;
-        }
-        dp.Delay = isStackFirst ? 3000 : 6100;
-        dp.DestoryAt = isStackFirst ? 3000 : 6100;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            drawSpreadLine(spreadTime, myIndex, accessory);
+        return;
+    }
 
+    private static void drawSpreadLine(int spreadTime, int myIndex, ScriptAccessory accessory)
+    {
+        Vector3[] safePos = new Vector3[8];
+        safePos[0] = new Vector3(100, 0, 90);
+        safePos[1] = new Vector3(110, 0, 100);
+        safePos[2] = new Vector3(90, 0, 100);
+        safePos[3] = new Vector3(100, 0, 100);
+        safePos[4] = new Vector3(90, 0, 90);
+        safePos[5] = new Vector3(110, 0, 90);
+        safePos[6] = new Vector3(90, 0, 110);
+        safePos[7] = new Vector3(110, 0, 110);
+
+        for (int i = 0; i < 8; i++)
+        {
+            var dp = AssignDp.dirPos2Pos(new Vector3(100, 0, 100), safePos[i], spreadTime - 500, spreadTime + 500, $"分散方向{i}", accessory);
+            dp.Scale = new(1.5f);
+            dp.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        }
+    }
+
+    private static void drawSpreadPos(bool isLeftCleave, int spreadTime, int myIndex, ScriptAccessory accessory)
+    {
+        Vector3[] safePos = new Vector3[8];
+        // 右边
+        safePos[0] = new Vector3(100.5f, 0, 80);
+        safePos[1] = new Vector3(110, 0, 80);
+        safePos[2] = new Vector3(100.5f, 0, 90);
+        safePos[3] = new Vector3(100.5f, 0, 100);
+        safePos[4] = new Vector3(110, 0, 90);
+        safePos[5] = new Vector3(110, 0, 100);
+        safePos[6] = new Vector3(110, 0, 110);
+        safePos[7] = new Vector3(100.5f, 0, 110);
+
+        if (!isLeftCleave)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                safePos[i] = DirectionCalc.FoldPointLR(safePos[i], 100);
+            }
+        }
+
+        for (int i = 0; i < 8; i++)
+        {
+            var dp0 = AssignDp.drawStatic(safePos[i], 0, 0, spreadTime, $"分散位置{i}", accessory);
+            dp0.Scale = new(1f);
+            dp0.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+        }
+
+        var dp = AssignDp.dirPos(safePos[myIndex], 0, spreadTime, $"分散位置指路{myIndex}", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
 
     // 5076.4 "Forcible Trifire/Forcible Difreeze" Ability { id: ["79BD", "79BE"], source: "Hephaistos" }
     [ScriptMethod(name: "本体：一冰火引导范围", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(47[68])$"])]
     public void MB_ForceFireFreeze(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        var isFireFirst = @event["Param"] == "476";
+        if (mb_phase != MB_Phase.NA1) return;
+        var tid = @event.TargetId();
+        var isFireFirst = @event.Param() == 476;
         var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
 
         var dp = accessory.Data.GetDefaultDrawProperties();
@@ -914,8 +1029,8 @@ public class p8s
             dp.CentreResolvePattern = PositionResolvePatternEnum.PlayerFarestOrder;
             dp.CentreOrderIndex = i;
             dp.Color = mb_isNATarget[myIndex] ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
-            dp.Delay = isFireFirst ? 2000 : 6100;
-            dp.DestoryAt = isFireFirst ? 4000 : 6100;
+            dp.Delay = isFireFirst ? 0 : 6100;
+            dp.DestoryAt = isFireFirst ? 6000 : 6100;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
 
@@ -928,13 +1043,12 @@ public class p8s
             dp.CentreResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
             dp.CentreOrderIndex = i + 1;
             dp.Color = mb_isNATarget[myIndex] ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
-            dp.Delay = isFireFirst ? 6100 : 2000;
-            dp.DestoryAt = isFireFirst ? 6100 : 4000;
+            dp.Delay = isFireFirst ? 6100 : 0;
+            dp.DestoryAt = isFireFirst ? 6100 : 6000;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
 
-    // TODO：读取条件可能要改成，当分身出现时获取其位置
     [ScriptMethod(name: "本体：分身炮判断第几行", eventType: EventTypeEnum.SetObjPos, eventCondition: ["SourceDataId:15079"], userControl: false)]
     public void MB_IllusionBeamLineIdx(Event @event, ScriptAccessory accessory)
     {
@@ -944,14 +1058,13 @@ public class p8s
         mb_NA1_isLine1Safe = pos.Z < 90 ? false : true;
     }
 
-    // TODO：这边的设置要考虑到分身炮行数判断是否结束
     [ScriptMethod(name: "本体：一冰火指路提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(47[68])$"])]
     public void MB_ForceFireFreezeGuide(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        var isFireFirst = @event["Param"] == "476";
-        var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
-        accessory.Method.SendChat($"/e {(mb_NA1_isLine1Safe ? "先第一行安全" : "先第二行安全")}");
+        if (mb_phase != MB_Phase.NA1) return;
+        var isFireFirst = @event.Param() == 476;
+        var myIndex = IndexHelper.getMyIndex(accessory);
+        DebugMsg($"{(mb_NA1_isLine1Safe ? "先第一行安全" : "先第二行安全")}", accessory);
 
         // 我是TN且TN固定，或，我是DPS但DPS固定
         var isFixed = (mb_NA1_isTNFixed && myIndex < 4) || (!mb_NA1_isTNFixed && myIndex >= 4);
@@ -1015,7 +1128,6 @@ public class p8s
                 biasIdx = myIndex == lastFalseIdx ? 3 : 0;
             }
 
-            // TODO 当前录像安全区错了
             destinationPoint1 = isFireFirst ? (Vector3)new(100, 0, 90) + dzFire : (Vector3)new(100, 0, 90) + dxFixed[biasIdx] + dzFreeze;
             destinationPoint2 = isFireFirst ? (Vector3)new(100, 0, 90) + dxFixed[biasIdx] - dzFreeze : (Vector3)new(100, 0, 90) - dzFire;
             accessory.Method.TextInfo($"动脑组，优先级站位", 10000);
@@ -1029,8 +1141,8 @@ public class p8s
         dp.TargetPosition = destinationPoint1;
         dp.ScaleMode = ScaleMode.YByDistance;
         dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = 2000;
-        dp.DestoryAt = 4000;
+        dp.Delay = 0;
+        dp.DestoryAt = 6000;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
 
         dp = accessory.Data.GetDefaultDrawProperties();
@@ -1049,7 +1161,7 @@ public class p8s
     [ScriptMethod(name: "本体：分身炮", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31371"])]
     public void MB_IllusionBeam(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+        var sid = @event.SourceId();
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = $"分身炮";
         dp.Scale = new(10, 50);
@@ -1067,6 +1179,12 @@ public class p8s
     public void MB_HighConceptReady(Event @event, ScriptAccessory accessory)
     {
         mb_conceptFinNum = 0;
+        mb_phase = mb_phase switch
+        {
+            MB_Phase.NA1 => MB_Phase.HC1,
+            MB_Phase.NA2 => MB_Phase.HC2,
+            _ => MB_Phase.HC1
+        };
     }
 
     // 5118.6 "High Concept 1" Ability { id: "710A", source: "Hephaistos" } window 20,20
@@ -1091,8 +1209,10 @@ public class p8s
     [ScriptMethod(name: "本体：一运记录Buff", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(3346|3347|3331|3330|3332)$"], userControl: false)]
     public void MB_BRC_HighConcept1(Event @event, ScriptAccessory accessory)
     {
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        if (!int.TryParse(@event["DurationMilliseconds"], out var dur)) return;
+        if (mb_phase != MB_Phase.HC1) return;
+        var tid = @event.TargetId();
+        var dur = @event.DurationMilliseconds();
+        // if (!int.TryParse(@event["DurationMilliseconds"], out var dur)) return;
         var isLong = dur > 9000;
         switch (@event["StatusID"])
         {
@@ -1137,9 +1257,10 @@ public class p8s
         }
     }
 
-    [ScriptMethod(name: "本体：一运指路阶段零", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31148"])]
+    [ScriptMethod(name: "本体：一运初始站位指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31148"])]
     public void MB_HC1_GuidePhase0(Event @event, ScriptAccessory accessory)
     {
+        if (mb_phase != MB_Phase.HC1) return;
         Task.Delay(10900).ContinueWith(t =>
         {
             var myHCIndex = mb_hc1_sid.IndexOf(accessory.Data.Me);
@@ -1175,9 +1296,11 @@ public class p8s
     [ScriptMethod(name: "本体：记录塔色", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"], userControl: false)]
     public void MB_TowerColorRecord(Event @event, ScriptAccessory accessory)
     {
+        if (mb_phase != MB_Phase.HC1) return;
         lock (this)
         {
-            if (!int.TryParse(@event["Index"], System.Globalization.NumberStyles.HexNumber, null, out var tower_color)) return;
+            // if (!int.TryParse(@event["Index"], System.Globalization.NumberStyles.HexNumber, null, out var tower_color)) return;
+            var tower_color = @event.Index();
             mb_conceptFinNum++;
             // accessory.Method.SendChat($"/e mb_conceptFinNum = {mb_conceptFinNum}");
 
@@ -1256,10 +1379,10 @@ public class p8s
         }
     }
 
-
-    [ScriptMethod(name: "本体：一运指路阶段一", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
+    [ScriptMethod(name: "本体：一运第一次合成指路", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
     public void MB_HC1_GuidePhase1(Event @event, ScriptAccessory accessory)
     {
+        if (mb_phase != MB_Phase.HC1) return;
         Task.Delay(50).ContinueWith(t =>
         {
             if (mb_sideCleaveNum == 1 && mb_conceptFinNum == 2)
@@ -1309,9 +1432,10 @@ public class p8s
         });
     }
 
-    [ScriptMethod(name: "本体：一运指路阶段二", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"])]
+    [ScriptMethod(name: "本体：一运合成后站位指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"])]
     public void MB_HC1_GuidePhase2(Event @event, ScriptAccessory accessory)
     {
+        if (mb_phase != MB_Phase.HC1) return;
         if (mb_conceptFinNum != 2) return;
         var myHCIndex = mb_hc1_sid.IndexOf(accessory.Data.Me);
         bool joinedMerge = false;
@@ -1370,9 +1494,10 @@ public class p8s
         }
     }
 
-    [ScriptMethod(name: "本体：一运指路阶段三", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
+    [ScriptMethod(name: "本体：一运第二次合成指路", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
     public void MB_HC1_GuidePhase3(Event @event, ScriptAccessory accessory)
     {
+        if (mb_phase != MB_Phase.HC1) return;
         Task.Delay(50).ContinueWith(t =>
         {
             if (mb_sideCleaveNum == 2 && mb_conceptFinNum == 6)
@@ -1463,26 +1588,10 @@ public class p8s
 
     #region 本体：万象
 
-    // 5185.3 "Limitless Desolation" Ability { id: "75ED", source: "Hephaistos" }
-    // 5186.5 "Tyrant's Fire III 1" Ability { id: "75F0", source: "Hephaistos" }
-    // 5189.5 "Tyrant's Fire III 2" Ability { id: "75F0", source: "Hephaistos" }
-    // 5192.5 "Tyrant's Fire III 3" Ability { id: "75F0", source: "Hephaistos" }
-    // 5195.5 "Tyrant's Fire III 4" Ability { id: "75F0", source: "Hephaistos" }
-    // 5197.5 "Tyrant's Flare II" Ability { id: "7A88", source: "Hephaistos" }
-    // 5197.5 "Burst 1" #Ability { id: "79D5", source: "Hephaistos" }
-    // 5200.4 "Tyrant's Flare II" #Ability { id: "7A88", source: "Hephaistos" }
-    // 5200.4 "Burst 2" #Ability { id: "79D5", source: "Hephaistos" }
-    // 5203.4 "Tyrant's Flare II" #Ability { id: "7A88", source: "Hephaistos" }
-    // 5203.4 "Burst 3" #Ability { id: "79D5", source: "Hephaistos" }
-    // 5206.3 "Tyrant's Flare II" #Ability { id: "7A88", source: "Hephaistos" }
-    // 5206.3 "Burst 4" #Ability { id: "79D5", source: "Hephaistos" }
-
-    // Tyrant's Fire III 是决定顺序的buff
-    // Tyrant's Flare II 是引导的黄圈爆炸
-    // Burst 是踩塔
     [ScriptMethod(name: "本体：万象灰烬分散预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:30189"])]
     public void MB_LimitlessDesolation(Event @event, ScriptAccessory accessory)
     {
+        mb_phase = MB_Phase.LD;
         var dp = accessory.Data.GetDefaultDrawProperties();
         for (int i = 0; i < 8; i++)
         {
@@ -1496,12 +1605,10 @@ public class p8s
         }
     }
 
-    // TODO 可能这个要改？
     [ScriptMethod(name: "本体：万象灰烬放黄圈预警", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:30192"])]
     public void MB_TyrantsFire(Event @event, ScriptAccessory accessory)
     {
-        // TODO 被点名后删除分散预警，添加放置黄圈预警。放置黄圈预警只添加玩家自己
-        if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+        var tid = @event.TargetId();
         var tidx = accessory.Data.PartyList.IndexOf(tid);
         accessory.Method.RemoveDraw($"万象分散-{tidx}");
 
@@ -1513,13 +1620,600 @@ public class p8s
         dp.Scale = new(8);
         dp.ScaleMode = ScaleMode.ByTime;
         dp.Owner = tid;
-        dp.Color = DelayDangerColor;
+        dp.Color = ColorHelper.DelayDangerColor.V4;
         dp.Delay = 0;
         dp.DestoryAt = 8000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-
     }
 
+    // EnvControl记录
+    // 800375AB 00020001
+    // Index
+    // 00000005 (2,2) 石头      // 00000009 (2,2) 塔
+    // 00000006 (2,3) 石头      // 0000000A (2,3) 塔
+    // 00000007 (3,2) 石头      // 0000000B (3,2) 塔
+    // 00000008 (3,3) 石头      // 0000000C (3,3) 塔
+
+    // 00000046 (1,1) 石头      // 0000004C (1,1) 塔
+    // 00000047 (1,2) 石头      // 0000004D (1,2) 塔
+    // 00000048 (1,3) 石头      // 0000004E (1,3) 塔
+    // 00000049 (1,4) 石头      // 0000004F (1,4) 塔
+    // 0000004A (2,1) 石头      // 00000050 (2,1) 塔
+    // 0000004B (2,4) 石头      // 00000051 (2,4) 塔
+
+    // 00000052 (3,1) 石头      // 00000054 (3,1) 塔
+    // 00000053 (3,4) 石头      // 00000055 (3,4) 塔
+
+    // State
+    // 00020001 生成
+    // 00200010 踩到
+    // 00400001 出去
+    // 00080004 消失
     #endregion
 
 }
+
+#region 函数集
+public static class EventExtensions
+{
+    private static bool ParseHexId(string? idStr, out uint id)
+    {
+        id = 0;
+        if (string.IsNullOrEmpty(idStr)) return false;
+        try
+        {
+            var idStr2 = idStr.Replace("0x", "");
+            id = uint.Parse(idStr2, System.Globalization.NumberStyles.HexNumber);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public static uint ActionId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["ActionId"]);
+    }
+
+    public static uint SourceId(this Event @event)
+    {
+        return ParseHexId(@event["SourceId"], out var id) ? id : 0;
+    }
+
+    public static uint SourceDataId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["SourceDataId"]);
+    }
+
+    public static uint TargetId(this Event @event)
+    {
+        return ParseHexId(@event["TargetId"], out var id) ? id : 0;
+    }
+
+    public static uint TargetIndex(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["TargetIndex"]);
+    }
+
+    public static Vector3 SourcePosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+    }
+
+    public static Vector3 TargetPosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
+    }
+
+    public static Vector3 EffectPosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
+    }
+
+    public static float SourceRotation(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
+    }
+
+    public static float TargetRotation(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<float>(@event["TargetRotation"]);
+    }
+
+    public static string SourceName(this Event @event)
+    {
+        return @event["SourceName"];
+    }
+
+    public static string TargetName(this Event @event)
+    {
+        return @event["TargetName"];
+    }
+
+    public static uint DurationMilliseconds(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
+    }
+
+    public static uint Index(this Event @event)
+    {
+        return ParseHexId(@event["Index"], out var id) ? id : 0;
+    }
+
+    public static uint State(this Event @event)
+    {
+        return ParseHexId(@event["State"], out var id) ? id : 0;
+    }
+
+    public static uint DirectorId(this Event @event)
+    {
+        return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
+    }
+
+    public static uint StatusID(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
+    }
+
+    public static uint StackCount(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["StackCount"]);
+    }
+
+    public static uint Param(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["Param"]);
+    }
+}
+
+public static class IbcHelper
+{
+    public static IBattleChara? GetById(uint id)
+    {
+        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+    }
+
+    public static IBattleChara? GetMe()
+    {
+        return Svc.ClientState.LocalPlayer;
+    }
+
+    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
+    {
+        return Svc.Objects.Where(x => x.DataId == dataId);
+    }
+
+    public static uint GetCharHpcur(uint id)
+    {
+        // 如果null，返回0
+        var hp = GetById(id)?.CurrentHp ?? 0;
+        return hp;
+    }
+}
+
+public static class DirectionCalc
+{
+    // 以北为0建立list
+    // InnGame      List    Dir
+    // 0            - 4     pi
+    // 0.25 pi      - 3     0.75pi
+    // 0.5 pi       - 2     0.5pi
+    // 0.75 pi      - 1     0.25pi
+    // pi           - 0     0
+    // 1.25 pi      - 7     1.75pi
+    // 1.5 pi       - 6     1.5pi
+    // 1.75 pi      - 5     1.25pi
+    // Dir = Pi - InnGame (+ 2pi)
+
+    /// <summary>
+    /// 将游戏基角度（以南为0，逆时针增加）转为逻辑基角度（以北为0，顺时针增加）
+    /// </summary>
+    /// <param name="radian">游戏基角度</param>
+    /// <returns>逻辑基角度</returns>
+    public static float BaseInnGame2DirRad(float radian)
+    {
+        float r = (float)Math.PI - radian;
+        if (r < 0) r = (float)(r + 2 * Math.PI);
+        if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
+        return r;
+    }
+
+    /// <summary>
+    /// 将逻辑基角度（以北为0，顺时针增加）转为游戏基角度（以南为0，逆时针增加）
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <returns>游戏基角度</returns>
+    public static float BaseDirRad2InnGame(float radian)
+    {
+        float r = (float)Math.PI - radian;
+        if (r < Math.PI) r = (float)(r + 2 * Math.PI);
+        if (r > Math.PI) r = (float)(r - 2 * Math.PI);
+        return r;
+    }
+
+    /// <summary>
+    /// 输入逻辑基角度，获取逻辑方位
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <param name="dirs">方位总数</param>
+    /// <returns>逻辑基角度对应的逻辑方位</returns>
+    public static int DirRadRoundToDirs(float radian, int dirs)
+    {
+        var r = Math.Round(radian / (2f / dirs * Math.PI));
+        if (r == dirs) r = r - dirs;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 输入坐标，获取正分割逻辑方位（以右上为0）
+    /// </summary>
+    /// <param name="point">坐标点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="dirs">方位总数</param>
+    /// <returns>该坐标点对应的逻辑方位</returns>
+    public static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
+    {
+        // 正分割，0°为分界线，将360°分为dirs份
+        var r = Math.Floor(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 输入坐标，获取斜分割逻辑方位（以正上为0）
+    /// </summary>
+    /// <param name="point">坐标点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="dirs">方位总数</param>
+    /// <returns>该坐标点对应的逻辑方位</returns>
+    public static int PositionRoundToDirs(Vector3 point, Vector3 center, int dirs)
+    {
+        // 斜分割，0° return 0，将360°分为dirs份
+        var r = Math.Round(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 将角度转为弧度
+    /// </summary>
+    /// <param name="angle">角度值</param>
+    /// <returns>对应的弧度值</returns>
+    public static float angle2Rad(float angle)
+    {
+        // 输入角度转为弧度
+        float radian = (float)(angle * Math.PI / 180);
+        return radian;
+    }
+
+    /// <summary>
+    /// 以逻辑基弧度旋转某点
+    /// </summary>
+    /// <param name="point">待旋转点坐标</param>
+    /// <param name="center">中心</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <returns>旋转后坐标点</returns>
+    public static Vector3 RotatePoint(Vector3 point, Vector3 center, float radian)
+    {
+        // 围绕某点顺时针旋转某弧度
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
+        var length = v2.Length();
+        return new(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
+
+        // 另一种方案待验证
+        // var nextPos = Vector3.Transform((point - center), Matrix4x4.CreateRotationY(radian)) + center;
+    }
+
+    /// <summary>
+    /// 以逻辑基角度从某中心点向外延伸
+    /// </summary>
+    /// <param name="center">待延伸中心点</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <param name="length">延伸长度</param>
+    /// <returns>延伸后坐标点</returns>
+    public static Vector3 ExtendPoint(Vector3 center, float radian, float length)
+    {
+        // 令某点以某弧度延伸一定长度
+        return new(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
+    }
+
+    /// <summary>
+    /// 寻找外侧某点到中心的逻辑基弧度
+    /// </summary>
+    /// <param name="center">中心</param>
+    /// <param name="new_point">外侧点</param>
+    /// <returns>外侧点到中心的逻辑基弧度</returns>
+    public static float FindRadian(Vector3 center, Vector3 new_point)
+    {
+        // 找到某点到中心的弧度
+        float radian = MathF.PI - MathF.Atan2(new_point.X - center.X, new_point.Z - center.Z);
+        if (radian < 0)
+            radian += 2 * MathF.PI;
+        return radian;
+    }
+
+    /// <summary>
+    /// 将输入点左右折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerx">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointLR(Vector3 point, int centerx)
+    {
+        Vector3 v3 = new(2 * centerx - point.X, point.Y, point.Z);
+        return v3;
+    }
+}
+
+public static class IndexHelper
+{
+    /// <summary>
+    /// 输入玩家dataid，获得对应的位置index
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置index</returns>
+    public static int getPlayerIdIndex(uint pid, ScriptAccessory accessory)
+    {
+        // 获得玩家 IDX
+        return accessory.Data.PartyList.IndexOf(pid);
+    }
+
+    /// <summary>
+    /// 获得主视角玩家对应的位置index
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <returns>主视角玩家对应的位置index</returns>
+    public static int getMyIndex(ScriptAccessory accessory)
+    {
+        return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+    }
+
+    /// <summary>
+    /// 输入玩家dataid，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置称呼</returns>
+    public static string getPlayerJobByID(uint pid, ScriptAccessory accessory)
+    {
+        // 获得玩家职能简称，无用处，仅作DEBUG输出
+        var a = accessory.Data.PartyList.IndexOf(pid);
+        switch (a)
+        {
+            case 0: return "MT";
+            case 1: return "ST";
+            case 2: return "H1";
+            case 3: return "H2";
+            case 4: return "D1";
+            case 5: return "D2";
+            case 6: return "D3";
+            case 7: return "D4";
+            default: return "unknown";
+        }
+    }
+
+    /// <summary>
+    /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="idx">位置index</param>
+    /// <returns></returns>
+    public static string getPlayerJobByIndex(int idx)
+    {
+        switch (idx)
+        {
+            case 0: return "MT";
+            case 1: return "ST";
+            case 2: return "H1";
+            case 3: return "H2";
+            case 4: return "D1";
+            case 5: return "D2";
+            case 6: return "D3";
+            case 7: return "D4";
+            default: return "unknown";
+        }
+    }
+}
+
+public static class ColorHelper
+{
+    public static ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
+    public static ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
+    public static ScriptColor colorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 0.8f, 1.0f) };
+
+    // 门神 龙龙凤凤延迟危险区颜色，紫色
+    public static ScriptColor DelayDangerColor = new ScriptColor { V4 = new Vector4(1f, 0.2f, 1f, 1.5f) };
+    // 门神 蛇蛇位置颜色
+    public static ScriptColor GorgonColor = new ScriptColor { V4 = new Vector4(1f, 1f, 1f, 2f) };
+}
+
+public static class AssignDp
+{
+    /// <summary>
+    /// 返回自己指向某目标地点的dp，可修改dp.TargetPosition, dp.Scale
+    /// </summary>
+    /// <param name="target_pos">指向地点</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit dirPos(Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(0.5f);
+        dp.Owner = accessory.Data.Me;
+        dp.TargetPosition = target_pos;
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回起始地点指向某目标地点的dp，可修改dp.Position, dp.TargetPosition, dp.Scale
+    /// </summary>
+    /// <param name="start_pos">起始地点</param>
+    /// <param name="target_pos">指向地点</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit dirPos2Pos(Vector3 start_pos, Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(0.5f);
+        dp.Position = start_pos;
+        dp.TargetPosition = target_pos;
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回自己指向某目标对象的dp，可修改dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="target_id">指向目标对象</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit dirTarget(uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(0.5f);
+        dp.Owner = accessory.Data.Me;
+        dp.TargetObject = target_id;
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回与某对象仇恨相关的dp，可修改dp.TargetResolvePattern, dp.TargetOrderIndex, dp.Owner
+    /// </summary>
+    /// <param name="owner_id">起始目标id，通常为boss</param>
+    /// <param name="order_idx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawTargetOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5, 40);
+        dp.Owner = owner_id;
+        dp.TargetResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
+        dp.TargetOrderIndex = order_idx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回与某对象距离相关的dp，可修改dp.CentreResolvePattern, dp.CentreOrderIndex, dp.Owner
+    /// </summary>
+    /// <param name="owner_id">起始目标id，通常为boss</param>
+    /// <param name="order_idx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawCenterOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5);
+        dp.Owner = owner_id;
+        dp.CentreResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
+        dp.CentreOrderIndex = order_idx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+    /// <summary>
+    /// 返回owner与target的dp，可修改 dp.Owner, dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="owner_id">起始目标id，通常为自己</param>
+    /// <param name="target_id">目标单位id</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawOwner2Target(uint owner_id, uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5, 40);
+        dp.Owner = owner_id;
+        dp.TargetObject = target_id;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回圆形dp，跟随owner，可修改 dp.Owner, dp.Scale
+    /// </summary>
+    /// <param name="owner_id">起始目标id，通常为自己或Boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawCircle(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5);
+        dp.Owner = owner_id;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
+    /// </summary>
+    /// <param name="center">起始位置，通常为场地中心</param>
+    /// <param name="radian">旋转角度，以北为0度顺时针</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawStatic(Vector3 center, float radian, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5, 20);
+        dp.Position = center;
+        dp.Rotation = DirectionCalc.BaseDirRad2InnGame(radian);
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+}
+
+
+#endregion
