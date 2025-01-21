@@ -28,7 +28,8 @@ using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using System.Security.AccessControl;
 using System.Timers;
-using Lumina.Data.Parsing.Scd;
+// using Lumina.Data.Parsing.Scd;
+// using Lumina.Excel.GeneratedSheets;
 
 namespace UsamisScript.EndWalker.p8s;
 
@@ -38,7 +39,11 @@ public class p8s
     const string noteStr =
     """
     v0.0.0.2:
-    1. 重构代码。
+    1. 重构了部分代码（白费工夫。
+    2. 增加了门神一车指路。
+    3. 增加了本体分散位置指路。
+    4. 加快了本体一冰火指路的出现时间。
+    5. 增加了本体万象踩塔指引。
 
     v0.0.0.1:
     初版完成，门神仅到一分身，本体仅到万象。
@@ -68,8 +73,6 @@ public class p8s
     uint db_gorgonTarget;
     int db_gorgonTargetPos;
 
-
-
     List<uint> db_upliftOrder = [];
     List<uint> db_flareTarget = [];
     bool[] db_isFirstRound = [false, false, false, false, false, false, false, false];
@@ -77,6 +80,7 @@ public class p8s
     List<int> db_GorgonPosition = [];
     List<uint> db_GorgonSid = [];
 
+    static bool mb_isLeftCleave = false;   // 本体，是左半场刀
     // 本体，是紫圈目标
     bool[] mb_isNATarget = [false, false, false, false, false, false, false, false];
 
@@ -115,6 +119,7 @@ public class p8s
         db_GorgonPosition = [];
         db_GorgonSid = [];
 
+        mb_isLeftCleave = false;   // 本体，是左半场刀
         mb_isNATarget = [false, false, false, false, false, false, false, false];
 
         mb_hc1_sid = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -148,16 +153,7 @@ public class p8s
         var msg = @event["Message"].ToString();
         accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
 
-        List<int> safeDir = [0, 4, 6, 2, 5, 3, 7, 1];
-        var myIndex = IndexHelper.getMyIndex(accessory);
-        for (int i = 0; i < 8; i++)
-        {
-            var dp = DrawFunc.assignDp_DrawStaticLine(new Vector3(100, 0, 100), 0 + DirectionCalc.angle2Rad(45) * i, 0, 6000, $"八方指示{i}", accessory);
-            dp.Scale = new(2f, i % 2 == 0 ? 10 : 14.4f);
-            dp.ScaleMode = ScaleMode.YByDistance;
-            dp.Color = safeDir[myIndex] == i ? posColorPlayer.V4.WithW(3f) : posColorNormal.V4;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-        }
+        drawSpreadPos(accessory);
     }
 
     [ScriptMethod(name: "防击退删除画图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(7559|7548|7389)$"], userControl: false)]
@@ -342,43 +338,42 @@ public class p8s
 
     #region 门神：一车
 
-    // 1170.3 "Footprint" Ability { id: "7109", source: "Hephaistos" } window 100,100
-    // 击退后，令每名玩家身上出现范围圈，以互相分散
     [ScriptMethod(name: "门神：一车分散提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31027"])]
     public void DB_BeastSpread(Event @event, ScriptAccessory accessory)
     {
         for (int i = 0; i < 8; i++)
         {
-            var dp = assignDp_BeastSpread(accessory.Data.PartyList[i], 0, 13000, $"一车分散{i}", accessory);
+            var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 0, 13000, $"一车分散告警{i}", accessory);
+            dp.Scale = new(5);
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(0.6f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
-        drawSpreadDir(0, DirectionCalc.angle2Rad(45f), 8, accessory);
-    }
-    private static DrawPropertiesEdit assignDp_BeastSpread(uint sid, int delay, int destoryAt, string name, ScriptAccessory accessory)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new(5);
-        dp.Owner = sid;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destoryAt;
-        return dp;
+        drawSpreadPos(accessory);
     }
 
-    // TODO 感觉这边也别搞了，直接找点吧
-    private static void drawSpreadDir(float init_radian, float add_radian, int dir_num, ScriptAccessory accessory)
+    private static void drawSpreadPos(ScriptAccessory accessory)
     {
-        List<int> safeDir = [0, 4, 6, 2, 5, 3, 7, 1];
+        Vector3[] safePos = new Vector3[8];
+        safePos[0] = new Vector3(100, 0, 90);
+        safePos[1] = new Vector3(100, 0, 110);
+        safePos[2] = new Vector3(90, 0, 100);
+        safePos[3] = new Vector3(110, 0, 100);
+        safePos[4] = new Vector3(90, 0, 110);
+        safePos[5] = new Vector3(110, 0, 110);
+        safePos[6] = new Vector3(90, 0, 90);
+        safePos[7] = new Vector3(110, 0, 90);
+
         var myIndex = IndexHelper.getMyIndex(accessory);
-        for (int i = 0; i < dir_num; i++)
+
+        for (int i = 0; i < 8; i++)
         {
-            var dp = DrawFunc.assignDp_DrawStaticLine(new Vector3(100, 0, 100), init_radian + add_radian * i, 0, 6000, $"八方指示{i}", accessory);
-            dp.Scale = new(2f, i % 2 == 0 ? 10 : 14.4f);
-            dp.ScaleMode = ScaleMode.YByDistance;
-            dp.Color = safeDir[myIndex] == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+            var dp = AssignDp.drawStatic(safePos[i], 0, 0, 6000, $"一车起始定点{i}", accessory);
+            dp.Scale = new(1.5f);
+            dp.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+        var dp0 = AssignDp.dirPos(safePos[myIndex], 0, 6000, $"一车起始指路{myIndex}", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
     }
 
     // 决定受击顺序
@@ -388,9 +383,6 @@ public class p8s
         var tid = @event.TargetId();
         if (@event.TargetIndex() != 1) return;
         db_upliftOrder.Add(tid);
-
-        // if (!ParseObjectId(@event["TargetId"], out var tid)) return;
-        // if (@event["TargetIndex"] != "1") return;
     }
 
     // 决定引导顺序
@@ -402,7 +394,8 @@ public class p8s
             accessory.Method.TextInfo("自求多福吧……", 8000, true);
             return;
         }
-        var myTurn = Math.Floor((double)db_upliftOrder.IndexOf(accessory.Data.Me) / 2) + 1;
+        var myTurn = db_upliftOrder.IndexOf(accessory.Data.Me) / 2 + 1;
+        drawBeastStompRouteDir(myTurn, accessory);
         switch (myTurn)
         {
             case 1: accessory.Method.TextInfo("第一轮，先【左上1点引导】，后【A/D躲避】", 8000, true); return;
@@ -413,12 +406,46 @@ public class p8s
         }
     }
 
+    // TODO: 时间待验证
+    private static void drawBeastStompRouteDir(int myTurn, ScriptAccessory accessory)
+    {
+        // 左上，正上，正左，中
+        Vector3[] beastStompPos = [new(90, 0, 90), new(100, 0, 90), new(90, 0, 100), new(100, 0, 100)];
+        for (int i = 0; i < 4; i++)
+        {
+            var dp = AssignDp.drawStatic(beastStompPos[i], 0, 0, 8000, $"一车位置{i}", accessory);
+            dp.Scale = new(1.5f);
+            dp.Color = posColorNormal.V4.WithW(0.6f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+
+        List<int> stompIdx = myTurn switch
+        {
+            1 => new List<int> { 0, 1, 1, 1 },
+            2 => new List<int> { 3, 3, 2, 2 },
+            3 => new List<int> { 1, 0, 0, 1 },
+            4 => new List<int> { 1, 1, 3, 3 },
+            _ => new List<int> { -1, -1, -1, -1 }
+        };
+
+        List<int> delayTime = [0, 2000, 4000, 6000];
+        List<int> destoryTime = [2000, 4000, 6000, 8000];
+
+        for (int i = 0; i < 4; i++)
+        {
+            var dp_a = AssignDp.dirPos(beastStompPos[stompIdx[i]], delayTime[i], destoryTime[i], $"指路{i}", accessory);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_a);
+
+            if (i + 1 == 4) return;
+            var dp_b = AssignDp.dirPos2Pos(beastStompPos[stompIdx[i]], beastStompPos[stompIdx[i + 1]], delayTime[0], destoryTime[0], $"就位{i}", accessory);
+            dp_b.Color = accessory.Data.DefaultDangerColor;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_b);
+        }
+    }
+
     #endregion
 
     #region 门神：一蛇
-
-    // TODO
-    // 还需测试：毒圈范围
 
     // 177.3 "Gorgomanteia" Ability { id: "791A", source: "Hephaistos" }
     // 记录玩家buff
@@ -578,7 +605,7 @@ public class p8s
             var dp2 = assignDp_SnakeTarget(db_gorgonTarget, 0, 10000, $"蛇蛇目标{db_gorgonIdx}", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
 
-            var dp3 = DrawFunc.assignDp_DirTarget(db_gorgonTarget, 0, 5000, $"指向目标蛇蛇{db_gorgonIdx}", accessory);
+            var dp3 = AssignDp.dirTarget(db_gorgonTarget, 0, 5000, $"指向目标蛇蛇{db_gorgonIdx}", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp3);
 
             // 传输信息
@@ -644,7 +671,7 @@ public class p8s
             var dp2 = assignDp_SnakeTarget(db_gorgonTarget, 0, 10000, $"蛇蛇目标{db_gorgonIdx}", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
 
-            var dp3 = DrawFunc.assignDp_DirTarget(db_gorgonTarget, 0, 10000, $"指向目标蛇蛇{db_gorgonIdx}", accessory);
+            var dp3 = AssignDp.dirTarget(db_gorgonTarget, 0, 10000, $"指向目标蛇蛇{db_gorgonIdx}", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp3);
 
             // 传输信息
@@ -748,7 +775,7 @@ public class p8s
 
             for (uint i = 1; i < 5; i++)
             {
-                var dp = DrawFunc.assignDp_DrawOrder(sid, i, 0, 4000, $"一分身引导-{i}", accessory);
+                var dp = AssignDp.drawTargetOrder(sid, i, 0, 4000, $"一分身引导-{i}", accessory);
                 dp.Scale = new(5, 40);
                 dp.TargetOrderIndex = i;
                 dp.Color = hasDebuff ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
@@ -771,7 +798,7 @@ public class p8s
         {
             for (int i = 0; i < 8; i++)
             {
-                var dp = DrawFunc.assignDp_DrawLine(sid, accessory.Data.PartyList[i], 0, 6000, $"一分身分散直线{i}", accessory);
+                var dp = AssignDp.drawOwner2Target(sid, accessory.Data.PartyList[i], 0, 6000, $"一分身分散直线{i}", accessory);
                 dp.Scale = new(5, 40);
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
             }
@@ -783,33 +810,26 @@ public class p8s
             for (int i = 0; i < 4; i++)
             {
                 var ii = myIndex > 3 ? i + 4 : i;
-                var dp = DrawFunc.assignDp_DrawCircle(accessory.Data.PartyList[ii], 0, 6000, $"一分身分摊{ii}", accessory);
+                var dp = AssignDp.drawCircle(accessory.Data.PartyList[ii], 0, 6000, $"一分身分摊{ii}", accessory);
                 dp.Scale = new(5);
                 dp.Color = myIndex == ii || myIndex == parterner[ii] ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
             }
         }
-
     }
-
     #endregion
 
-    // TODO: 本体的所有时间都需要校对
-    // TODO：门神始终没遇到一分身分摊情况……一蛇毒也没遇到过，需要验证
 
     #region 本体：基础
 
-    // 5064.6 "Ashing Blaze" Ability { id: ["79D7", "79D8"], source: "Hephaistos" }
     [ScriptMethod(name: "本体：半场刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"])]
     public void MB_SideCleave(Event @event, ScriptAccessory accessory)
     {
         var isleft = @event.ActionId() == 31191;
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = "本体半场刀";
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.DestoryAt = 5700;
-        dp.Position = isleft ? new(90, 0, 80) : new(110, 0, 80);
+        mb_isLeftCleave = isleft;
+        var dp = AssignDp.drawStatic(new Vector3(100, 0, 100), 0, 0, 5700, $"本体半场刀{isleft}", accessory);
         dp.Scale = new(20, 40);
+        dp.Position = isleft ? new(90, 0, 80) : new(110, 0, 80);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
 
@@ -846,20 +866,15 @@ public class p8s
     [ScriptMethod(name: "本体：黄圈引导", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31369"])]
     public void MB_TyrantFlare(Event @event, ScriptAccessory accessory)
     {
-        var dp = accessory.Data.GetDefaultDrawProperties();
         for (int i = 0; i < 8; i++)
         {
-            dp.Name = $"黄圈引导";
+            var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 0, 3000, $"黄圈引导{i}", accessory);
             dp.Scale = new(6);
             dp.ScaleMode = ScaleMode.ByTime;
-            dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = ColorHelper.DelayDangerColor.V4;
-            dp.Delay = 0;
-            dp.DestoryAt = 3000;
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(0.6f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
-
 
     // const ids = {
     //   fireThenIce: '1DC',        476
@@ -875,51 +890,111 @@ public class p8s
     [ScriptMethod(name: "本体：一分摊分散", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(48[02])$"])]
     public void MB_ForceStackSpread(Event @event, ScriptAccessory accessory)
     {
-        var isStackFirst = @event["Param"] == "480";
-        // accessory.Method.SendChat($"/e [DEBUG] 先{(isStackFirst ? "分摊" : "分散")}");
+        var isStackFirst = @event.Param() == 480;
         var myIndex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
         if (mb_isNATarget[myIndex])
-        {
             accessory.Method.TextInfo($"先【{(isStackFirst ? "避开分摊" : "分散")}】，后【{(isStackFirst ? "分散" : "避开分摊")}】", 5000, true);
-        }
         else
-        {
             accessory.Method.TextInfo($"先【{(isStackFirst ? "分摊" : "分散")}】，后【{(isStackFirst ? "分散" : "分摊")}】", 5000, true);
-        }
-
-        var dp = accessory.Data.GetDefaultDrawProperties();
 
         // 绘制分散
+        drawForceSpread(isStackFirst, mb_isNATarget, accessory);
+        drawSpreadDir(isStackFirst, myIndex, accessory);
+        // 绘制分摊
+        drawForceStack(isStackFirst, myIndex, mb_isNATarget[myIndex], accessory);
+    }
+    private static void drawForceSpread(bool isStackFirst, bool[] naTargetList, ScriptAccessory accessory)
+    {
+        var spreadTime = isStackFirst ? 6100 : 3000;
+
         for (int i = 0; i < 8; i++)
         {
-            if (mb_isNATarget[i]) continue;
-            dp.Name = $"一紫圈分散-{i}";
+            if (naTargetList[i]) continue;
+            var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], spreadTime, spreadTime, $"一紫圈分散{i}", accessory);
             dp.Scale = new(6);
-            dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = accessory.Data.DefaultDangerColor;
-            dp.Delay = isStackFirst ? 6100 : 3000;
-            dp.DestoryAt = isStackFirst ? 6100 : 3000;
+            dp.ScaleMode = ScaleMode.ByTime;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+    }
 
-        // 绘制分摊
-        dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = $"一紫圈分摊";
+    private static void drawForceStack(bool isStackFirst, int myIndex, bool isTarget, ScriptAccessory accessory)
+    {
+        var stackTime = isStackFirst ? 3000 : 6100;
+        var stackOwner = myIndex < 4 ? accessory.Data.PartyList[myIndex + 4] : accessory.Data.PartyList[myIndex - 4];
+        var owner_id = isTarget ? stackOwner : accessory.Data.Me;
+        var dp = AssignDp.drawCircle(owner_id, stackTime, stackTime, $"一紫圈分摊{myIndex}", accessory);
         dp.Scale = new(6);
-        if (mb_isNATarget[myIndex])
+        dp.ScaleMode = ScaleMode.ByTime;
+        dp.Color = isTarget ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private async static void drawSpreadDir(bool isStackFirst, int myIndex, ScriptAccessory accessory)
+    {
+        var spreadTime = isStackFirst ? 6100 : 3000;
+
+        if (isStackFirst)
         {
-            dp.Owner = myIndex < 4 ? accessory.Data.PartyList[myIndex + 4] : accessory.Data.PartyList[myIndex - 4];
-            dp.Color = accessory.Data.DefaultDangerColor;
+            await Task.Delay(3000);
+            drawSpreadPos(mb_isLeftCleave, spreadTime, myIndex, accessory);
         }
         else
-        {
-            dp.Owner = accessory.Data.Me;
-            dp.Color = accessory.Data.DefaultSafeColor;
-        }
-        dp.Delay = isStackFirst ? 3000 : 6100;
-        dp.DestoryAt = isStackFirst ? 3000 : 6100;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            drawSpreadLine(spreadTime, myIndex, accessory);
+            return;
+    }
+    
+    private static void drawSpreadLine(int spreadTime, int myIndex, ScriptAccessory accessory)
+    {        
+        Vector3[] safePos = new Vector3[8];
+        safePos[0] = new Vector3(100, 0, 90);
+        safePos[1] = new Vector3(110, 0, 100);
+        safePos[2] = new Vector3(90, 0, 100);
+        safePos[3] = new Vector3(100, 0, 100);
+        safePos[4] = new Vector3(90, 0, 90);
+        safePos[5] = new Vector3(110, 0, 90);
+        safePos[6] = new Vector3(90, 0, 110);
+        safePos[7] = new Vector3(110, 0, 110);
 
+        for (int i = 0; i < 8; i++)
+        {
+            var dp = AssignDp.dirPos2Pos(new Vector3(100, 0, 100), safePos[i], 0, spreadTime, $"分散方向{i}", accessory);
+            dp.Scale = new(1.5f);
+            dp.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        }
+    }
+
+    private static void drawSpreadPos(bool isLeftCleave, int spreadTime, int myIndex, ScriptAccessory accessory)
+    {        
+        Vector3[] safePos = new Vector3[8];
+        // 右边
+        safePos[0] = new Vector3(102, 0, 80);
+        safePos[1] = new Vector3(110, 0, 80);
+        safePos[2] = new Vector3(102, 0, 90);
+        safePos[3] = new Vector3(102, 0, 100);
+        safePos[4] = new Vector3(110, 0, 90);
+        safePos[5] = new Vector3(110, 0, 100);
+        safePos[6] = new Vector3(110, 0, 110);
+        safePos[7] = new Vector3(102, 0, 110);
+
+        if (!isLeftCleave)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                safePos[i] = DirectionCalc.FoldPointLR(safePos[i], 100);
+            }
+        }
+        
+        for (int i = 0; i < 8; i++)
+        {
+            var dp0 = AssignDp.drawStatic(safePos[i], 0, spreadTime, spreadTime, $"分散位置{i}", accessory);
+            dp0.Scale = new(1.5f);
+            dp0.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp0);
+        }
+
+        var dp = AssignDp.dirPos(safePos[myIndex], spreadTime, spreadTime, $"分散位置指路{myIndex}", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
 
     // 5076.4 "Forcible Trifire/Forcible Difreeze" Ability { id: ["79BD", "79BE"], source: "Hephaistos" }
@@ -940,8 +1015,8 @@ public class p8s
             dp.CentreResolvePattern = PositionResolvePatternEnum.PlayerFarestOrder;
             dp.CentreOrderIndex = i;
             dp.Color = mb_isNATarget[myIndex] ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
-            dp.Delay = isFireFirst ? 2000 : 6100;
-            dp.DestoryAt = isFireFirst ? 4000 : 6100;
+            dp.Delay = isFireFirst ? 0 : 6100;
+            dp.DestoryAt = isFireFirst ? 6000 : 6100;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
 
@@ -954,8 +1029,8 @@ public class p8s
             dp.CentreResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
             dp.CentreOrderIndex = i + 1;
             dp.Color = mb_isNATarget[myIndex] ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
-            dp.Delay = isFireFirst ? 6100 : 2000;
-            dp.DestoryAt = isFireFirst ? 6100 : 4000;
+            dp.Delay = isFireFirst ? 6100 : 0;
+            dp.DestoryAt = isFireFirst ? 6100 : 6000;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
@@ -1051,8 +1126,8 @@ public class p8s
         dp.TargetPosition = destinationPoint1;
         dp.ScaleMode = ScaleMode.YByDistance;
         dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = 2000;
-        dp.DestoryAt = 4000;
+        dp.Delay = 0;
+        dp.DestoryAt = 6000;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
 
         dp = accessory.Data.GetDefaultDrawProperties();
@@ -1160,7 +1235,7 @@ public class p8s
         }
     }
 
-    [ScriptMethod(name: "本体：一运指路阶段零", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31148"])]
+    [ScriptMethod(name: "本体：一运初始站位指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31148"])]
     public void MB_HC1_GuidePhase0(Event @event, ScriptAccessory accessory)
     {
         Task.Delay(10900).ContinueWith(t =>
@@ -1280,8 +1355,7 @@ public class p8s
         }
     }
 
-
-    [ScriptMethod(name: "本体：一运指路阶段一", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
+    [ScriptMethod(name: "本体：一运第一次合成指路", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
     public void MB_HC1_GuidePhase1(Event @event, ScriptAccessory accessory)
     {
         Task.Delay(50).ContinueWith(t =>
@@ -1333,7 +1407,7 @@ public class p8s
         });
     }
 
-    [ScriptMethod(name: "本体：一运指路阶段二", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"])]
+    [ScriptMethod(name: "本体：一运合成后站位指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3119[12])$"])]
     public void MB_HC1_GuidePhase2(Event @event, ScriptAccessory accessory)
     {
         if (mb_conceptFinNum != 2) return;
@@ -1394,7 +1468,7 @@ public class p8s
         }
     }
 
-    [ScriptMethod(name: "本体：一运指路阶段三", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
+    [ScriptMethod(name: "本体：一运第二次合成指路", eventType: EventTypeEnum.EnvControl, eventCondition: ["Id:00020001"])]
     public void MB_HC1_GuidePhase3(Event @event, ScriptAccessory accessory)
     {
         Task.Delay(50).ContinueWith(t =>
@@ -1487,23 +1561,6 @@ public class p8s
 
     #region 本体：万象
 
-    // 5185.3 "Limitless Desolation" Ability { id: "75ED", source: "Hephaistos" }
-    // 5186.5 "Tyrant's Fire III 1" Ability { id: "75F0", source: "Hephaistos" }
-    // 5189.5 "Tyrant's Fire III 2" Ability { id: "75F0", source: "Hephaistos" }
-    // 5192.5 "Tyrant's Fire III 3" Ability { id: "75F0", source: "Hephaistos" }
-    // 5195.5 "Tyrant's Fire III 4" Ability { id: "75F0", source: "Hephaistos" }
-    // 5197.5 "Tyrant's Flare II" Ability { id: "7A88", source: "Hephaistos" }
-    // 5197.5 "Burst 1" #Ability { id: "79D5", source: "Hephaistos" }
-    // 5200.4 "Tyrant's Flare II" #Ability { id: "7A88", source: "Hephaistos" }
-    // 5200.4 "Burst 2" #Ability { id: "79D5", source: "Hephaistos" }
-    // 5203.4 "Tyrant's Flare II" #Ability { id: "7A88", source: "Hephaistos" }
-    // 5203.4 "Burst 3" #Ability { id: "79D5", source: "Hephaistos" }
-    // 5206.3 "Tyrant's Flare II" #Ability { id: "7A88", source: "Hephaistos" }
-    // 5206.3 "Burst 4" #Ability { id: "79D5", source: "Hephaistos" }
-
-    // Tyrant's Fire III 是决定顺序的buff
-    // Tyrant's Flare II 是引导的黄圈爆炸
-    // Burst 是踩塔
     [ScriptMethod(name: "本体：万象灰烬分散预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:30189"])]
     public void MB_LimitlessDesolation(Event @event, ScriptAccessory accessory)
     {
@@ -1539,7 +1596,6 @@ public class p8s
         dp.Delay = 0;
         dp.DestoryAt = 8000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-
     }
 
     #endregion
@@ -1673,10 +1729,9 @@ public static class IbcHelper
         return Svc.ClientState.LocalPlayer;
     }
 
-    public static IEnumerable<IBattleChara> GetByDataId(uint dataId)
+    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
     {
-        //! 不确定是否有用
-        return (IEnumerable<IBattleChara>)Svc.Objects.Where(x => x.DataId == dataId);
+        return Svc.Objects.Where(x => x.DataId == dataId);
     }
 
     public static uint GetCharHpcur(uint id)
@@ -1700,6 +1755,12 @@ public static class DirectionCalc
     // 1.5 pi       - 6     1.5pi
     // 1.75 pi      - 5     1.25pi
     // Dir = Pi - InnGame (+ 2pi)
+
+    /// <summary>
+    /// 将游戏基角度（以南为0，逆时针增加）转为逻辑基角度（以北为0，顺时针增加）
+    /// </summary>
+    /// <param name="radian">游戏基角度</param>
+    /// <returns>逻辑基角度</returns>
     public static float BaseInnGame2DirRad(float radian)
     {
         float r = (float)Math.PI - radian;
@@ -1708,6 +1769,11 @@ public static class DirectionCalc
         return r;
     }
 
+    /// <summary>
+    /// 将逻辑基角度（以北为0，顺时针增加）转为游戏基角度（以南为0，逆时针增加）
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <returns>游戏基角度</returns>
     public static float BaseDirRad2InnGame(float radian)
     {
         float r = (float)Math.PI - radian;
@@ -1716,6 +1782,12 @@ public static class DirectionCalc
         return r;
     }
 
+    /// <summary>
+    /// 输入逻辑基角度，获取逻辑方位
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <param name="dirs">方位总数</param>
+    /// <returns>逻辑基角度对应的逻辑方位</returns>
     public static int DirRadRoundToDirs(float radian, int dirs)
     {
         var r = Math.Round(radian / (2f / dirs * Math.PI));
@@ -1723,6 +1795,13 @@ public static class DirectionCalc
         return (int)r;
     }
 
+    /// <summary>
+    /// 输入坐标，获取正分割逻辑方位（以右上为0）
+    /// </summary>
+    /// <param name="point">坐标点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="dirs">方位总数</param>
+    /// <returns>该坐标点对应的逻辑方位</returns>
     public static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
     {
         // 正分割，0°为分界线，将360°分为dirs份
@@ -1730,6 +1809,13 @@ public static class DirectionCalc
         return (int)r;
     }
 
+    /// <summary>
+    /// 输入坐标，获取斜分割逻辑方位（以正上为0）
+    /// </summary>
+    /// <param name="point">坐标点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="dirs">方位总数</param>
+    /// <returns>该坐标点对应的逻辑方位</returns>
     public static int PositionRoundToDirs(Vector3 point, Vector3 center, int dirs)
     {
         // 斜分割，0° return 0，将360°分为dirs份
@@ -1737,6 +1823,11 @@ public static class DirectionCalc
         return (int)r;
     }
 
+    /// <summary>
+    /// 将角度转为弧度
+    /// </summary>
+    /// <param name="angle">角度值</param>
+    /// <returns>对应的弧度值</returns>
     public static float angle2Rad(float angle)
     {
         // 输入角度转为弧度
@@ -1744,6 +1835,13 @@ public static class DirectionCalc
         return radian;
     }
 
+    /// <summary>
+    /// 以逻辑基弧度旋转某点
+    /// </summary>
+    /// <param name="point">待旋转点坐标</param>
+    /// <param name="center">中心</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <returns>旋转后坐标点</returns>
     public static Vector3 RotatePoint(Vector3 point, Vector3 center, float radian)
     {
         // 围绕某点顺时针旋转某弧度
@@ -1752,16 +1850,29 @@ public static class DirectionCalc
         var length = v2.Length();
         return new(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
 
-        // TODO 另一种方案待验证
+        // 另一种方案待验证
         // var nextPos = Vector3.Transform((point - center), Matrix4x4.CreateRotationY(radian)) + center;
     }
 
+    /// <summary>
+    /// 以逻辑基角度从某中心点向外延伸
+    /// </summary>
+    /// <param name="center">待延伸中心点</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <param name="length">延伸长度</param>
+    /// <returns>延伸后坐标点</returns>
     public static Vector3 ExtendPoint(Vector3 center, float radian, float length)
     {
         // 令某点以某弧度延伸一定长度
         return new(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
     }
 
+    /// <summary>
+    /// 寻找外侧某点到中心的逻辑基弧度
+    /// </summary>
+    /// <param name="center">中心</param>
+    /// <param name="new_point">外侧点</param>
+    /// <returns>外侧点到中心的逻辑基弧度</returns>
     public static float FindRadian(Vector3 center, Vector3 new_point)
     {
         // 找到某点到中心的弧度
@@ -1770,21 +1881,50 @@ public static class DirectionCalc
             radian += 2 * MathF.PI;
         return radian;
     }
+
+    /// <summary>
+    /// 将输入点左右折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerx">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointLR(Vector3 point, int centerx)
+    {
+        Vector3 v3 = new(2 * centerx - point.X, point.Y, point.Z);
+        return v3;
+    }
 }
 
 public static class IndexHelper
 {
+    /// <summary>
+    /// 输入玩家dataid，获得对应的位置index
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置index</returns>
     public static int getPlayerIdIndex(uint pid, ScriptAccessory accessory)
     {
         // 获得玩家 IDX
         return accessory.Data.PartyList.IndexOf(pid);
     }
 
+    /// <summary>
+    /// 获得主视角玩家对应的位置index
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <returns>主视角玩家对应的位置index</returns>
     public static int getMyIndex(ScriptAccessory accessory)
     {
         return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
     }
 
+    /// <summary>
+    /// 输入玩家dataid，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置称呼</returns>
     public static string getPlayerJobByID(uint pid, ScriptAccessory accessory)
     {
         // 获得玩家职能简称，无用处，仅作DEBUG输出
@@ -1802,6 +1942,12 @@ public static class IndexHelper
             default: return "unknown";
         }
     }
+
+    /// <summary>
+    /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="idx">位置index</param>
+    /// <returns></returns>
     public static string getPlayerJobByIndex(int idx)
     {
         switch (idx)
@@ -1831,12 +1977,18 @@ public static class ColorHelper
     public static ScriptColor GorgonColor = new ScriptColor { V4 = new Vector4(1f, 1f, 1f, 2f) };
 }
 
-public static class DrawFunc
+public static class AssignDp
 {
     /// <summary>
-    /// 返回自己指向某地点的dp
+    /// 返回自己指向某目标地点的dp，可修改dp.TargetPosition, dp.Scale
     /// </summary>
-    public static DrawPropertiesEdit assignDp_DirPos(Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    /// <param name="target_pos">指向地点</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit dirPos(Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -1851,9 +2003,39 @@ public static class DrawFunc
     }
 
     /// <summary>
-    /// 返回自己指向某对象的dp
+    /// 返回起始地点指向某目标地点的dp，可修改dp.Position, dp.TargetPosition, dp.Scale
     /// </summary>
-    public static DrawPropertiesEdit assignDp_DirTarget(uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    /// <param name="start_pos">起始地点</param>
+    /// <param name="target_pos">指向地点</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit dirPos2Pos(Vector3 start_pos, Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(0.5f);
+        dp.Position = start_pos;
+        dp.TargetPosition = target_pos;
+        dp.ScaleMode = ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回自己指向某目标对象的dp，可修改dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="target_id">指向目标对象</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit dirTarget(uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -1868,9 +2050,16 @@ public static class DrawFunc
     }
 
     /// <summary>
-    /// 返回离某对象距离/仇恨相关的dp
+    /// 返回与某对象仇恨相关的dp，可修改dp.TargetResolvePattern, dp.TargetOrderIndex, dp.Owner
     /// </summary>
-    public static DrawPropertiesEdit assignDp_DrawOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    /// <param name="owner_id">起始目标id，通常为boss</param>
+    /// <param name="order_idx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawTargetOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -1885,9 +2074,39 @@ public static class DrawFunc
     }
 
     /// <summary>
-    /// 返回直线dp
+    /// 返回与某对象距离相关的dp，可修改dp.CentreResolvePattern, dp.CentreOrderIndex, dp.Owner
     /// </summary>
-    public static DrawPropertiesEdit assignDp_DrawLine(uint owner_id, uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    /// <param name="owner_id">起始目标id，通常为boss</param>
+    /// <param name="order_idx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawCenterOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(5);
+        dp.Owner = owner_id;
+        dp.CentreResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
+        dp.CentreOrderIndex = order_idx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destoryAt;
+        return dp;
+    }
+    /// <summary>
+    /// 返回owner与target的dp，可修改 dp.Owner, dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="owner_id">起始目标id，通常为自己</param>
+    /// <param name="target_id">目标单位id</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawOwner2Target(uint owner_id, uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -1901,9 +2120,15 @@ public static class DrawFunc
     }
 
     /// <summary>
-    /// 返回圆形dp
+    /// 返回圆形dp，跟随owner，可修改 dp.Owner, dp.Scale
     /// </summary>
-    public static DrawPropertiesEdit assignDp_DrawCircle(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    /// <param name="owner_id">起始目标id，通常为自己或Boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawCircle(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -1915,7 +2140,17 @@ public static class DrawFunc
         return dp;
     }
 
-    public static DrawPropertiesEdit assignDp_DrawStaticLine(Vector3 center, float radian, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    /// <summary>
+    /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
+    /// </summary>
+    /// <param name="center">起始位置，通常为场地中心</param>
+    /// <param name="radian">旋转角度，以北为0度顺时针</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destoryAt">绘图自出现起，经destoryAt ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit drawStatic(Vector3 center, float radian, int delay, int destoryAt, string name, ScriptAccessory accessory)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
