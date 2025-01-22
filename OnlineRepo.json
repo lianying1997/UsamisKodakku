@@ -13,7 +13,7 @@
         "Version": "0.0.0.1",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
-        "UpdateInfo": "【未完成！】仅门神，一范正攻，门神到三泛前的对话"
+        "UpdateInfo": "【未完成！仅门神，到三范前对话】\n1. 一范添加“正攻/无敌改/无敌”打法，于用户设置中设置。\n2. 修复超链黑白分摊位置提示错误Bug。\n3. 其他的忘了。"
     },
     {
         "Name": "Lv87 [创造环境极北造物院]",
