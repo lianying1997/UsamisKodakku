@@ -34,8 +34,8 @@ using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 
 namespace UsamisScript.EndWalker.p8s_unfinished;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "abc", version: "0.0.0.3", author: "Usami", note: noteStr)]
-// [ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.2", author: "Usami", note: noteStr)]
+// [ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "abc", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.3", author: "Usami", note: noteStr)]
 public class p8s
 {
     const string noteStr =
@@ -1607,11 +1607,13 @@ public class p8s
             dp.Name = $"万象分散-{i}";
             dp.Scale = new(6);
             dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = accessory.Data.DefaultDangerColor;
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(0.6f);
             dp.Delay = 0;
             dp.DestoryAt = 20000;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+        var myIndex = IndexHelper.getMyIndex(accessory);
+        drawLDSpreadDir(5000, myIndex, accessory);
     }
 
     private static void drawLDSpreadDir(int castTime, int myIndex, ScriptAccessory accessory)
@@ -1626,7 +1628,6 @@ public class p8s
         safePos[6] = DirectionCalc.FoldPointLR(safePos[2], 100);
         safePos[7] = DirectionCalc.FoldPointLR(safePos[3], 100);
 
-        // TODO
         for (int i = 0; i < 8; i++)
         {
             var dp0 = AssignDp.drawStatic(safePos[i], 0, 0, castTime, $"分散位置{i}", accessory);
@@ -1679,7 +1680,7 @@ public class p8s
         }
     }
 
-    [ScriptMethod(name: "本体：万象塔记录", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AB", "Id:00020001", "Index:regex:^(0000000(0[9ABC]|4[CDEF]|5[0145]))$"], userControl: false)]
+    [ScriptMethod(name: "本体：万象塔记录", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AB", "Id:00020001", "Index:regex:^(000000(0[9ABC]|4[CDEF]|5[0145]))$"], userControl: false)]
     public void MB_LDTowerRecord(Event @event, ScriptAccessory accessory)
     {
         lock (mb_LD_towerOrder)
@@ -1706,7 +1707,6 @@ public class p8s
             mb_LD_towerOrder.Add(new LD_Tower(mb_LD_towerOrder.Count(), Row, Col, -1));
             DebugMsg($"捕捉到第{mb_LD_towerOrder.Count()}座塔({Row}行, {Col}列)的生成。", accessory);
         }
-
     }
 
     [ScriptMethod(name: "本体：万象踩塔绘图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:30192"])]
@@ -1719,38 +1719,41 @@ public class p8s
         DebugMsg($"捕捉到易伤：{IndexHelper.getPlayerJobByIndex(pidx)}", accessory);
         // 第{mb_LD_playerOrder.Count()}个
 
-        await Task.Delay(100);
+        await Task.Delay(1000);
 
-        var myIndex = IndexHelper.getMyIndex(accessory);
-        for (int i = 0; i < mb_LD_towerOrder.Count(); i++)
+        lock (mb_LD_towerOrder)
         {
-            if (mb_LD_towerOrder[i].PlayerIdx != -1) continue;
-
-            var isTN = pidx <= 3;
-            var isLeftTower = mb_LD_towerOrder[i].Col <= 1;
-
-            if ((isTN && isLeftTower) || (!isTN && !isLeftTower))
+            var myIndex = IndexHelper.getMyIndex(accessory);
+            for (int i = 0; i < mb_LD_towerOrder.Count(); i++)
             {
-                mb_LD_towerOrder[i].PlayerIdx = pidx;
-                if (myIndex == pidx)
-                    drawLDDir(mb_LD_towerOrder[i], accessory);
+                if (mb_LD_towerOrder[i].PlayerIdx != -1) continue;
+
+                var isTN = pidx <= 3;
+                var isLeftTower = mb_LD_towerOrder[i].Col <= 2;
+
+                if ((isTN && isLeftTower) || (!isTN && !isLeftTower))
+                {
+                    mb_LD_towerOrder[i].PlayerIdx = pidx;
+                    if (myIndex == pidx)
+                        drawLDDir(mb_LD_towerOrder[i], accessory);
+                }
+                else
+                    continue;
             }
-            else
-                continue;
         }
+
     }
 
     private static void drawLDDir(LD_Tower tower, ScriptAccessory accessory)
     {
         // 在自身脚下出现黄圈前，将塔范围标记为危险区
-        // TODO: 最好是有一个在自身脚下出现黄圈的代码
         var dp_tdanger = assignDp_Tower(tower.Row, tower.Col, accessory);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp_tdanger);
 
         // 塔中危险区消失后，再标记为安全区
         var dp_tsafe = assignDp_Tower(tower.Row, tower.Col, accessory);
         dp_tsafe.Color = accessory.Data.DefaultSafeColor;
-        dp_tsafe.Delay = 7900;
+        dp_tsafe.Delay = 7000;
         // 故意写长消失时间，用envcontrol消除
         dp_tsafe.DestoryAt = 30000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp_tsafe);
@@ -1765,9 +1768,9 @@ public class p8s
     {
         Vector3 tower_center = new Vector3(75 + col * 10, 0, 75 + row * 10);
         var delay = 0;
-        var destoryAt = 7900;   // 8000 - task delay的100
+        var destoryAt = 7000;   // 8000 - task delay的100
         var dp = AssignDp.drawStatic(tower_center, 0, delay, destoryAt, $"塔{row}{col}", accessory);
-        dp.Scale = new(5);
+        dp.Scale = new(4);
         dp.Color = ColorHelper.colorRed.V4;
         return dp;
     }
@@ -1775,10 +1778,36 @@ public class p8s
     private static DrawPropertiesEdit assignDp_TowerDir(int row, int col, ScriptAccessory accessory)
     {
         Vector3 tower_center = new Vector3(75 + col * 10, 0, 75 + row * 10);
-        var delay = 7900;
+        var delay = 7000;
         var destoryAt = 30000;   // 8000 - task delay的100
         var dp = AssignDp.dirPos(tower_center, delay, destoryAt, $"塔指路{row}{col}", accessory);
         return dp;
+    }
+
+    [ScriptMethod(name: "本体：万象塔消失", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AB", "Id:00080004", "Index:regex:^(000000(0[9ABC]|4[CDEF]|5[0145]))$"], userControl: false)]
+    public void MB_LDTowerRemove(Event @event, ScriptAccessory accessory)
+    {
+        var idx = @event.Index();
+        int Row;
+        int Col;
+        (Row, Col) = idx switch
+        {
+            0x9 => (2, 2),
+            0xA => (2, 3),
+            0xB => (3, 2),
+            0xC => (3, 3),
+            0x4C => (1, 1),
+            0x4D => (1, 2),
+            0x4E => (1, 3),
+            0x4F => (1, 4),
+            0x50 => (2, 1),
+            0x51 => (2, 4),
+            0x54 => (3, 1),
+            0x55 => (3, 4),
+            _ => (0, 0)
+        };
+        accessory.Method.RemoveDraw($"塔指路{Row}{Col}");
+        accessory.Method.RemoveDraw($"塔{Row}{Col}");
     }
 
     // EnvControl记录
@@ -1806,7 +1835,6 @@ public class p8s
     // 00080004 消失
 
     #endregion
-
 }
 
 #region 函数集
