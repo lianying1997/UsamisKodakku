@@ -32,13 +32,16 @@ using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 // using Lumina.Data.Parsing.Scd;
 // using Lumina.Excel.GeneratedSheets;
 
-namespace UsamisScript.EndWalker.p8s;
+namespace UsamisScript.EndWalker.p8s_unfinished;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.2", author: "Usami", note: noteStr)]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.3", author: "Usami", note: noteStr)]
 public class p8s
 {
     const string noteStr =
     """
+    v0.0.0.3:
+    1. 增加万象踩塔指引。
+    
     v0.0.0.2:
     1. 重构了部分代码（白费工夫。
     2. 增加了门神一车指路。
@@ -111,6 +114,8 @@ public class p8s
     uint mb_gammaLongFollower;
     bool mb_NA1_isTNFixed = false;
     bool mb_NA1_isLine1Safe = false;
+    List<int> mb_LD_playerOrder = [];       // 本体万象阶段，玩家易伤顺序
+    List<LD_Tower> mb_LD_towerOrder = [];   // 本体万象阶段，塔顺序
 
     public void Init(ScriptAccessory accessory)
     {
@@ -149,6 +154,9 @@ public class p8s
         mb_gammaLongFollower = 0;
         mb_NA1_isTNFixed = false;
         mb_NA1_isLine1Safe = false;
+
+        mb_LD_playerOrder = [];         // 本体万象阶段，玩家易伤顺序
+        mb_LD_towerOrder = [];          // 本体万象阶段，塔顺序
 
         accessory.Method.RemoveDraw(".*");
     }
@@ -1588,7 +1596,7 @@ public class p8s
 
     #region 本体：万象
 
-    [ScriptMethod(name: "本体：万象灰烬分散预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:30189"])]
+    [ScriptMethod(name: "本体：万象灰烬指路与分散预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:30189"])]
     public void MB_LimitlessDesolation(Event @event, ScriptAccessory accessory)
     {
         mb_phase = MB_Phase.LD;
@@ -1598,16 +1606,43 @@ public class p8s
             dp.Name = $"万象分散-{i}";
             dp.Scale = new(6);
             dp.Owner = accessory.Data.PartyList[i];
-            dp.Color = accessory.Data.DefaultDangerColor;
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(0.6f);
             dp.Delay = 0;
             dp.DestoryAt = 20000;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
+        var myIndex = IndexHelper.getMyIndex(accessory);
+        drawLDSpreadDir(5000, myIndex, accessory);
+    }
+
+    private static void drawLDSpreadDir(int castTime, int myIndex, ScriptAccessory accessory)
+    {
+        Vector3[] safePos = new Vector3[8];
+        safePos[0] = new Vector3(90, 0, 80);
+        safePos[1] = new Vector3(80, 0, 90);
+        safePos[2] = new Vector3(80, 0, 100);
+        safePos[3] = new Vector3(90, 0, 110);
+        safePos[4] = DirectionCalc.FoldPointLR(safePos[0], 100);
+        safePos[5] = DirectionCalc.FoldPointLR(safePos[1], 100);
+        safePos[6] = DirectionCalc.FoldPointLR(safePos[2], 100);
+        safePos[7] = DirectionCalc.FoldPointLR(safePos[3], 100);
+
+        for (int i = 0; i < 8; i++)
+        {
+            var dp0 = AssignDp.drawStatic(safePos[i], 0, 0, castTime, $"分散位置{i}", accessory);
+            dp0.Scale = new(1f);
+            dp0.Color = myIndex == i ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+        }
+
+        var dp = AssignDp.dirPos(safePos[myIndex], 0, castTime, $"分散位置指路{myIndex}", accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
 
     [ScriptMethod(name: "本体：万象灰烬放黄圈预警", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:30192"])]
     public void MB_TyrantsFire(Event @event, ScriptAccessory accessory)
     {
+        // 检测到易伤后，绘制放黄圈预警
         var tid = @event.TargetId();
         var tidx = accessory.Data.PartyList.IndexOf(tid);
         accessory.Method.RemoveDraw($"万象分散-{tidx}");
@@ -1624,6 +1659,154 @@ public class p8s
         dp.Delay = 0;
         dp.DestoryAt = 8000;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    /// <summary>
+    /// 万象踩塔数据，包含“塔是第几个出现的”，“塔相对坐标”，“哪个玩家负责踩塔”
+    /// </summary>
+    public class LD_Tower
+    {
+        public int TowerIdx { get; set; }
+        public int Row { get; set; }
+        public int Col { get; set; }
+        public int PlayerIdx { get; set; }
+        public LD_Tower(int tidx, int row, int col, int playerIdx)
+        {
+            TowerIdx = tidx;
+            Row = row;
+            Col = col;
+            PlayerIdx = playerIdx;
+        }
+    }
+
+    [ScriptMethod(name: "本体：万象塔记录", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AB", "Id:00020001", "Index:regex:^(000000(0[9ABC]|4[CDEF]|5[0145]))$"], userControl: false)]
+    public void MB_LDTowerRecord(Event @event, ScriptAccessory accessory)
+    {
+        lock (mb_LD_towerOrder)
+        {
+            var idx = @event.Index();
+            int Row;
+            int Col;
+            (Row, Col) = idx switch
+            {
+                0x9 => (2, 2),
+                0xA => (2, 3),
+                0xB => (3, 2),
+                0xC => (3, 3),
+                0x4C => (1, 1),
+                0x4D => (1, 2),
+                0x4E => (1, 3),
+                0x4F => (1, 4),
+                0x50 => (2, 1),
+                0x51 => (2, 4),
+                0x54 => (3, 1),
+                0x55 => (3, 4),
+                _ => (0, 0)
+            };
+            mb_LD_towerOrder.Add(new LD_Tower(mb_LD_towerOrder.Count(), Row, Col, -1));
+            DebugMsg($"捕捉到第{mb_LD_towerOrder.Count()}座塔({Row}行, {Col}列)的生成。", accessory);
+        }
+    }
+
+    [ScriptMethod(name: "本体：万象踩塔绘图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:30192"])]
+    public async void MB_LDPlayerRecord(Event @event, ScriptAccessory accessory)
+    {
+        var tid = @event.TargetId();
+        if (@event.TargetIndex() != 1) return;
+        var pidx = IndexHelper.getPlayerIdIndex(tid, accessory);
+        mb_LD_playerOrder.Add(pidx);
+        DebugMsg($"捕捉到易伤：{IndexHelper.getPlayerJobByIndex(pidx)}", accessory);
+        // 第{mb_LD_playerOrder.Count()}个
+
+        await Task.Delay(1000);
+
+        lock (mb_LD_towerOrder)
+        {
+            var myIndex = IndexHelper.getMyIndex(accessory);
+            for (int i = 0; i < mb_LD_towerOrder.Count(); i++)
+            {
+                if (mb_LD_towerOrder[i].PlayerIdx != -1) continue;
+
+                var isTN = pidx <= 3;
+                var isLeftTower = mb_LD_towerOrder[i].Col <= 2;
+
+                if ((isTN && isLeftTower) || (!isTN && !isLeftTower))
+                {
+                    mb_LD_towerOrder[i].PlayerIdx = pidx;
+                    if (myIndex == pidx)
+                        drawLDDir(mb_LD_towerOrder[i], accessory);
+                }
+                else
+                    continue;
+            }
+        }
+
+    }
+
+    private static void drawLDDir(LD_Tower tower, ScriptAccessory accessory)
+    {
+        // 在自身脚下出现黄圈前，将塔范围标记为危险区
+        var dp_tdanger = assignDp_Tower(tower.Row, tower.Col, accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp_tdanger);
+
+        // 塔中危险区消失后，再标记为安全区
+        var dp_tsafe = assignDp_Tower(tower.Row, tower.Col, accessory);
+        dp_tsafe.Color = accessory.Data.DefaultSafeColor;
+        dp_tsafe.Delay = 7000;
+        // 故意写长消失时间，用envcontrol消除
+        dp_tsafe.DestoryAt = 30000;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp_tsafe);
+
+        // 塔中危险区消失后，人物到塔指路
+        var dp_tdir = assignDp_TowerDir(tower.Row, tower.Col, accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_tdir);
+        return;
+    }
+
+    private static DrawPropertiesEdit assignDp_Tower(int row, int col, ScriptAccessory accessory)
+    {
+        Vector3 tower_center = new Vector3(75 + col * 10, 0, 75 + row * 10);
+        var delay = 0;
+        var destoryAt = 7000;   // 8000 - task delay的100
+        var dp = AssignDp.drawStatic(tower_center, 0, delay, destoryAt, $"塔{row}{col}", accessory);
+        dp.Scale = new(4);
+        dp.Color = ColorHelper.colorRed.V4;
+        return dp;
+    }
+
+    private static DrawPropertiesEdit assignDp_TowerDir(int row, int col, ScriptAccessory accessory)
+    {
+        Vector3 tower_center = new Vector3(75 + col * 10, 0, 75 + row * 10);
+        var delay = 7000;
+        var destoryAt = 30000;   // 8000 - task delay的100
+        var dp = AssignDp.dirPos(tower_center, delay, destoryAt, $"塔指路{row}{col}", accessory);
+        return dp;
+    }
+
+    [ScriptMethod(name: "本体：万象塔消失", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AB", "Id:00080004", "Index:regex:^(000000(0[9ABC]|4[CDEF]|5[0145]))$"], userControl: false)]
+    public void MB_LDTowerRemove(Event @event, ScriptAccessory accessory)
+    {
+        var idx = @event.Index();
+        int Row;
+        int Col;
+        (Row, Col) = idx switch
+        {
+            0x9 => (2, 2),
+            0xA => (2, 3),
+            0xB => (3, 2),
+            0xC => (3, 3),
+            0x4C => (1, 1),
+            0x4D => (1, 2),
+            0x4E => (1, 3),
+            0x4F => (1, 4),
+            0x50 => (2, 1),
+            0x51 => (2, 4),
+            0x54 => (3, 1),
+            0x55 => (3, 4),
+            _ => (0, 0)
+        };
+        accessory.Method.RemoveDraw($"塔指路{Row}{Col}");
+        accessory.Method.RemoveDraw($"塔{Row}{Col}");
     }
 
     // EnvControl记录
@@ -1649,8 +1832,8 @@ public class p8s
     // 00200010 踩到
     // 00400001 出去
     // 00080004 消失
-    #endregion
 
+    #endregion
 }
 
 #region 函数集
