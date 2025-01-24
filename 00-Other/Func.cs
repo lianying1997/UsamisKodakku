@@ -17,6 +17,7 @@ using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs;
 
 namespace UsamisScript;
 
@@ -214,7 +215,7 @@ public static class DirectionCalc
     /// </summary>
     /// <param name="radian">游戏基角度</param>
     /// <returns>逻辑基角度</returns>
-    public static float BaseInnGame2DirRad(float radian)
+    public static float BaseInnGame2DirRad(this float radian)
     {
         float r = (float)Math.PI - radian;
         if (r < 0) r = (float)(r + 2 * Math.PI);
@@ -227,7 +228,7 @@ public static class DirectionCalc
     /// </summary>
     /// <param name="radian">逻辑基角度</param>
     /// <returns>游戏基角度</returns>
-    public static float BaseDirRad2InnGame(float radian)
+    public static float BaseDirRad2InnGame(this float radian)
     {
         float r = (float)Math.PI - radian;
         if (r < Math.PI) r = (float)(r + 2 * Math.PI);
@@ -241,7 +242,7 @@ public static class DirectionCalc
     /// <param name="radian">逻辑基角度</param>
     /// <param name="dirs">方位总数</param>
     /// <returns>逻辑基角度对应的逻辑方位</returns>
-    public static int DirRadRoundToDirs(float radian, int dirs)
+    public static int DirRadRoundToDirs(this float radian, int dirs)
     {
         var r = Math.Round(radian / (2f / dirs * Math.PI));
         if (r == dirs) r = r - dirs;
@@ -255,7 +256,7 @@ public static class DirectionCalc
     /// <param name="center">中心点</param>
     /// <param name="dirs">方位总数</param>
     /// <returns>该坐标点对应的逻辑方位</returns>
-    public static int PositionFloorToDirs(Vector3 point, Vector3 center, int dirs)
+    public static int PositionFloorToDirs(this Vector3 point, Vector3 center, int dirs)
     {
         // 正分割，0°为分界线，将360°分为dirs份
         var r = Math.Floor(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
@@ -269,7 +270,7 @@ public static class DirectionCalc
     /// <param name="center">中心点</param>
     /// <param name="dirs">方位总数</param>
     /// <returns>该坐标点对应的逻辑方位</returns>
-    public static int PositionRoundToDirs(Vector3 point, Vector3 center, int dirs)
+    public static int PositionRoundToDirs(this Vector3 point, Vector3 center, int dirs)
     {
         // 斜分割，0° return 0，将360°分为dirs份
         var r = Math.Round(dirs / 2 - dirs / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirs;
@@ -281,7 +282,7 @@ public static class DirectionCalc
     /// </summary>
     /// <param name="angle">角度值</param>
     /// <returns>对应的弧度值</returns>
-    public static float angle2Rad(float angle)
+    public static float angle2Rad(this float angle)
     {
         // 输入角度转为弧度
         float radian = (float)(angle * Math.PI / 180);
@@ -295,7 +296,7 @@ public static class DirectionCalc
     /// <param name="center">中心</param>
     /// <param name="radian">旋转弧度</param>
     /// <returns>旋转后坐标点</returns>
-    public static Vector3 RotatePoint(Vector3 point, Vector3 center, float radian)
+    public static Vector3 RotatePoint(this Vector3 point, Vector3 center, float radian)
     {
         // 围绕某点顺时针旋转某弧度
         Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
@@ -314,7 +315,7 @@ public static class DirectionCalc
     /// <param name="radian">旋转弧度</param>
     /// <param name="length">延伸长度</param>
     /// <returns>延伸后坐标点</returns>
-    public static Vector3 ExtendPoint(Vector3 center, float radian, float length)
+    public static Vector3 ExtendPoint(this Vector3 center, float radian, float length)
     {
         // 令某点以某弧度延伸一定长度
         return new(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
@@ -326,7 +327,7 @@ public static class DirectionCalc
     /// <param name="center">中心</param>
     /// <param name="new_point">外侧点</param>
     /// <returns>外侧点到中心的逻辑基弧度</returns>
-    public static float FindRadian(Vector3 center, Vector3 new_point)
+    public static float FindRadian(this Vector3 new_point, Vector3 center)
     {
         // 找到某点到中心的弧度
         float radian = MathF.PI - MathF.Atan2(new_point.X - center.X, new_point.Z - center.Z);
@@ -341,7 +342,7 @@ public static class DirectionCalc
     /// <param name="point">待折叠点</param>
     /// <param name="centerx">中心折线坐标点</param>
     /// <returns></returns>
-    public static Vector3 FoldPointLR(Vector3 point, int centerx)
+    public static Vector3 FoldPointLR(this Vector3 point, int centerx)
     {
         Vector3 v3 = new(2 * centerx - point.X, point.Y, point.Z);
         return v3;
@@ -356,7 +357,7 @@ public static class IndexHelper
     /// <param name="pid">玩家SourceId</param>
     /// <param name="accessory"></param>
     /// <returns>该玩家对应的位置index</returns>
-    public static int getPlayerIdIndex(uint pid, ScriptAccessory accessory)
+    public static int getPlayerIdIndex(this ScriptAccessory accessory, uint pid)
     {
         // 获得玩家 IDX
         return accessory.Data.PartyList.IndexOf(pid);
@@ -367,7 +368,7 @@ public static class IndexHelper
     /// </summary>
     /// <param name="accessory"></param>
     /// <returns>主视角玩家对应的位置index</returns>
-    public static int getMyIndex(ScriptAccessory accessory)
+    public static int getMyIndex(this ScriptAccessory accessory)
     {
         return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
     }
@@ -378,7 +379,7 @@ public static class IndexHelper
     /// <param name="pid">玩家SourceId</param>
     /// <param name="accessory"></param>
     /// <returns>该玩家对应的位置称呼</returns>
-    public static string getPlayerJobByID(uint pid, ScriptAccessory accessory)
+    public static string getPlayerJobByID(this ScriptAccessory accessory, uint pid)
     {
         // 获得玩家职能简称，无用处，仅作DEBUG输出
         var a = accessory.Data.PartyList.IndexOf(pid);
@@ -400,8 +401,9 @@ public static class IndexHelper
     /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
     /// </summary>
     /// <param name="idx">位置index</param>
+    /// <param name="accessory"></param>
     /// <returns></returns>
-    public static string getPlayerJobByIndex(int idx)
+    public static string getPlayerJobByIndex(this ScriptAccessory accessory, int idx)
     {
         switch (idx)
         {
@@ -424,10 +426,6 @@ public static class ColorHelper
     public static ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
     public static ScriptColor colorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 0.8f, 1.0f) };
 
-    // 门神 龙龙凤凤延迟危险区颜色，紫色
-    public static ScriptColor DelayDangerColor = new ScriptColor { V4 = new Vector4(1f, 0.2f, 1f, 1.5f) };
-    // 门神 蛇蛇位置颜色
-    public static ScriptColor GorgonColor = new ScriptColor { V4 = new Vector4(1f, 1f, 1f, 2f) };
 }
 
 public static class AssignDp
@@ -441,7 +439,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit dirPos(Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit dirPos(this ScriptAccessory accessory, Vector3 target_pos, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -465,7 +463,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit dirPos2Pos(Vector3 start_pos, Vector3 target_pos, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit dirPos2Pos(this ScriptAccessory accessory, Vector3 start_pos, Vector3 target_pos, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -488,7 +486,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit dirTarget(uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit dirTarget(this ScriptAccessory accessory, uint target_id, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -512,7 +510,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawTargetOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawTargetOrder(this ScriptAccessory accessory, uint owner_id, uint order_idx, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -536,7 +534,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawCenterOrder(uint owner_id, uint order_idx, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawCenterOrder(this ScriptAccessory accessory, uint owner_id, uint order_idx, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -559,7 +557,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawOwner2Target(uint owner_id, uint target_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawOwner2Target(this ScriptAccessory accessory, uint owner_id, uint target_id, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -581,7 +579,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawCircle(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawCircle(this ScriptAccessory accessory, uint owner_id, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -603,7 +601,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawStatic(Vector3 center, float radian, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawStatic(this ScriptAccessory accessory, Vector3 center, float radian, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
