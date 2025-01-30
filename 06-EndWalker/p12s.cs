@@ -29,7 +29,7 @@ using System.Drawing;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.4", author: "Usami", note: noteStr)]
 
 public class p12s
 {
@@ -37,6 +37,9 @@ public class p12s
     """
     请先按需求检查并设置“用户设置”栏目。
     门神到超链后对话，本体到一地火。
+
+    v0.0.0.4:
+    1. 修复一风火可能不绘图的BUG。
 
     v0.0.0.3:
     1. 本体到一地火。
@@ -1841,7 +1844,7 @@ public class p12s
             mb_Caloric_WindPriority[tidx]++;
         // 1 左上，2 右上，3 右下，4 左下
 
-        mb_Caloric_phase = mb_Caloric_phase + 1;
+        mb_Caloric_phase++;
     }
 
     [ScriptMethod(name: "本体：一风火，初始指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33597"])]
@@ -1883,7 +1886,7 @@ public class p12s
     public void MB_PhaseChange_Caloric_PartnerStack(Event @event, ScriptAccessory accessory)
     {
         if (phase != P12S_Phase.Caloric_I) return;
-        if (mb_Caloric_phase != 2) return;
+        if (mb_Caloric_phase > 2) return;
         mb_Caloric_phase = 10;
         accessory.Method.RemoveDraw($"^(一风火分摊.*)$");
         accessory.Method.RemoveDraw($"^(一风火初始指路.*)$");
@@ -2288,7 +2291,17 @@ public class p12s
     }
 
     #endregion
+    
+    #region 本体：黑白塔
 
+    [ScriptMethod(name: "本体：阶段转换地火（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33566"], userControl: false)]
+    public void MB_PhaseChange_Pangenesis(Event @event, ScriptAccessory accessory)
+    {
+        phase = P12S_Phase.Pangenesis;
+        DebugMsg($"当前阶段为：{phase}", accessory);
+    }
+
+    #endregion
 }
 
 
