@@ -2294,12 +2294,7 @@ public class p12s
     
     #region 本体：黑白塔
 
-    [ScriptMethod(name: "本体：阶段转换地火（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33566"], userControl: false)]
-    public void MB_PhaseChange_Pangenesis(Event @event, ScriptAccessory accessory)
-    {
-        phase = P12S_Phase.Pangenesis;
-        DebugMsg($"当前阶段为：{phase}", accessory);
-    }
+
 
     #endregion
 }
