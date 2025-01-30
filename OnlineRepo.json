@@ -10,10 +10,10 @@
     {
         "Name": "P12S [零式万魔殿 荒天之狱4]",
         "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
-        "Version": "0.0.0.3",
+        "Version": "0.0.0.4",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
-        "UpdateInfo": "1. 一范添加“正攻/无敌改/无敌”打法，于用户设置中设置。\n2. 本体到一地火。"
+        "UpdateInfo": "1. 一范添加“正攻/无敌改/无敌”打法，于用户设置中设置。\n2. 本体到一地火。\n3. 修复一风火可能不绘图的BUG。"
     },
     {
         "Name": "Lv87 [创造环境极北造物院]",
