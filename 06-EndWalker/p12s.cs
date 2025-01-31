@@ -26,17 +26,22 @@ using System.ComponentModel;
 using Microsoft.VisualBasic;
 using System.Reflection.Metadata.Ecma335;
 using System.Drawing;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
+using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.4", author: "Usami", note: noteStr)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.5", author: "Usami", note: noteStr)]
 
 public class p12s
 {
     const string noteStr =
     """
     请先按需求检查并设置“用户设置”栏目。
-    门神到超链后对话，本体到一地火。
+    门神到超链后对话，本体到黑白塔。
+
+    v0.0.0.5
+    1. 增加黑白塔指路（G8）。
 
     v0.0.0.4:
     1. 修复一风火可能不绘图的BUG。
@@ -47,6 +52,7 @@ public class p12s
     v0.0.0.2:
     1. 一范添加“正攻/无敌改/无敌”打法，于用户设置中设置。
     2. 修复超链黑白分摊位置提示错误Bug。
+    鸭门。
     """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -132,6 +138,15 @@ public class p12s
     bool mb_Caloric_SecondWindDonutDrawn = false;    // 一风火环风是否绘制完毕
     List<bool> mb_Exflare_FlarePos = [false, false, false, false]; // 地火核爆区
     bool mb_Exflare_DirDrawn = false;   // 地火指路是否绘制完毕
+    int mb_Pangenesis_towerNum = 0; // 黑白塔出塔计数
+    List<bool> mb_Pangenesis_phase = [false, false, false, false, false, false, false, false];  // 黑白塔程序阶段处理是否完成
+    List<bool> mb_Pangenesis_isLong = [false, false, false, false, false, false, false, false];    // 黑白塔，长buff
+    List<bool> mb_Pangenesis_isWhite = [false, false, false, false, false, false, false, false];   // 黑白塔，是白Buff
+    List<bool> mb_Pangenesis_hasFactor = [false, false, false, false, false, false, false, false]; // 黑白塔，有合成因子
+    List<bool> mb_Pangenesis_isTwo = [false, false, false, false, false, false, false, false];     // 黑白塔，有两层因子
+    List<bool> mb_Pangenesis_shouldWhiteTower = [false, false, false, false, false, false, false, false];   // 黑白塔，应该踩白塔
+    List<int> mb_Pangenesis_TowerIdxOrder = [-1, -1, -1, -1, -1, -1, -1, -1];   // 黑白塔，初始安排的一塔左，一塔左，二塔左上，二塔左下，一塔右，一塔右，二塔右上，二塔右下
+    List<int> mb_Pangenesis_TowerIdxSecondOrder = [-1, -1, -1, -1, -1, -1, -1, -1];   // 黑白塔，二塔左上，二塔左上，二塔左下，二塔左下，二塔右上，二塔右上，二塔右下，二塔右下
     public void Init(ScriptAccessory accessory)
     {
         phase = P12S_Phase.Init;
@@ -182,6 +197,17 @@ public class p12s
         mb_Exflare_FlarePos = [false, false, false, false]; // 地火核爆区
         mb_Exflare_DirDrawn = false;   // 地火指路是否绘制完毕
 
+        mb_Pangenesis_towerNum = 0; // 黑白塔出塔计数
+        mb_Pangenesis_phase = [false, false, false, false, false, false, false, false];  // 黑白塔程序阶段处理是否完成
+        mb_Pangenesis_isLong = [false, false, false, false, false, false, false, false];    // 黑白塔，长buff
+        mb_Pangenesis_isWhite = [false, false, false, false, false, false, false, false];   // 黑白塔，是白Buff
+        mb_Pangenesis_hasFactor = [false, false, false, false, false, false, false, false]; // 黑白塔，有合成因子
+        mb_Pangenesis_isTwo = [false, false, false, false, false, false, false, false];     // 黑白塔，有两层因子
+        mb_Pangenesis_shouldWhiteTower = [false, false, false, false, false, false, false, false];   // 黑白塔，应该踩白塔
+        mb_Pangenesis_TowerIdxOrder = [-1, -1, -1, -1, -1, -1, -1, -1];   // 黑白塔，初始安排的一塔左，一塔左，二塔上，二塔下，一塔右，一塔右，二塔上，二塔下
+        mb_Pangenesis_TowerIdxSecondOrder = [-1, -1, -1, -1, -1, -1, -1, -1];   // 黑白塔，二塔左上，二塔左上，二塔左下，二塔左下，二塔右上，二塔右上，二塔右下，二塔右下
+
+
         // DebugMsg($"/e Init Success.", accessory);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
@@ -200,7 +226,28 @@ public class p12s
         var msg = @event["Message"].ToString();
         DebugMsg($"获得玩家发送的消息：{msg}", accessory);
 
-        drawVerticalSafetyField(accessory);
+        DebugMsg($"hello", accessory);
+
+        string hasFactorStr = string.Join(", ", mb_Pangenesis_hasFactor);
+        DebugMsg($"hasFactorStr: {hasFactorStr}", accessory);
+
+        string isLongStr = string.Join(", ", mb_Pangenesis_isLong);
+        DebugMsg($"isLongStr: {isLongStr}", accessory);
+
+        string isWhiteStr = string.Join(", ", mb_Pangenesis_isWhite);
+        DebugMsg($"isWhiteStr: {isWhiteStr}", accessory);
+
+        string isTwoStr = string.Join(", ", mb_Pangenesis_isTwo);
+        DebugMsg($"isTwoStr: {isTwoStr}", accessory);
+
+        string shouldWhiteStr = string.Join(", ", mb_Pangenesis_shouldWhiteTower);
+        DebugMsg($"shouldWhiteStr: {shouldWhiteStr}", accessory);
+
+        string TowerIdxOrderStr = string.Join(", ", mb_Pangenesis_TowerIdxOrder);
+        DebugMsg($"TowerIdxOrderStr: {TowerIdxOrderStr}", accessory);
+
+        string TowerIdxSecondOrderStr = string.Join(", ", mb_Pangenesis_TowerIdxSecondOrder);
+        DebugMsg($"TowerIdxSecondOrderStr: {TowerIdxSecondOrderStr}", accessory);
     }
 
     [ScriptMethod(name: "移除绘图", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=RMV"], userControl: false)]
@@ -2291,10 +2338,362 @@ public class p12s
     }
 
     #endregion
-    
+
     #region 本体：黑白塔
 
+    [ScriptMethod(name: "本体：阶段转换黑白塔（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33599"], userControl: false)]
+    public void MB_PhaseChange_Pangenesis(Event @event, ScriptAccessory accessory)
+    {
+        phase = P12S_Phase.Pangenesis;
+        DebugMsg($"当前阶段为：{phase}", accessory);
+    }
 
+    [ScriptMethod(name: "本体：黑白塔排队提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33599"])]
+    public async void MB_Pangenesis_InitPosition(Event @event, ScriptAccessory accessory)
+    {
+        await Task.Delay(100);
+        if (phase != P12S_Phase.Pangenesis) return;
+        accessory.Method.TextInfo($"横向排队", 5000);
+    }
+
+    [ScriptMethod(name: "本体：黑白塔BUFF记录（不可控）", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(3593|357[67])$"], userControl: false)]
+    public async void MB_Pangenesis_BuffRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P12S_Phase.Pangenesis) return;
+        if (mb_Pangenesis_phase[0]) return;
+        var tid = @event.TargetId();
+        var tidx = IndexHelper.getPlayerIdIndex(tid, accessory);
+        var sid = @event.StatusID();
+        var stc = @event.StackCount();
+        var dur = @event.DurationMilliseconds();
+
+        const uint DNA = 3593;
+        const uint WHITE = 3576;
+        const uint BLACK = 3577;
+        const uint LONG = 20000;
+        const uint SHORT = 16000;
+
+        // DebugMsg($"检测到TIDX {tidx}, SID {sid}, STC {stc}, DUR {dur}", accessory);
+
+        switch (sid)
+        {
+            case DNA:
+                mb_Pangenesis_hasFactor[tidx] = true;
+                mb_Pangenesis_isTwo[tidx] = stc == 2;
+                // DebugMsg($"玩家{tidx}：{(sid == DNA ? "因子" : "无因子")}, {(stc == 2 ? "2层": "1层")}", accessory);
+                break;
+            case WHITE:
+            case BLACK:
+                mb_Pangenesis_isWhite[tidx] = sid == WHITE;
+                mb_Pangenesis_isLong[tidx] = dur == LONG;
+                mb_Pangenesis_shouldWhiteTower[tidx] = sid == BLACK;
+                // DebugMsg($"玩家{tidx}：{(sid == WHITE ? "白Buff" : "黑buff")}, {(dur == LONG ? "长": "短")}", accessory);
+                break;
+            default:
+                break;
+        }
+
+
+        await Task.Delay(100);
+        mb_Pangenesis_phase[0] = true;
+        // DebugMsg($"黑白塔初始BUFF记录封锁", accessory);
+    }
+
+    [ScriptMethod(name: "本体：黑白塔无极性组就位", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:33602"])]
+    public void MB_Pangenesis_NonpolarityPos(Event @event, ScriptAccessory accessory)
+    {
+        var FirstLeftPlayerIdx = getSpecificTowerPlayer(true, false, false, false, true);
+        var FirstRightPlayerIdx = getSpecificTowerPlayer(true, false, false, false, false);
+        var SecondUpLeftPlayerIdx = getSpecificTowerPlayer(false, false, false, false, true);
+        var SecondUpRightPlayerIdx = getSpecificTowerPlayer(false, false, false, false, false);
+
+        mb_Pangenesis_TowerIdxOrder[0] = FirstLeftPlayerIdx;
+        mb_Pangenesis_TowerIdxOrder[4] = FirstRightPlayerIdx;
+        mb_Pangenesis_TowerIdxOrder[2] = SecondUpLeftPlayerIdx;
+        mb_Pangenesis_TowerIdxOrder[6] = SecondUpRightPlayerIdx;
+        mb_Pangenesis_TowerIdxSecondOrder[0] = SecondUpLeftPlayerIdx;
+        mb_Pangenesis_TowerIdxSecondOrder[4] = SecondUpRightPlayerIdx;
+
+        DebugMsg($"左一塔{IndexHelper.getPlayerJobByIndex(FirstLeftPlayerIdx)}就位。", accessory);
+        DebugMsg($"右一塔{IndexHelper.getPlayerJobByIndex(FirstRightPlayerIdx)}就位。", accessory);
+        DebugMsg($"左二上塔{IndexHelper.getPlayerJobByIndex(SecondUpLeftPlayerIdx)}就位。", accessory);
+        DebugMsg($"右二上塔{IndexHelper.getPlayerJobByIndex(SecondUpRightPlayerIdx)}就位。", accessory);
+
+        const int CENTER_X = 100;
+        const int CENTER_Z = 91;
+
+        Vector3 FIRST_LEFT = new Vector3(85, 0, 91);
+        Vector3 FIRST_RIGHT = DirectionCalc.FoldPointLR(FIRST_LEFT, CENTER_X);
+        Vector3 SECOND_UP_LEFT = new Vector3(90, 0, 88);
+        Vector3 SECOND_UP_RIGHT = DirectionCalc.FoldPointLR(SECOND_UP_LEFT, CENTER_X);
+
+        var myIndex = IndexHelper.getMyIndex(accessory);
+        if (myIndex == FirstLeftPlayerIdx)
+            drawPangenesisDir(FIRST_LEFT, FirstLeftPlayerIdx, 0, 9000, accessory);
+            // var dp_FirstLeft = assignDp_TowerDir(FIRST_LEFT, FirstLeftPlayerIdx, 0, 9000, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_FirstLeft);
+        if (myIndex == FirstRightPlayerIdx)
+            drawPangenesisDir(FIRST_RIGHT, FirstRightPlayerIdx, 0, 9000, accessory);
+            // var dp_FirstRight = assignDp_TowerDir(FIRST_RIGHT, FirstRightPlayerIdx, 0, 9000, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_FirstRight);
+        if (myIndex == SecondUpLeftPlayerIdx)
+            drawPangenesisDir(SECOND_UP_LEFT, SecondUpLeftPlayerIdx, 0, 14000, accessory);
+            // var dp_SecondUpLeft = assignDp_TowerDir(SECOND_UP_LEFT, SecondUpLeftPlayerIdx, 0, 14000, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_SecondUpLeft);
+        if (myIndex == SecondUpRightPlayerIdx)
+            drawPangenesisDir(SECOND_UP_RIGHT, SecondUpRightPlayerIdx, 0, 14000, accessory);
+            // var dp_SecondUpRight = assignDp_TowerDir(SECOND_UP_RIGHT, SecondUpRightPlayerIdx, 0, 14000, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp_SecondUpRight);
+    }
+
+    [ScriptMethod(name: "本体：黑白塔数量记录（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3360[34])$"], userControl: false)]
+    public void MB_Pangenesis_TowerNumRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P12S_Phase.Pangenesis) return;
+        mb_Pangenesis_towerNum++;
+    }
+
+    [ScriptMethod(name: "本体：黑白塔第一步", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3360[34])$"])]
+    public async void MB_Pangenesis_FirstPlace(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P12S_Phase.Pangenesis) return;
+        if (mb_Pangenesis_phase[1]) return;
+
+        // 等塔数记录完毕
+        await Task.Delay(100);
+        if (mb_Pangenesis_towerNum > 2) return;
+
+        var myIndex = IndexHelper.getMyIndex(accessory);
+
+        bool isLeftTower = false;
+        bool isWhiteTower = false;
+        bool needWhiteBuff;
+
+        const int CENTER_X = 100;
+        const uint WHITE_TOWER = 33603;
+        const uint BLACK_TOWER = 33604;
+
+        var aid = @event.ActionId();
+        var tpos = @event.TargetPosition();
+
+        if (tpos.X < CENTER_X)
+            isLeftTower = true;
+        if (aid == WHITE_TOWER)
+            isWhiteTower = true;
+        needWhiteBuff = !isWhiteTower;
+
+        // 只有出现了塔的颜色才能判断的剩余四人
+        mb_Pangenesis_shouldWhiteTower[mb_Pangenesis_TowerIdxOrder[isLeftTower ? 0 : 4]] = isWhiteTower;
+        mb_Pangenesis_shouldWhiteTower[mb_Pangenesis_TowerIdxOrder[isLeftTower ? 2 : 6]] = !isWhiteTower;
+
+        // 边1塔：2层因子+短黑白BUFF
+        var FirstPlayerIdx = getSpecificTowerPlayer(true, true, false, needWhiteBuff, true);
+        mb_Pangenesis_TowerIdxOrder[isLeftTower ? 1 : 5] = FirstPlayerIdx;
+
+        DebugMsg($"{(isLeftTower ? "左一塔" : "右一塔")}为{(isWhiteTower ? "白" : "黑")}，{IndexHelper.getPlayerJobByIndex(FirstPlayerIdx)}去踩。", accessory);
+
+        if (myIndex == FirstPlayerIdx)
+            drawPangenesisDir(tpos, FirstPlayerIdx, 0, 5000, accessory);
+            // var dp = assignDp_TowerDir(tpos, FirstPlayerIdx, 0, 5000, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+        const int CENTER_Z = 91;
+        Vector3 SECOND_UP_LEFT = new Vector3(90, 0, 88);
+        Vector3 SECOND_UP_RIGHT = DirectionCalc.FoldPointLR(SECOND_UP_LEFT, CENTER_X);
+        Vector3 SECOND_DOWN_LEFT = DirectionCalc.FoldPointUD(SECOND_UP_LEFT, CENTER_Z);
+        Vector3 SECOND_DOWN_RIGHT = DirectionCalc.FoldPointUD(SECOND_UP_RIGHT, CENTER_Z);
+
+        // 下2塔：2层因子+长黑白BUFF
+        var SecondDownPlayerIdx = getSpecificTowerPlayer(true, true, true, needWhiteBuff, true);
+        mb_Pangenesis_TowerIdxOrder[isLeftTower ? 3 : 7] = SecondDownPlayerIdx;
+        mb_Pangenesis_TowerIdxSecondOrder[isLeftTower ? 2 : 6] = SecondDownPlayerIdx;
+
+        DebugMsg($"{(isLeftTower ? "左二下塔" : "右二下塔")}为{(isWhiteTower ? "白" : "黑")}，{IndexHelper.getPlayerJobByIndex(SecondDownPlayerIdx)}去踩。", accessory);
+
+        if (myIndex == SecondDownPlayerIdx)
+            drawPangenesisDir(isLeftTower ? SECOND_DOWN_LEFT : SECOND_DOWN_RIGHT, SecondDownPlayerIdx, 0, 10000, accessory);
+            // var dp = assignDp_TowerDir(isLeftTower ? SECOND_DOWN_LEFT : SECOND_DOWN_RIGHT, SecondDownPlayerIdx, 0, 10000, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+        await Task.Delay(100);
+        mb_Pangenesis_phase[1] = true;
+        DebugMsg($"=== 黑白塔第一步结束 ===", accessory);
+    }
+
+    [ScriptMethod(name: "本体：黑白塔转换塔色（不可控）", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(357[67])$"], userControl: false)]
+    public void MB_Pangenesis_ChangePolar(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P12S_Phase.Pangenesis) return;
+        if (mb_Pangenesis_towerNum < 2) return;
+        // 后续过程中，只要被附加黑白buff，就需要转换塔色
+        var tid = @event.TargetId();
+        var tidx = IndexHelper.getPlayerIdIndex(tid, accessory);
+        mb_Pangenesis_shouldWhiteTower[tidx] = !mb_Pangenesis_shouldWhiteTower[tidx];
+    }
+
+    [ScriptMethod(name: "本体：黑白塔第二步", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3360[34])$"])]
+    public async void MB_Pangenesis_SecondPlace(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P12S_Phase.Pangenesis) return;
+        if (mb_Pangenesis_phase[2]) return;
+
+        // 等塔数记录完毕
+        await Task.Delay(100);
+        if (mb_Pangenesis_towerNum <= 2) return;
+        if (mb_Pangenesis_towerNum > 6) return;
+
+        // 等极性buff记录完毕
+        await Task.Delay(1000);
+
+        var myIndex = IndexHelper.getMyIndex(accessory);
+
+        bool isLeftTower = false;
+        bool isWhiteTower = false;
+        bool isUpTower = false;
+
+        const int CENTER_X = 100;
+        const int CENTER_Z = 91;
+        const uint WHITE_TOWER = 33603;
+        const uint BLACK_TOWER = 33604;
+
+        var aid = @event.ActionId();
+        var tpos = @event.TargetPosition();
+
+        if (tpos.X < CENTER_X)
+            isLeftTower = true;
+        if (tpos.Z < CENTER_Z)
+            isUpTower = true;
+        if (aid == WHITE_TOWER)
+            isWhiteTower = true;
+
+        // spos刷出了黑塔，判断isLeft
+        // 如果是isLeft，踩黑塔的人应该是踩左一塔的某一人，两人都要进行判断，即 mb_Pangenesis_TowerIdxOrder[0] 与 mb_Pangenesis_TowerIdxOrder[1]
+        // 如果not isLeft，判断mb_Pangenesis_TowerIdxOrder[4] 与 mb_Pangenesis_TowerIdxOrder[5]
+        int TowerOrderPlayerIdx;
+
+        if (isLeftTower)
+        {
+            if ((mb_Pangenesis_shouldWhiteTower[mb_Pangenesis_TowerIdxOrder[0]] && isWhiteTower) || (!mb_Pangenesis_shouldWhiteTower[mb_Pangenesis_TowerIdxOrder[0]] && !isWhiteTower))
+                TowerOrderPlayerIdx = 0;
+            else
+                TowerOrderPlayerIdx = 1;
+        }
+        else
+        {
+            if ((mb_Pangenesis_shouldWhiteTower[mb_Pangenesis_TowerIdxOrder[4]] && isWhiteTower) || (!mb_Pangenesis_shouldWhiteTower[mb_Pangenesis_TowerIdxOrder[4]] && !isWhiteTower))
+                TowerOrderPlayerIdx = 4;
+            else
+                TowerOrderPlayerIdx = 5;
+        }
+
+        int playerIdx = mb_Pangenesis_TowerIdxOrder[TowerOrderPlayerIdx];
+        int SecondTowerIdx = 1 + (isLeftTower ? 0 : 4) + (isUpTower ? 0 : 2);
+        mb_Pangenesis_TowerIdxSecondOrder[SecondTowerIdx] = playerIdx;
+
+        DebugMsg($"{(isLeftTower ? "左二" : "右二")}的{(isUpTower ? "上" : "下")}{(isWhiteTower ? "白" : "黑")}塔，{IndexHelper.getPlayerJobByIndex(playerIdx)}去踩。", accessory);
+
+        if (myIndex == playerIdx)
+            drawPangenesisDir(tpos, playerIdx, 0, 3900, accessory);
+            // var dp = assignDp_TowerDir(tpos, playerIdx, 0, 3900, accessory);
+            // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+        await Task.Delay(100);
+        mb_Pangenesis_phase[2] = true;
+        DebugMsg($"=== 黑白塔第二步结束 ===", accessory);
+    }
+
+    [ScriptMethod(name: "本体：黑白塔第三步", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3360[34])$"])]
+    public async void MB_Pangenesis_ThirdPlace(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P12S_Phase.Pangenesis) return;
+        if (mb_Pangenesis_phase[3]) return;
+
+        // 等塔数记录完毕
+        await Task.Delay(100);
+        if (mb_Pangenesis_towerNum <= 6) return;
+        if (mb_Pangenesis_towerNum > 10) return;
+
+        // 等极性buff记录完毕
+        await Task.Delay(1000);
+
+        var myIndex = IndexHelper.getMyIndex(accessory);
+
+        bool isLeftTower = false;
+        bool isWhiteTower = false;
+        bool isUpTower = false;
+
+        const int CENTER_X = 100;
+        const int CENTER_Z = 91;
+        const uint WHITE_TOWER = 33603;
+        const uint BLACK_TOWER = 33604;
+
+        var aid = @event.ActionId();
+        var tpos = @event.TargetPosition();
+
+        if (tpos.X < CENTER_X)
+            isLeftTower = true;
+        if (tpos.Z < CENTER_Z)
+            isUpTower = true;
+        if (aid == WHITE_TOWER)
+            isWhiteTower = true;
+
+        for (int i = 0; i < 4; i++)
+        {
+            var idx = isLeftTower ? i : i + 4;
+            var playerIdx = mb_Pangenesis_TowerIdxSecondOrder[idx];
+
+            if ((mb_Pangenesis_shouldWhiteTower[playerIdx] && isWhiteTower) || (!mb_Pangenesis_shouldWhiteTower[playerIdx] && !isWhiteTower))
+            {
+                DebugMsg($"{(isLeftTower ? "左三" : "右三")}的{(isUpTower ? "上" : "下")}{(isWhiteTower ? "白" : "黑")}塔，{IndexHelper.getPlayerJobByIndex(playerIdx)}去踩。", accessory);
+
+                if (myIndex != playerIdx) continue;
+                drawPangenesisDir(tpos, playerIdx, 0, 3900, accessory);
+                // var dp = assignDp_TowerDir(tpos, playerIdx, 0, 3900, accessory);
+                // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+                // var dp0 = AssignDp.drawStatic(tpos, 0, 0, 3900, $"黑白塔{playerIdx}", accessory);
+                // dp0.Scale = new(3f);
+                // dp0.Color = accessory.Data.DefaultSafeColor;
+                // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
+            }
+        }
+
+        await Task.Delay(100);
+        mb_Pangenesis_phase[3] = true;
+        DebugMsg($"=== 黑白塔第三步结束 ===", accessory);
+    }
+
+    private int getSpecificTowerPlayer(bool hasFactor, bool isTwo, bool isLong, bool isWhiteBuff, bool isFirst)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            int idx = isFirst ? i : 7 - i;
+            bool condition_1 = hasFactor ? mb_Pangenesis_hasFactor[idx] : !mb_Pangenesis_hasFactor[idx];
+            bool condition_2 = isTwo ? mb_Pangenesis_isTwo[idx] : !mb_Pangenesis_isTwo[idx];
+            bool condition_3 = isLong ? mb_Pangenesis_isLong[idx] : !mb_Pangenesis_isLong[idx];
+            bool condition_4 = isWhiteBuff ? mb_Pangenesis_isWhite[idx] : !mb_Pangenesis_isWhite[idx];
+
+            if (condition_1 && condition_2 && condition_3 && condition_4)
+                return idx;
+        }
+        return -1;
+    }
+
+    private DrawPropertiesEdit assignDp_TowerDir(Vector3 tower_pos, int player_idx, int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        var dp = AssignDp.dirPos(tower_pos, delay, destoryAt, $"黑白塔{player_idx}-{tower_pos}", accessory);
+        return dp;
+    }
+
+    private void drawPangenesisDir(Vector3 tower_pos, int player_idx, int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        var dp = assignDp_TowerDir(tower_pos, player_idx, delay, destoryAt, accessory);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+        var dp0 = AssignDp.drawStatic(tower_pos, 0, delay, destoryAt, $"黑白塔{player_idx}", accessory);
+        dp0.Scale = new(3f);
+        dp0.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp0);
+    }
 
     #endregion
 }
