@@ -31,7 +31,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.5", author: "Usami", note: noteStr)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.6", author: "Usami", note: noteStr)]
 
 public class p12s
 {
@@ -39,6 +39,8 @@ public class p12s
     """
     请先按需求检查并设置“用户设置”栏目。
     门神到超链后对话，本体到黑白塔。
+    v0.0.0.6
+    1. 调整迭代次数随实际人数变更，避免报错弹出。
 
     v0.0.0.5
     1. 增加黑白塔指路（G8）。
@@ -1145,7 +1147,7 @@ public class p12s
     private static void drawSC1SpreadCircle(ScriptAccessory accessory)
     {
         // 不在db_SC1_BWTBidx里的就是分散的
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             if (db_SC1_BWTBidx.Contains(i)) continue;
             var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 15800, 4000, $"分散{i}", accessory);
@@ -2160,7 +2162,7 @@ public class p12s
 
         DebugMsg($"开始绘制环风范围 {mb_Caloric_phase}", accessory);
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             if (!mb_Caloric_isWind[i]) continue;
             drawWindCircle(accessory.Data.PartyList[i], accessory);

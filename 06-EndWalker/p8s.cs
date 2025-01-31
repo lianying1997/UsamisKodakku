@@ -32,13 +32,16 @@ using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 // using Lumina.Data.Parsing.Scd;
 // using Lumina.Excel.GeneratedSheets;
 
-namespace UsamisScript.EndWalker.p8s_unfinished;
+namespace UsamisScript.EndWalker.p8s;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.4", author: "Usami", note: noteStr)]
 public class p8s
 {
     const string noteStr =
     """
+    v0.0.0.4
+    1. 调整迭代次数随实际人数变更，避免报错弹出。
+
     v0.0.0.3:
     1. 增加万象踩塔指引。
     
@@ -367,7 +370,7 @@ public class p8s
     [ScriptMethod(name: "门神：一车分散提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31027"])]
     public void DB_BeastSpread(Event @event, ScriptAccessory accessory)
     {
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 0, 13000, $"一车分散告警{i}", accessory);
             dp.Scale = new(5);
@@ -764,7 +767,7 @@ public class p8s
     [ScriptMethod(name: "门神：一分身分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31009"])]
     public void DB_ManifoldFlames(Event @event, ScriptAccessory accessory)
     {
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             var dp = assignDp_IllusionSpread(accessory.Data.PartyList[i], 0, 6500, $"一分身分散{i}", accessory);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
@@ -820,7 +823,7 @@ public class p8s
         var sid = @event.SourceId();
         if (isSpread)
         {
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
             {
                 var dp = AssignDp.drawOwner2Target(sid, accessory.Data.PartyList[i], 0, 6000, $"一分身分散直线{i}", accessory);
                 dp.Scale = new(5, 40);
@@ -896,7 +899,7 @@ public class p8s
     [ScriptMethod(name: "本体：黄圈引导", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31369"])]
     public void MB_TyrantFlare(Event @event, ScriptAccessory accessory)
     {
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], 0, 3000, $"黄圈引导{i}", accessory);
             dp.Scale = new(6);
@@ -927,7 +930,7 @@ public class p8s
     {
         var spreadTime = isStackFirst ? 6100 : 3000;
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             if (naTargetList[i]) continue;
             var dp = AssignDp.drawCircle(accessory.Data.PartyList[i], spreadTime, spreadTime, $"一紫圈分散{i}", accessory);
@@ -1601,7 +1604,7 @@ public class p8s
     {
         mb_phase = MB_Phase.LD;
         var dp = accessory.Data.GetDefaultDrawProperties();
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
         {
             dp.Name = $"万象分散-{i}";
             dp.Scale = new(6);

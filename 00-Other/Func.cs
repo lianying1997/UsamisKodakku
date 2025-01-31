@@ -154,7 +154,11 @@ public static class EventExtensions
     {
         return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
     }
-
+    public static uint Id(this Event @event)
+    {
+        return ParseHexId(@event["Id"], out var id) ? id : 0;
+    }
+    
     public static uint StatusID(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
@@ -194,6 +198,26 @@ public static class IbcHelper
         var hp = GetById(id)?.CurrentHp ?? 0;
         return hp;
     }
+
+    public static bool isTank(uint id)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.GetRole() == CombatRole.Tank;
+    }
+    public static bool isHealer(uint id)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.GetRole() == CombatRole.Healer;
+    }
+    public static bool isDps(uint id)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.GetRole() == CombatRole.DPS;
+    }
+
 }
 
 public static class DirectionCalc
@@ -347,6 +371,18 @@ public static class DirectionCalc
         Vector3 v3 = new(2 * centerx - point.X, point.Y, point.Z);
         return v3;
     }
+
+    /// <summary>
+    /// 将输入点上下折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerx">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointUD(Vector3 point, int centerz)
+    {
+        Vector3 v3 = new(point.X, point.Y, 2 * centerz - point.Z);
+        return v3;
+    }
 }
 
 public static class IndexHelper
@@ -425,6 +461,9 @@ public static class ColorHelper
     public static ScriptColor colorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
     public static ScriptColor colorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
     public static ScriptColor colorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 0.8f, 1.0f) };
+    public static ScriptColor colorDark = new ScriptColor { V4 = new Vector4(0f, 0f, 0f, 1.0f) };
+    public static ScriptColor colorLightBlue = new ScriptColor { V4 = new Vector4(0.48f, 0.40f, 0.93f, 1.0f) };
+    public static ScriptColor colorWhite = new ScriptColor { V4 = new Vector4(1f, 1f, 1f, 2f) };
 
 }
 
@@ -443,7 +482,7 @@ public static class AssignDp
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
-        dp.Scale = new(0.5f);
+        dp.Scale = new(1f);
         dp.Owner = accessory.Data.Me;
         dp.TargetPosition = target_pos;
         dp.ScaleMode = ScaleMode.YByDistance;
@@ -467,7 +506,7 @@ public static class AssignDp
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
-        dp.Scale = new(0.5f);
+        dp.Scale = new(1f);
         dp.Position = start_pos;
         dp.TargetPosition = target_pos;
         dp.ScaleMode = ScaleMode.YByDistance;
@@ -490,7 +529,7 @@ public static class AssignDp
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
-        dp.Scale = new(0.5f);
+        dp.Scale = new(1f);
         dp.Owner = accessory.Data.Me;
         dp.TargetObject = target_id;
         dp.ScaleMode = ScaleMode.YByDistance;
@@ -501,7 +540,7 @@ public static class AssignDp
     }
 
     /// <summary>
-    /// 返回与某对象仇恨相关的dp，可修改dp.TargetResolvePattern, dp.TargetOrderIndex, dp.Owner
+    /// 返回与某对象仇恨或某定点相关的dp，可修改dp.TargetResolvePattern, dp.TargetOrderIndex, dp.Owner
     /// </summary>
     /// <param name="owner_id">起始目标id，通常为boss</param>
     /// <param name="order_idx">顺序，从1开始</param>
@@ -611,6 +650,29 @@ public static class AssignDp
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.Delay = delay;
         dp.DestoryAt = destoryAt;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回矩形
+    /// </summary>
+    /// <param name="owner_id">起始目标id，通常为自己或Boss</param>
+    /// <param name="width">矩形宽度</param>
+    /// <param name="length">矩形长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destory">绘图自出现起，经destory ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    private static DrawPropertiesEdit drawRect(this ScriptAccessory accessory, uint owner_id, int width, int length, int delay, int destory, string name)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(width, length);      // 宽度为6，长度为20
+        dp.Owner = owner_id;             // 从哪个单位前方绘图
+        dp.Color = accessory.Data.DefaultDangerColor;   // 绘图颜色
+        dp.Delay = delay;               // 从捕获到对应日志行后，延迟多少毫秒开始绘图
+        dp.DestoryAt = destory;        // 从绘图出现后，经过多少毫秒绘图消失
         return dp;
     }
 }

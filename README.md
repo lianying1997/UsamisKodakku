@@ -12,8 +12,9 @@ A repository contains scripts for the Dalamud KodakkuAssist plugin, created by a
 - 佐迪亚克歼灭战 [Zodiark.cs] (Online)
 - 卢比坎特歼灭战 [Rubicante.cs] (Online)
 - 卢比坎特歼殛战 [RubicanteEx.cs] (Online)
+- 零式万魔殿 边境之狱4 [p4s.cs] (Online)
 - 零式万魔殿 炼净之狱4 [p8s.cs] (Online)
-- （未完成）零式万魔殿 荒天之狱4 [p12s.cs] (Online)
+- 零式万魔殿 荒天之狱4 [p12s.cs] (Online)
 
 ### 07-DawnTrail
 - 阿卡狄亚零式登天斗技场 轻量级1 [M1s绘图_Usami.cs] (Local)

@@ -43,7 +43,7 @@ public class Ucob
     请先按需求检查并设置“用户设置”栏目。
 
     Original code by Joshua, adjustments by Usami.
-    Great Thanks to Contributor @BLACKMAGE. 
+    Great Thanks to Contributor @KnightRider. 
     v0.0.1.6:
     【重要】1. 修复P3连击BUG。
 
@@ -57,7 +57,7 @@ public class Ucob
     3. 修复了一些不可控函数可被玩家关闭的设置错误。
 
     v0.0.1.3:
-    感谢BLACKMAGE佬的帮助，孩子抄代码抄的很开心！
+    感谢KnightRider佬的帮助，孩子抄代码抄的很开心！
     1. 添加了P2火龙分摊吃火/不吃火的情况判断。
 
     v0.0.1.2:
