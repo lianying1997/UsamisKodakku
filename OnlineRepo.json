@@ -18,10 +18,10 @@
     {
         "Name": "P4S [零式万魔殿 边境之狱4]",
         "Guid": "de9e31e6-d040-48e3-bf0b-aa4e2643f79d",
-        "Version": "0.0.0.1",
+        "Version": "0.0.0.2",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p4s.cs",
-        "UpdateInfo": "1. 门神仅线毒提示，本体到二运，二运仅逃课打法。"
+        "UpdateInfo": "1. 门神仅线毒提示，本体到二运，二运含逃课与正攻打法。"
     },
     {
         "Name": "Lv87 [创造环境极北造物院]",

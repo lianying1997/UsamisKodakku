@@ -21,10 +21,12 @@ using FFXIVClientStructs;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using System.Drawing;
 using System.Security.AccessControl;
+using Lumina.Excel.GeneratedSheets2;
+using System.ComponentModel;
 
 namespace UsamisScript.EndWalker.p4s;
 
-[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.2", author: "Usami", note: noteStr)]
 
 public class p4s
 {
@@ -34,8 +36,8 @@ public class p4s
     “逃课”即为黑糖荔枝攻略演示。
     门神仅线毒提示，本体到二运。
 
-    v0.0.0.1
-    1. 先行版完成。
+    v0.0.0.2
+    1. 初版完成。
     鸭门。
     """;
 
@@ -43,7 +45,7 @@ public class p4s
     public static bool DebugMode { get; set; } = false;
     public enum Act2StrategyEnum
     {
-        未完成_正攻_Regular,
+        正攻_Regular,
         逃课_Spread
     }
 
@@ -93,7 +95,7 @@ public class p4s
         var str = Act2Sol.Print();
         DebugMsg($"{str}", accessory);
 
-        drawSpreadDir(Act2Sol, accessory);
+        // drawSpreadDir(Act2Sol, accessory);
     }
 
     [ScriptMethod(name: "门神：聚血初始化（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27096"], userControl: false)]
@@ -147,6 +149,7 @@ public class p4s
         phase = P4S_Phase.Act1;
         Act1CirclePosition = -1;    // 一幕大钢铁方位
         Drawn[0] = false;
+        DebugMsg($"当前阶段为：{phase}", accessory);
     }
 
     [ScriptMethod(name: "本体：一运范围提示", eventType: EventTypeEnum.Tether, eventCondition: ["Id:00AD"])]
@@ -228,8 +231,10 @@ public class p4s
     {
         phase = P4S_Phase.Act2;
         Act2CirclePosition = -1;    // 二幕大钢铁方位
-        Drawn[1] = false;
-        Act2Solution Act2Sol = new Act2Solution();
+        for (int i = 1; i <= 5; i++)
+            Drawn[i] = false;
+        Act2Sol.Init();
+        DebugMsg($"当前阶段为：{phase}", accessory);
     }
 
     [ScriptMethod(name: "本体：二运范围提示", eventType: EventTypeEnum.Tether, eventCondition: ["Id:00AD"])]
@@ -303,16 +308,37 @@ public class p4s
 
     public class Act2Solution
     {
+        public Vector3[] TowerPos = new Vector3[4];
+        public Vector3[] CirclePos = new Vector3[4];
         public List<int> FireTargets { get; set; }
         public List<int> WindTargets { get; set; }
         public List<int> DarkTargets { get; set; }
         public bool isLRSafeFirst { get; set; }
+        public int CircleCastTimes { get; set; }
         public Act2Solution()
+        {
+            FireTargets = new List<int> { };
+            WindTargets = new List<int> { };
+            DarkTargets = new List<int> { };
+            Init();
+        }
+        public void Init()
         {
             isLRSafeFirst = false;
             FireTargets = new List<int> { };
             WindTargets = new List<int> { };
             DarkTargets = new List<int> { };
+            CircleCastTimes = 0;
+
+            TowerPos[0] = new(96, 0, 82);
+            TowerPos[1] = TowerPos[0].RotatePoint(CENTER, float.Pi / 2);
+            TowerPos[2] = TowerPos[0].RotatePoint(CENTER, float.Pi);
+            TowerPos[3] = TowerPos[0].RotatePoint(CENTER, float.Pi / -2);
+
+            CirclePos[0] = new(104, 0, 82);
+            CirclePos[1] = CirclePos[0].RotatePoint(CENTER, float.Pi / 2);
+            CirclePos[2] = CirclePos[0].RotatePoint(CENTER, float.Pi);
+            CirclePos[3] = CirclePos[0].RotatePoint(CENTER, float.Pi / -2);
         }
         public string Print()
         {
@@ -374,6 +400,13 @@ public class p4s
             Act2Sol.FireTargets.Add(sidx);
     }
 
+    [ScriptMethod(name: "本体：二运大圈次数记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27150"], userControl: false)]
+    public void Act2_CircleCastTimeRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P4S_Phase.Act2) return;
+        Act2Sol.CircleCastTimes++;
+    }
+
     [ScriptMethod(name: "本体：二运就位方案（逃课）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:00AC"])]
     public async void Act2_SpreadSolution(Event @event, ScriptAccessory accessory)
     {
@@ -384,7 +417,6 @@ public class p4s
 
         await Task.Delay(500);
         drawSpreadDir(Act2Sol, accessory);
-
     }
 
     private static void drawSpreadDir(Act2Solution act2sol, ScriptAccessory accessory)
@@ -416,37 +448,269 @@ public class p4s
             isSouth = true;
 
         // 暗线全上，火线左右，风线全下，只标四方
-        var dp = accessory.dirPos2Pos(CENTER, DirectionCalc.ExtendPoint(CENTER, 0, 20), 0, 10000, $"北指路");
+        var dp = accessory.dirPos2Pos(CENTER, CENTER.ExtendPoint(0, 20), 0, 10000, $"北指路");
         dp.Color = isNorth ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
         dp.Scale = new(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
 
-        dp = accessory.dirPos2Pos(CENTER, DirectionCalc.ExtendPoint(CENTER, float.Pi, 20), 0, 10000, $"南指路");
+        dp = accessory.dirPos2Pos(CENTER, CENTER.ExtendPoint(float.Pi, 20), 0, 10000, $"南指路");
         dp.Color = isSouth ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
         dp.Scale = new(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
 
-        dp = accessory.dirPos2Pos(CENTER, DirectionCalc.ExtendPoint(CENTER, float.Pi * 0.42f, 20), 0, 10000, $"东上指路");
+        dp = accessory.dirPos2Pos(CENTER, CENTER.ExtendPoint(float.Pi * 0.42f, 20), 0, 10000, $"东上指路");
         dp.Color = isEastUp ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
         dp.Scale = new(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
 
-        dp = accessory.dirPos2Pos(CENTER, DirectionCalc.ExtendPoint(CENTER, float.Pi * -0.42f, 20), 0, 10000, $"西上指路");
+        dp = accessory.dirPos2Pos(CENTER, CENTER.ExtendPoint(float.Pi * -0.42f, 20), 0, 10000, $"西上指路");
         dp.Color = isWestUp ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
         dp.Scale = new(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
 
-        dp = accessory.dirPos2Pos(CENTER, DirectionCalc.ExtendPoint(CENTER, float.Pi * 0.58f, 20), 0, 10000, $"东下指路");
+        dp = accessory.dirPos2Pos(CENTER, CENTER.ExtendPoint(float.Pi * 0.58f, 20), 0, 10000, $"东下指路");
         dp.Color = isEastDown ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
         dp.Scale = new(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
 
-        dp = accessory.dirPos2Pos(CENTER, DirectionCalc.ExtendPoint(CENTER, float.Pi * -0.58f, 20), 0, 10000, $"西下指路");
+        dp = accessory.dirPos2Pos(CENTER, CENTER.ExtendPoint(float.Pi * -0.58f, 20), 0, 10000, $"西下指路");
         dp.Color = isWestDown ? posColorPlayer.V4.WithW(2f) : posColorNormal.V4;
         dp.Scale = new(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
     }
 
+    [ScriptMethod(name: "本体：二运就位方案（正攻）第一步", eventType: EventTypeEnum.Tether, eventCondition: ["Id:00AC"])]
+    public async void Act2_RegularSolutionFirst(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P4S_Phase.Act2) return;
+        if (Drawn[3]) return;
+        Drawn[3] = true;
+        if (Act2Strategy != Act2StrategyEnum.正攻_Regular) return;
+
+        await Task.Delay(500);
+
+        var myIndex = accessory.getMyIndex();
+        if (Act2Sol.DarkTargets.Contains(myIndex))
+        {
+            // Dark两人在外放圈拉线
+            // 等待黄圈被放下（StartCasting黑暗设计圈）
+            drawDarkTargetRouteFirst(Act2Sol, myIndex, false, accessory);
+            drawDarkTargetTowerFirst(Act2Sol, myIndex, true, accessory);
+        }
+        else
+        {
+            // 其他人中间
+            var dp = accessory.dirPos(CENTER, 0, 10000, $"二运其他1{myIndex}");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            if (Act2Sol.FireTargets.Contains(myIndex))
+                drawFireTargetStackFirst(Act2Sol, myIndex, true, accessory);
+            if (Act2Sol.WindTargets.Contains(myIndex))
+                drawWindTargetStackFirst(Act2Sol, myIndex, true, accessory);
+        }
+    }
+
+    private static void drawDarkTargetRouteFirst(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        Vector3 UPLEFT = CENTER.ExtendPoint((act2sol.isLRSafeFirst ? 45f : -45f).angle2Rad(), 15);
+        float _rot_radian;
+        var _myid = accessory.Data.Me;
+        if (IbcHelper.isTank(_myid))
+            _rot_radian = 0;
+        else
+            _rot_radian = float.Pi;
+        var spos = UPLEFT.RotatePoint(CENTER, _rot_radian);
+        // 如果是Tank，左上；否则右下
+        var dp = accessory.dirPos(spos, 0, 10000, $"二运暗1{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+    private static void drawDarkTargetTowerFirst(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        int _tower_idx;
+        var _myid = accessory.Data.Me;
+        if (IbcHelper.isTank(_myid))
+            _tower_idx = 0;
+        else
+            _tower_idx = 2;
+        if (act2sol.isLRSafeFirst)
+            _tower_idx++;
+
+        var dp = accessory.dirPos(act2sol.TowerPos[_tower_idx], 0, 10000, $"二运暗塔1{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private static void drawFireTargetStackFirst(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        int _circle_idx;
+        var _myid = accessory.Data.Me;
+
+        if (!IbcHelper.isDps(_myid))
+        {
+            if (IbcHelper.isTank(_myid))
+                _circle_idx = 0;
+            else
+                _circle_idx = 2;
+        }
+        else
+            _circle_idx = 0;
+
+        if (act2sol.isLRSafeFirst)
+            _circle_idx++;
+
+        var dp = accessory.dirPos(act2sol.CirclePos[_circle_idx], 0, 10000, $"二运火分摊1{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private static void drawWindTargetStackFirst(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        int _circle_idx = 2;
+        var _myid = accessory.Data.Me;
+
+        if (act2sol.isLRSafeFirst)
+            _circle_idx++;
+
+        var dp = accessory.dirPos(act2sol.CirclePos[_circle_idx], 0, 10000, $"二运风分摊1{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    [ScriptMethod(name: "本体：二运就位方案（正攻）第二步", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27178"])]
+    public void Act2_RegularSolutionSecond(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P4S_Phase.Act2) return;
+        if (Drawn[4]) return;
+        Drawn[4] = true;
+        if (Act2Strategy != Act2StrategyEnum.正攻_Regular) return;
+
+        accessory.Method.RemoveDraw($"^(二运火分摊1{true}.*)$");
+        accessory.Method.RemoveDraw($"^(二运风分摊1{true}.*)$");
+        accessory.Method.RemoveDraw($"^(二运暗1{false}.*)$");
+        accessory.Method.RemoveDraw($"^(二运暗塔1{true}.*)$");
+        accessory.Method.RemoveDraw($"^(二运其他1.*)$");
+
+        var myIndex = accessory.getMyIndex();
+        if (Act2Sol.DarkTargets.Contains(myIndex))
+        {
+            drawDarkTargetTowerFirst(Act2Sol, myIndex, false, accessory);
+            // TN分情况踩塔分摊
+            drawDarkTargetRouteSecond(Act2Sol, myIndex, true, accessory);
+        }
+        else
+        {
+            if (Act2Sol.FireTargets.Contains(myIndex))
+            {
+                drawFireTargetStackFirst(Act2Sol, myIndex, false, accessory);
+                // 四个火分情况
+                drawFireTargetRouteSecond(Act2Sol, myIndex, true, accessory);
+            }
+            if (Act2Sol.WindTargets.Contains(myIndex))
+            {
+                drawWindTargetStackFirst(Act2Sol, myIndex, false, accessory);
+                drawWindTargetStackSecond(Act2Sol, myIndex, true, accessory);
+            }
+        }
+    }
+    private static void drawDarkTargetRouteSecond(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        // 暗TH在右汇合，H踩塔T分摊
+        int _pos_idx = 1;
+        var _myid = accessory.Data.Me;
+        if (act2sol.isLRSafeFirst)
+            _pos_idx++;
+
+        var _target_pos = IbcHelper.isTank(_myid) ? act2sol.CirclePos[_pos_idx] : act2sol.TowerPos[_pos_idx];
+        var dp = accessory.dirPos(_target_pos, 0, 10000, $"二运暗2{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private static void drawWindTargetStackSecond(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        int _circle_idx = 3;
+        var _myid = accessory.Data.Me;
+
+        if (act2sol.isLRSafeFirst)
+            _circle_idx = 0;
+
+        var dp = accessory.dirPos(act2sol.CirclePos[_circle_idx], 0, 10000, $"二运风2{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private static void drawFireTargetRouteSecond(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
+    {
+        int _pos_idx;
+        var _myid = accessory.Data.Me;
+
+        if (!IbcHelper.isDps(_myid))
+        {
+            // 火T在右侧分摊
+            if (IbcHelper.isTank(_myid))
+                _pos_idx = 1;
+            // 火H在左侧踩塔
+            else
+                _pos_idx = 3;
+        }
+        else
+        {
+            // 优先级最低，右
+            if (act2sol.FireTargets.Max() == myIndex)
+                _pos_idx = 1;
+            else
+                _pos_idx = 3;
+        }
+
+        if (act2sol.isLRSafeFirst)
+            _pos_idx = _pos_idx == 3 ? 0 : _pos_idx + 1;
+
+        var _target_pos = IbcHelper.isHealer(_myid) ? act2sol.TowerPos[_pos_idx] : act2sol.CirclePos[_pos_idx];
+        var dp = accessory.dirPos(_target_pos, 0, 10000, $"二运火2{isPreparing}{myIndex}");
+        dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    [ScriptMethod(name: "本体：二运就位方案（正攻）第三步", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:27150"])]
+    public void Act2_RegularSolutionThird(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P4S_Phase.Act2) return;
+        if (Drawn[5]) return;
+        Drawn[5] = true;
+        if (Act2Strategy != Act2StrategyEnum.正攻_Regular) return;
+
+        accessory.Method.RemoveDraw($"^(二运火2{true}.*)$");
+        accessory.Method.RemoveDraw($"^(二运风2{true}.*)$");
+        accessory.Method.RemoveDraw($"^(二运暗2{true}.*)$");
+        accessory.Method.RemoveDraw($"^(二运火分摊1{false}.*)$");
+        accessory.Method.RemoveDraw($"^(二运风分摊1{false}.*)$");
+        accessory.Method.RemoveDraw($"^(二运暗塔1{false}.*)$");
+
+        var myIndex = accessory.getMyIndex();
+        if (Act2Sol.DarkTargets.Contains(myIndex))
+        {
+            drawDarkTargetRouteSecond(Act2Sol, myIndex, false, accessory);
+        }
+        else
+        {
+            if (Act2Sol.FireTargets.Contains(myIndex))
+            {
+                drawFireTargetRouteSecond(Act2Sol, myIndex, false, accessory);
+            }
+            if (Act2Sol.WindTargets.Contains(myIndex))
+            {
+                drawWindTargetStackSecond(Act2Sol, myIndex, false, accessory);
+            }
+        }
+    }
+
+    [ScriptMethod(name: "本体：二运就位方案删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:27150"], userControl: false)]
+    public void Act2_RegularSolutionRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != P4S_Phase.Act2) return;
+        if (Act2Sol.CircleCastTimes < 4) return;
+        accessory.Method.RemoveDraw($".*");
+    }
 }
 
 #region 函数集
