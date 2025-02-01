@@ -70,5 +70,13 @@
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Zodiark.cs",
         "UpdateInfo": "鸭门。"
+    },
+    {
+        "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
+        "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
+        "Version": "0.0.0.1",
+        "Author": "Usami",
+        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR_Patch.cs",
+        "UpdateInfo": "基于K佬绝龙诗绘图的个人向补充，请先按需求检查并设置“用户设置”栏目。鸭门。"
     }
     ]

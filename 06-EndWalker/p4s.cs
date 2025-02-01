@@ -77,7 +77,7 @@ public class p4s
     {
         phase = P4S_Phase.Init;
         BloodrakeCastTime = 0;  // 聚血释放次数
-        List<bool> Drawn = new bool[20].ToList();   // 绘图记录
+        Drawn = new bool[20].ToList();   // 绘图记录
         accessory.Method.RemoveDraw(".*");
     }
 

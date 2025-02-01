@@ -536,7 +536,6 @@ public class Ucob
             dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
-
     }
 
     [ScriptMethod(name: "P1&P4双塔：旋风自身位置预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9898"])]
