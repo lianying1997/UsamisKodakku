@@ -47,10 +47,10 @@ public class DSR_Patch
     public static ScriptColor posColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
 
     [UserSetting("地火（百京核爆）爆炸区颜色")]
-    public ScriptColor exaflareColor { get; set; } = new ScriptColor { V4 = new Vector4(0f, 1.0f, 1.0f, 1.0f) };
+    public ScriptColor exaflareColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 0.5f, 0f, 1.0f) };
 
     [UserSetting("地火（百京核爆）预警区颜色")]
-    public ScriptColor exaflareWarnColor { get; set; } = new ScriptColor { V4 = new Vector4(0f, 0.3f, 0.6f, 1.0f) };
+    public ScriptColor exaflareWarnColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
     public enum DSR_Phase
     {
         Init,                   // 初始
