@@ -653,7 +653,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawDonut(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawDonut(this ScriptAccessory accessory, uint owner_id, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;

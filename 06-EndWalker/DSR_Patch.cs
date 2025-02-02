@@ -23,7 +23,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace UsamisScript.EndWalker.DSR_Patch;
 
-[ScriptType(name: "DSR_Patch [幻想龙诗绝境战 补丁]", territorys: [968], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "DSR_Patch [幻想龙诗绝境战 补丁]", territorys: [968], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", version: "0.0.0.2", author: "Usami", note: noteStr)]
 
 public class DSR_Patch
 {
@@ -32,6 +32,10 @@ public class DSR_Patch
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
     
+    v0.0.0.2
+    1. 修复P7地火间隔错误问题。
+    2. 调整P7地火预设颜色，于“用户设置”增加一系列可选项。
+
     v0.0.0.1
     初版完成。
     鸭门。
@@ -46,11 +50,17 @@ public class DSR_Patch
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor posColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
 
+    [UserSetting("地火（百京核爆）使用程序预设颜色")]
+    public static bool exaflareBuiltInColor { get; set; } = true;
+
     [UserSetting("地火（百京核爆）爆炸区颜色")]
-    public ScriptColor exaflareColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 0.5f, 0f, 1.0f) };
+    public ScriptColor exaflareColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
+
+    [UserSetting("地火（百京核爆）是否绘制下一枚地火预警区")]
+    public static bool exaflareWarnDrawn { get; set; } = true;
 
     [UserSetting("地火（百京核爆）预警区颜色")]
-    public ScriptColor exaflareWarnColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
+    public ScriptColor exaflareWarnColor { get; set; } = new ScriptColor { V4 = new Vector4(0.6f, 0.6f, 1.0f, 1.0f) };
     public enum DSR_Phase
     {
         Init,                   // 初始
@@ -102,15 +112,14 @@ public class DSR_Patch
         if (!DebugMode) return;
 
         // DEBUG CODE
-        uint sid1 = 0x400066A9;
-        var dp1 = accessory.drawRect(sid1, 2, 10, 0, 2000, $"看面相");
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp1);
-        uint sid2 = 0x400066AA;
-        var dp2 = accessory.drawRect(sid2, 2, 10, 0, 2000, $"看面相");
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp2);
-        uint sid3 = 0x400066A8;
-        var dp3 = accessory.drawRect(sid3, 2, 10, 0, 2000, $"看面相");
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp3);
+        uint _bossid = 0x400036B1;
+        // debugCircle(_bossid, accessory);
+        debugDonut(_bossid, accessory);
+        debugExaflare(new Vector3(106.87f, 0, 104.09f), 3.13f, accessory);
+        debugExaflare(new Vector3(100.11f, 0, 92f), 3.13f, accessory);
+        debugExaflare(new Vector3(93.02f, 0, 103.91f), 2.34f, accessory);
+
+
     }
 
     #region P2
@@ -705,7 +714,7 @@ public class DSR_Patch
         // var _logic_rad = srot.BaseInnGame2DirRad();
         // var _logic_angle = _rad.rad2Angle();
 
-        const int INTERVAL_TIME = 2000;
+        const int INTERVAL_TIME = 1850;
         const int CAST_TIME = 7000;
         const int EXTEND_DISTANCE = 8;
 
@@ -726,20 +735,27 @@ public class DSR_Patch
             {
                 // 第一轮只画一个
                 drawExaflare(_exaflarePos[0, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[0, i], _delay, _destoryAt, accessory);
             }
             else
             {
                 drawExaflare(_exaflarePos[0, i], _delay, _destoryAt, accessory);
                 drawExaflare(_exaflarePos[1, i], _delay, _destoryAt, accessory);
                 drawExaflare(_exaflarePos[2, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[0, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[1, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[2, i], _delay, _destoryAt, accessory);
             }
 
             // 预警地火
-            if (i < 5)
+            if (exaflareWarnDrawn)
             {
-                drawExaflareWarn(_exaflarePos[0, i + 1], 1, _delay, _destoryAt, accessory);
-                drawExaflareWarn(_exaflarePos[1, i + 1], 1, _delay, _destoryAt, accessory);
-                drawExaflareWarn(_exaflarePos[2, i + 1], 1, _delay, _destoryAt, accessory);
+                if (i < 5)
+                {
+                    drawExaflareWarn(_exaflarePos[0, i + 1], 1, _delay, _destoryAt, accessory);
+                    drawExaflareWarn(_exaflarePos[1, i + 1], 1, _delay, _destoryAt, accessory);
+                    drawExaflareWarn(_exaflarePos[2, i + 1], 1, _delay, _destoryAt, accessory);
+                }
             }
             // if (i < 4)
             // {
@@ -756,21 +772,108 @@ public class DSR_Patch
 
         var dp = accessory.drawStatic(spos, 0, delay, destoryAt, $"地火{spos}");
         dp.Scale = new(SCALE);
-        dp.Color = exaflareColor.V4.WithW(3f);
+        dp.Color = exaflareBuiltInColor ? ColorHelper.colorExaflare.V4 : exaflareColor.V4.WithW(1f);
         dp.ScaleMode = ScaleMode.ByTime;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
+    private void drawExaflareEdge(Vector3 spos, int delay, int destoryAt, ScriptAccessory accessory)
+    {
+        const int SCALE = 6;
+
+        var dp = accessory.drawStatic(spos, 0, delay, destoryAt, $"地火边缘{spos}");
+        dp.Scale = new(SCALE);
+        dp.InnerScale = new(SCALE - 0.05f);
+        dp.Color = exaflareBuiltInColor ? ColorHelper.colorExaflare.V4 : exaflareColor.V4.WithW(1.5f);
+        // dp.Color = ColorHelper.colorDark.V4;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Donut, dp);
+    }
+
     private void drawExaflareWarn(Vector3 spos, int adv, int delay, int destoryAt, ScriptAccessory accessory)
     {
-        const int INTERVAL_TIME = 2000;
+        const int INTERVAL_TIME = 1850;
         const int SCALE = 6;
 
         var destroy_add = INTERVAL_TIME * (adv - 1);
         var dp = accessory.drawStatic(spos, 0, delay, destoryAt + destroy_add, $"地火{spos}");
         dp.Scale = new(SCALE);
-        dp.Color = exaflareWarnColor.V4.WithW(0.4f / adv);
+        dp.Color = exaflareBuiltInColor ? ColorHelper.colorExaflareWarn.V4.WithW(1f / adv) : exaflareWarnColor.V4.WithW(1f / adv);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private void debugExaflare(Vector3 spos, float srot, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        const int INTERVAL_TIME = 1850;
+        const int CAST_TIME = 7000;
+        const int EXTEND_DISTANCE = 8;
+
+        Vector3[,] _exaflarePos = new Vector3[3, 6];
+        for (int i = 0; i < 6; i++)
+        {
+            _exaflarePos[0, i] = DirectionCalc.ExtendPoint(spos, DirectionCalc.BaseInnGame2DirRad(srot), EXTEND_DISTANCE * i);
+            _exaflarePos[1, i] = DirectionCalc.ExtendPoint(spos, DirectionCalc.BaseInnGame2DirRad(srot - float.Pi / 2), EXTEND_DISTANCE * i);
+            _exaflarePos[2, i] = DirectionCalc.ExtendPoint(spos, DirectionCalc.BaseInnGame2DirRad(srot + float.Pi / 2), EXTEND_DISTANCE * i);
+        }
+
+        for (int i = 0; i < 6; i++)
+        {
+            var _destoryAt = i == 0 ? CAST_TIME : INTERVAL_TIME;
+            var _delay = i == 0 ? 0 : CAST_TIME + (i - 1) * INTERVAL_TIME;
+            // 本体地火
+            if (i == 0)
+            {
+                // 第一轮只画一个
+                drawExaflare(_exaflarePos[0, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[0, i], _delay, _destoryAt, accessory);
+            }
+            else
+            {
+                drawExaflare(_exaflarePos[0, i], _delay, _destoryAt, accessory);
+                drawExaflare(_exaflarePos[1, i], _delay, _destoryAt, accessory);
+                drawExaflare(_exaflarePos[2, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[0, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[1, i], _delay, _destoryAt, accessory);
+                drawExaflareEdge(_exaflarePos[2, i], _delay, _destoryAt, accessory);
+            }
+
+            // 预警地火
+            if (exaflareWarnDrawn)
+            {
+                if (i < 5)
+                {
+                    drawExaflareWarn(_exaflarePos[0, i + 1], 1, _delay, _destoryAt, accessory);
+                    drawExaflareWarn(_exaflarePos[1, i + 1], 1, _delay, _destoryAt, accessory);
+                    drawExaflareWarn(_exaflarePos[2, i + 1], 1, _delay, _destoryAt, accessory);
+                }
+            }
+
+            // if (i < 4)
+            // {
+            //     drawExaflareWarn(_exaflarePos[0, i + 2], 2, _delay, _destoryAt, accessory);
+            //     drawExaflareWarn(_exaflarePos[1, i + 2], 2, _delay, _destoryAt, accessory);
+            //     drawExaflareWarn(_exaflarePos[2, i + 2], 2, _delay, _destoryAt, accessory);
+            // }
+        }
+    }
+
+    private void debugCircle(uint boss_id, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        var dp = accessory.drawCircle(boss_id, 0, 7000, $"钢铁");
+        dp.Scale = new(8);
+        dp.Color = accessory.Data.DefaultDangerColor.WithW(1f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private void debugDonut(uint boss_id, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        var dp = accessory.drawDonut(boss_id, 0, 7000, $"月环");
+        dp.Color = accessory.Data.DefaultDangerColor.WithW(1f);
+        dp.Scale = new(50);
+        dp.InnerScale = new(8);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
     }
 
     #endregion
@@ -1199,6 +1302,9 @@ public static class ColorHelper
     public static ScriptColor colorWhite = new ScriptColor { V4 = new Vector4(1f, 1f, 1f, 2f) };
     public static ScriptColor colorYellow = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
 
+    public static ScriptColor colorExaflare = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0.0f, 1.5f) };
+    public static ScriptColor colorExaflareWarn = new ScriptColor { V4 = new Vector4(0.6f, 0.6f, 1f, 1.0f) };
+
 }
 
 public static class AssignDp
@@ -1374,7 +1480,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawDonut(uint owner_id, int delay, int destoryAt, string name, ScriptAccessory accessory)
+    public static DrawPropertiesEdit drawDonut(this ScriptAccessory accessory, uint owner_id, int delay, int destoryAt, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
