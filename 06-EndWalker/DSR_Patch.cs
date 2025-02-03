@@ -31,7 +31,7 @@ public class DSR_Patch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
-    
+
     v0.0.0.2
     1. 修复P7地火间隔错误问题。
     2. 调整P7地火预设颜色，于“用户设置”增加一系列可选项。
@@ -118,8 +118,6 @@ public class DSR_Patch
         debugExaflare(new Vector3(106.87f, 0, 104.09f), 3.13f, accessory);
         debugExaflare(new Vector3(100.11f, 0, 92f), 3.13f, accessory);
         debugExaflare(new Vector3(93.02f, 0, 103.91f), 2.34f, accessory);
-
-
     }
 
     #region P2
