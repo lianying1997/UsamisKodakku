@@ -26,7 +26,7 @@ using System.Diagnostics;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.2", author: "Usami", note: noteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.3", author: "Usami", note: noteStr)]
 
 public class ASS
 {
@@ -34,7 +34,7 @@ public class ASS
     """
     请先按需求检查并设置“用户设置”栏目。
     
-    v0.0.0.2
+    v0.0.0.3
     初版完成，适配异闻与异闻零式。
     鸭门。
     """;
@@ -787,7 +787,7 @@ public class ASS
         return dp;
     }
 
-    [ScriptMethod(name: "Boss3：咒具二立体魔法阵", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(14770)$"])]
+    [ScriptMethod(name: "Boss3：咒具二立体魔法阵", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(14770|14821)$"])]
     public void Boss3_P2_Panels(Event @event, ScriptAccessory accessory)
     {
         var spos = @event.SourcePosition();

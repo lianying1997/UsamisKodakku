@@ -57,18 +57,11 @@ public class HelloTest
         if (!DebugMode) return;
 
         // DEBUG CODE
-        var tid = accessory.Data.Me;
-        
-        // 逆奇，顺偶，左%5=2，右%2=1
-        // 或者，数小向上传送；数大向下传送
-        const uint LEFT_CW = 462;
-        const uint RIGHT_CW = 466;
-        const uint LEFT_CCW = 467;
-        const uint RIGHT_CCW = 461;
+        DebugMsg($"hello", accessory);
+        var me = IbcHelper.GetMe();
+        var a = me.ClassJob.GameData.Abbreviation;
+        DebugMsg($"{a}", accessory);
 
-        uint param = LEFT_CCW;
-        DebugMsg($"你好", accessory);
-        drawPlayerPortal(tid, param, 0, 2000, accessory);
     }
 
     private DrawPropertiesEdit drawPlayerPortal(uint tid, uint param, int delay, int destory, ScriptAccessory accessory)
