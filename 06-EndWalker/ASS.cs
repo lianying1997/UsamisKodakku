@@ -26,7 +26,7 @@ using System.Diagnostics;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.2", author: "Usami", note: noteStr)]
 
 public class ASS
 {
@@ -34,10 +34,9 @@ public class ASS
     const string noteStr =
     """
     请先按需求检查并设置“用户设置”栏目。
-    在未充分完成测试前，只异闻，不零式。
     
     v0.0.0.1
-    初版完成。
+    初版完成，适配异闻。
     鸭门。
     """;
 
@@ -128,37 +127,40 @@ public class ASS
 
     #region Mob1
 
-    [ScriptMethod(name: "Mob1：树人", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3107[567])$"])]
+    [ScriptMethod(name: "Mob1：树人", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3107[567]|31099|3110[01])$"])]
     public void Mob1_Kaluk(Event @event, ScriptAccessory accessory)
     {
         const uint LEFT_CLEAVE = 31076;
         const uint RIGHT_CLEAVE = 31075;
         const uint FRONT_CLEAVE = 31077;
+        const uint LEFT_CLEAVE_SAVAGE = 31100;
+        const uint RIGHT_CLEAVE_SAVAGE = 31099;
+        const uint FRONT_CLEAVE_SAVAGE = 31101;
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
         var _scale = aid switch
         {
-            LEFT_CLEAVE => 30,
-            RIGHT_CLEAVE => 30,
-            FRONT_CLEAVE => 10,
+            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => 30,
+            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => 30,
+            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 10,
             _ => 30
         };
 
         var _radian = aid switch
         {
-            LEFT_CLEAVE => float.Pi / 180 * 210,
-            RIGHT_CLEAVE => float.Pi / 180 * 210,
-            FRONT_CLEAVE => float.Pi / 180 * 90,
+            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 210,
+            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => float.Pi / 180 * 210,
+            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => float.Pi / 180 * 90,
             _ => float.Pi / 180 * 210
         };
 
         var _rotation = aid switch
         {
-            LEFT_CLEAVE => float.Pi / 180 * 75,
-            RIGHT_CLEAVE => -float.Pi / 180 * 75,
-            FRONT_CLEAVE => 0,
+            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 75,
+            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => -float.Pi / 180 * 75,
+            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 0,
             _ => 0
         };
 
@@ -168,23 +170,25 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
 
-    [ScriptMethod(name: "Mob1：花", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3107[23])$"])]
+    [ScriptMethod(name: "Mob1：花", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3107[23]|3109[67])$"])]
     public void Mob1_Belladonna(Event @event, ScriptAccessory accessory)
     {
         const uint DONUT = 31072;
         const uint SIGHT = 31073;
+        const uint DONUT_SAVAGE = 31072;
+        const uint SIGHT_SAVAGE = 31073;
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
-        if (aid == DONUT)
+        if (aid == DONUT || aid == DONUT_SAVAGE)
         {
             var dp = accessory.drawDonut(sid, 0, 4000, $"花月环");
             dp.InnerScale = new(9f);
             dp.Scale = new(40f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
         }
-        else if (aid == SIGHT)
+        else if (aid == SIGHT || aid == SIGHT_SAVAGE)
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = $"花背对";
@@ -198,13 +202,16 @@ public class ASS
         else return;
     }
 
-    [ScriptMethod(name: "Mob1：三头龙", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3106[789])$"])]
+    [ScriptMethod(name: "Mob1：三头龙", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3106[789]|3109[123])$"])]
     public void Mob1_Udumbara(Event @event, ScriptAccessory accessory)
     {
         // TODO 前刀范围未测试
-        const uint LEFT_CLEAVE = 31067;
-        const uint RIGHT_CLEAVE = 31078;
-        const uint FRONT_CLEAVE = 31079;
+        const uint LEFT_CLEAVE  = 31067;
+        const uint RIGHT_CLEAVE = 31068;
+        const uint FRONT_CLEAVE = 31069;
+        const uint LEFT_CLEAVE_SAVAGE = 31091;
+        const uint RIGHT_CLEAVE_SAVAGE = 31092;
+        const uint FRONT_CLEAVE_SAVAGE = 31093;
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
@@ -212,17 +219,17 @@ public class ASS
         var _scale = 30;
         var _radian = aid switch
         {
-            LEFT_CLEAVE => float.Pi / 180 * 180,
-            RIGHT_CLEAVE => float.Pi / 180 * 180,
-            FRONT_CLEAVE => float.Pi / 180 * 12,
+            LEFT_CLEAVE  or LEFT_CLEAVE_SAVAGE  => float.Pi / 180 * 180,
+            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => float.Pi / 180 * 180,
+            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => float.Pi / 180 * 120,
             _ => float.Pi / 180 * 180
         };
 
         var _rotation = aid switch
         {
-            LEFT_CLEAVE => float.Pi / 180 * 135,
-            RIGHT_CLEAVE => -float.Pi / 180 * 135,
-            FRONT_CLEAVE => 0,
+            LEFT_CLEAVE  or LEFT_CLEAVE_SAVAGE  => float.Pi / 180 * 135,
+            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => -float.Pi / 180 * 135,
+            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 0,
             _ => 0
         };
 
@@ -231,7 +238,7 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
 
-    [ScriptMethod(name: "Mob1：大树", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31063)$"])]
+    [ScriptMethod(name: "Mob1：大树", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31063|31087)$"])]
     public void Mob1_Dryad(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
@@ -245,15 +252,15 @@ public class ASS
 
     #region BOSS1 鼠鼠
 
-    [ScriptMethod(name: "BOSS1：泡泡范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30557|30570|30556|30569|30555|30568)$"])]
+    [ScriptMethod(name: "BOSS1：泡泡范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3055[567]|3056[89]|30570|3059[012]|3060[345])$"])]
     public void Boss1_Bubbles(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
-        List<uint> LIGHT_AIDS = [30557, 30570];
-        List<uint> WIND_AIDS = [30556, 30569];
-        List<uint> ICE_AIDS = [30555, 30568];
+        List<uint> LIGHT_AIDS = [30557, 30570, 30592, 30605];
+        List<uint> WIND_AIDS = [30556, 30569, 30591, 30604];
+        List<uint> ICE_AIDS = [30555, 30568, 30590, 30603];
 
         if (LIGHT_AIDS.Contains(aid))
             drawLightFan(sid, true, accessory);
@@ -320,6 +327,8 @@ public class ASS
         // LEFT DOWN是左边安全，打右边
         const uint LEFT_DOWN = 30545;
         const uint RIGHT_DOWN = 30546;
+        const uint LEFT_DOWN_SAVAGE = 30545;
+        const uint RIGHT_DOWN_SAVAGE = 30546;
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
