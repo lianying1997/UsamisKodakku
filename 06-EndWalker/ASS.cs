@@ -26,17 +26,16 @@ using System.Diagnostics;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.2", author: "Usami", note: noteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.2", author: "Usami", note: noteStr)]
 
 public class ASS
 {
-    // territorys: [1075, 1076]
     const string noteStr =
     """
     请先按需求检查并设置“用户设置”栏目。
     
-    v0.0.0.1
-    初版完成，适配异闻。
+    v0.0.0.2
+    初版完成，适配异闻与异闻零式。
     鸭门。
     """;
 
@@ -206,7 +205,7 @@ public class ASS
     public void Mob1_Udumbara(Event @event, ScriptAccessory accessory)
     {
         // TODO 前刀范围未测试
-        const uint LEFT_CLEAVE  = 31067;
+        const uint LEFT_CLEAVE = 31067;
         const uint RIGHT_CLEAVE = 31068;
         const uint FRONT_CLEAVE = 31069;
         const uint LEFT_CLEAVE_SAVAGE = 31091;
@@ -219,7 +218,7 @@ public class ASS
         var _scale = 30;
         var _radian = aid switch
         {
-            LEFT_CLEAVE  or LEFT_CLEAVE_SAVAGE  => float.Pi / 180 * 180,
+            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 180,
             RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => float.Pi / 180 * 180,
             FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => float.Pi / 180 * 120,
             _ => float.Pi / 180 * 180
@@ -227,7 +226,7 @@ public class ASS
 
         var _rotation = aid switch
         {
-            LEFT_CLEAVE  or LEFT_CLEAVE_SAVAGE  => float.Pi / 180 * 135,
+            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 135,
             RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => -float.Pi / 180 * 135,
             FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 0,
             _ => 0
@@ -321,30 +320,30 @@ public class ASS
         return [dp0, dp1];
     }
 
-    [ScriptMethod(name: "BOSS1：擦拭", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3054[56])$"])]
+    [ScriptMethod(name: "BOSS1：擦拭", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3054[56]|3058[01])$"])]
     public void Boss1_SqueakyClean(Event @event, ScriptAccessory accessory)
     {
         // LEFT DOWN是左边安全，打右边
         const uint LEFT_DOWN = 30545;
         const uint RIGHT_DOWN = 30546;
-        const uint LEFT_DOWN_SAVAGE = 30545;
-        const uint RIGHT_DOWN_SAVAGE = 30546;
+        const uint LEFT_DOWN_SAVAGE = 30580;
+        const uint RIGHT_DOWN_SAVAGE = 30581;
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
         var _scale = aid switch
         {
-            LEFT_DOWN => 60,
-            RIGHT_DOWN => 60,
+            LEFT_DOWN or LEFT_DOWN_SAVAGE => 60,
+            RIGHT_DOWN or RIGHT_DOWN_SAVAGE => 60,
             _ => 30
         };
         var _radian = float.Pi / 180 * 225;
 
         var _rotation = aid switch
         {
-            LEFT_DOWN => -float.Pi / 180 * 67.5f,
-            RIGHT_DOWN => float.Pi / 180 * 67.5f,
+            LEFT_DOWN or LEFT_DOWN_SAVAGE => -float.Pi / 180 * 67.5f,
+            RIGHT_DOWN or RIGHT_DOWN_SAVAGE => float.Pi / 180 * 67.5f,
             _ => 0
         };
 
@@ -357,14 +356,17 @@ public class ASS
     const uint LIGHT_BUBBLE = 30553;
     const uint ICE_BUBBLE = 30552;
     const uint WIND_BUBBLE = 30551;
-    [ScriptMethod(name: "BOSS1：泡泡属性记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3055[123])$"], userControl: false)]
+    const uint LIGHT_BUBBLE_SAVAGE = 30588;
+    const uint ICE_BUBBLE_SAVAGE = 30587;
+    const uint WIND_BUBBLE_SAVAGE = 30586;
+    [ScriptMethod(name: "BOSS1：泡泡属性记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3055[123]|3058[678])$"], userControl: false)]
     public void Boss1_BubblePropertyRecord(Event @event, ScriptAccessory accessory)
     {
         var aid = @event.ActionId();
         Boss1_BubbleProperty = aid;
     }
 
-    [ScriptMethod(name: "BOSS1：泡泡滑行", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30558)$"])]
+    [ScriptMethod(name: "BOSS1：泡泡滑行", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30558|30593)$"])]
     public void Boss1_SlipperySoap(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
@@ -373,17 +375,20 @@ public class ASS
         switch (Boss1_BubbleProperty)
         {
             case LIGHT_BUBBLE:
+            case LIGHT_BUBBLE_SAVAGE:
                 // 雷泡泡叉字后带分散
                 dps = [drawLightFan(sid, false, accessory), null];
                 _type = DrawTypeEnum.Fan;
                 drawLightSpread(accessory);
                 break;
             case ICE_BUBBLE:
+            case ICE_BUBBLE_SAVAGE:
                 dps = drawIcePlusShaped(sid, false, accessory);
                 _type = DrawTypeEnum.Straight;
                 accessory.Method.TextInfo($"保持移动", 4000, true);
                 break;
             case WIND_BUBBLE:
+            case WIND_BUBBLE_SAVAGE:
                 // 风泡泡画月环是为了提醒击退
                 dps = [drawWindDonut(sid, true, accessory), null];
                 _type = DrawTypeEnum.Donut;
@@ -407,7 +412,7 @@ public class ASS
 
     #region Mob2
 
-    [ScriptMethod(name: "Mob2：瘦子", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31083)$"])]
+    [ScriptMethod(name: "Mob2：瘦子", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31083|31107)$"])]
     public void Mob2_Armor(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
@@ -420,7 +425,7 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
     }
 
-    [ScriptMethod(name: "Mob2：胖子", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31078)$"])]
+    [ScriptMethod(name: "Mob2：胖子", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31078|31102)$"])]
     public void Mob2_Dullahan(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
@@ -434,12 +439,15 @@ public class ASS
 
     #region BOSS2 斗士
 
-    [ScriptMethod(name: "Boss2：冲锋前后刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3029[678])$"])]
+    [ScriptMethod(name: "Boss2：冲锋前后刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3029[678]|3061[89]|30620)$"])]
     public void Boss2_RushCleave(Event @event, ScriptAccessory accessory)
     {
         const uint ONE = 30296;
         const uint TWO = 30297;
         const uint THREE = 30298;
+        const uint ONE_SAVAGE = 30618;
+        const uint TWO_SAVAGE = 30619;
+        const uint THREE_SAVAGE = 30620;
 
         var aid = @event.ActionId();
         var spos = @event.SourcePosition();
@@ -447,9 +455,9 @@ public class ASS
 
         var _rushDistance = aid switch
         {
-            ONE => 20f,
-            TWO => 27.5f,
-            THREE => 35f,
+            ONE or ONE_SAVAGE => 20f,
+            TWO or TWO_SAVAGE => 27.5f,
+            THREE or THREE_SAVAGE => 35f,
             _ => 20f
         };
 
@@ -467,7 +475,7 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp2);
     }
 
-    [ScriptMethod(name: "Boss2：挡枪分摊提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30316)$"])]
+    [ScriptMethod(name: "Boss2：挡枪分摊提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30316|30638)$"])]
     public void Boss2_WildCharge(Event @event, ScriptAccessory accessory)
     {
         accessory.Method.TextInfo($"坦克挡枪分摊", 4000, true);
@@ -518,7 +526,7 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    [ScriptMethod(name: "Boss2：蓄力钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3030[123456])$"])]
+    [ScriptMethod(name: "Boss2：蓄力钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3030[123456]|3062[345678])$"])]
     public void Boss2_ChariotDonut(Event @event, ScriptAccessory accessory)
     {
         const uint CHARIOT_1 = 30301;
@@ -528,19 +536,30 @@ public class ASS
         const uint DONUT_2 = 30305;
         const uint DONUT_3 = 30304;
 
+        const uint CHARIOT_1_SAVAGE = 30623;
+        const uint CHARIOT_2_SAVAGE = 30624;
+        const uint CHARIOT_3_SAVAGE = 30625;
+        const uint DONUT_1_SAVAGE = 30628;
+        const uint DONUT_2_SAVAGE = 30627;
+        const uint DONUT_3_SAVAGE = 30626;
+
         var aid = @event.ActionId();
         var sid = @event.SourceId();
+        DrawTypeEnum _type;
 
-        DrawTypeEnum _type = aid < DONUT_3 ? DrawTypeEnum.Circle : DrawTypeEnum.Donut;
+        if (aid < CHARIOT_1_SAVAGE)
+            _type = aid < DONUT_3 ? DrawTypeEnum.Circle : DrawTypeEnum.Donut;
+        else
+            _type = aid < DONUT_3_SAVAGE ? DrawTypeEnum.Circle : DrawTypeEnum.Donut;
 
         var _innerscale = aid switch
         {
-            CHARIOT_1 => 8,
-            CHARIOT_2 => 13,
-            CHARIOT_3 => 18,
-            DONUT_1 => 8,
-            DONUT_2 => 13,
-            DONUT_3 => 18,
+            CHARIOT_1 or CHARIOT_1_SAVAGE => 8,
+            CHARIOT_2 or CHARIOT_2_SAVAGE => 13,
+            CHARIOT_3 or CHARIOT_3_SAVAGE => 18,
+            DONUT_1 or DONUT_1_SAVAGE => 8,
+            DONUT_2 or DONUT_2_SAVAGE => 13,
+            DONUT_3 or DONUT_3_SAVAGE => 18,
             _ => 8,
         };
 
@@ -563,6 +582,8 @@ public class ASS
 
     const uint GOLDEN_BEAM = 30319;
     const uint SILVER_BEAM = 30320;
+    const uint GOLDEN_BEAM_SAVAGE = 30641;
+    const uint SILVER_BEAM_SAVAGE = 30642;
     const uint GOLDEN_BUFF = 3295;
     const uint SILVER_BUFF = 3296;
 
@@ -581,7 +602,7 @@ public class ASS
             Boss2_CurseBuff[tidx] = stid;
     }
 
-    [ScriptMethod(name: "Boss2：金银射线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(303(19|20))$"])]
+    [ScriptMethod(name: "Boss2：金银射线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(303(19|20)|3064[12])$"])]
     public void Boss2_GoldenSilverBeam(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
@@ -589,14 +610,23 @@ public class ASS
 
         Vector4 _color = accessory.Data.DefaultDangerColor;
         if (!Boss2_GoldenSilverBuff.All(x => x == 0))
-            _color = aid == GOLDEN_BEAM ? ColorHelper.colorYellow.V4 : ColorHelper.colorWhite.V4;
+        {
+            _color = aid switch
+            {
+                GOLDEN_BEAM or GOLDEN_BEAM_SAVAGE => ColorHelper.colorYellow.V4,
+                SILVER_BEAM or SILVER_BEAM_SAVAGE => ColorHelper.colorWhite.V4,
+                _ => accessory.Data.DefaultDangerColor
+            };
+        }
         var dp = accessory.drawRect(sid, 10, 40, 0, 9900, $"射线{aid}");
         dp.Color = _color;
-        dp.Rotation = aid == SILVER_BEAM ? float.Pi : 0;
+
+        // aid % 2 == 0，SILVER BEAM相关为偶数
+        dp.Rotation = aid % 2 == 0 ? float.Pi : 0;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
 
-    [ScriptMethod(name: "Boss2：隆起分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30348)$"])]
+    [ScriptMethod(name: "Boss2：隆起分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30348|30653)$"])]
     public void Boss2_EarthSpread(Event @event, ScriptAccessory accessory)
     {
         var tid = @event.TargetId();
@@ -634,7 +664,7 @@ public class ASS
 
     #region BOSS3 键山雏
 
-    [ScriptMethod(name: "Boss3：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29841)$"], userControl: false)]
+    [ScriptMethod(name: "Boss3：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29841|37098)$"], userControl: false)]
     public void Boss3_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         phase = phase switch
@@ -649,7 +679,7 @@ public class ASS
         DebugMsg($"当前阶段为：{phase}", accessory);
     }
 
-    [ScriptMethod(name: "Boss3：顺劈死刑", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29869)$"])]
+    [ScriptMethod(name: "Boss3：顺劈死刑", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29869|30404)$"])]
     public void Boss3_TankBuster(Event @event, ScriptAccessory accessory)
     {
         var tid = @event.TargetId();
@@ -673,18 +703,28 @@ public class ASS
         }
     }
 
-    [ScriptMethod(name: "Boss3：石火豪冲目标记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2987[34])$"], userControl: false)]
+    [ScriptMethod(name: "Boss3：石火豪冲目标记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2987[34]|3040[67])$"], userControl: false)]
     public void Boss3_StrikeTargetRecord(Event @event, ScriptAccessory accessory)
     {
         if (@event.TargetIndex() != 1) return;
 
         const uint FIRST = 29873;
         const uint SECOND = 29874;
+        const uint FIRST_SAVAGE = 30406;
+        const uint SECOND_SAVAGE = 30407;
+
         var aid = @event.ActionId();
         var tid = @event.TargetId();
         var tidx = accessory.getPlayerIdIndex(tid);
 
-        Boss3_StrikeTarget[aid == FIRST ? 0 : 1] = tidx;
+        var _idx = aid switch
+        {
+            FIRST or FIRST_SAVAGE => 0,
+            SECOND or SECOND_SAVAGE => 1,
+            _ => 0
+        };
+
+        Boss3_StrikeTarget[_idx] = tidx;
     }
 
     [ScriptMethod(name: "Boss3：祝福圣火挡枪", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29875)$"])]
@@ -701,7 +741,7 @@ public class ASS
         }
     }
 
-    [ScriptMethod(name: "Boss3：祝福圣火挡枪消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2987[67])$"], userControl: false)]
+    [ScriptMethod(name: "Boss3：祝福圣火挡枪消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2987[67]|3040[89])$"], userControl: false)]
     public void Boss3_BlessedBeaconRemove(Event @event, ScriptAccessory accessory)
     {
         var tid = @event.TargetId();
@@ -783,7 +823,7 @@ public class ASS
         return dp;
     }
 
-    [ScriptMethod(name: "Boss3：圣火炮消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(29862)$"], userControl: false)]
+    [ScriptMethod(name: "Boss3：圣火炮消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(29862|30401)$"], userControl: false)]
     public void Boss3_PanelsRemove(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
