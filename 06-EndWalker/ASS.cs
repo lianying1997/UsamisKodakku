@@ -25,18 +25,20 @@ using System.Security.Cryptography.X509Certificates;
 using System.Diagnostics;
 using Dalamud.Utility;
 using System.Timers;
+using ECommons.MathHelpers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.4", author: "Usami", note: noteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.5", author: "Usami", note: noteStr)]
 
 public class ASS
 {
     const string noteStr =
     """
     请先按需求检查并设置“用户设置”栏目。
-    v0.0.0.4
-    1. BOSS1鼠鼠指路完成（不含P5二拉球）
+    v0.0.0.5
+    1. BOSS1 鼠鼠指路完成（不含P5二拉球）
+    2. BOSS2 斗士金银BUFF指路完成
 
     v0.0.0.3
     初版完成，适配异闻与异闻零式。
@@ -92,6 +94,7 @@ public class ASS
     List<uint> Boss2_CurseBuff = [0, 0, 0, 0];                  // BOSS2 记录分摊/天光轮回buff
     List<bool> Boss2_isLongBuff = [false, false, false, false]; // BOSS2 记录长/短Buff
     List<int> Boss2_GoldenSilverBuff = [0, 0, 0, 0];            // BOSS2 记录金银Buff
+    List<List<int>> Boss2_GoldenSilverField = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]; // BOSS2 金银Buff场地计算
     List<int> Boss3_StrikeTarget = [0, 0];                      // BOSS3 石火豪冲（被挡枪目标）记录
     List<float> Boss3_P4_BrandRot = [0, 0, 0];                  // BOSS3 咒具面向逻辑角度记录
     List<uint> Boss3_P4_PanelSid = [0, 0, 0];                   // BOSS3 魔法阵ID记录
@@ -105,10 +108,13 @@ public class ASS
         Boss1_P2_FieldBubbleSid = [0, 0, 0];                // BOSS1 P2一染，场地泡泡ID记录
         Boss1_P3_FieldBubbleProperty = [0, 0, 0, 0];        // BOSS1 P3一拉，场地泡泡属性记录
         Boss1_P3_FieldBubbleSid = [];                       // BOSS1 P3一拉，场地泡泡ID记录
+        Boss1_P4_WaterLine = new bool[4].ToList();          // BOSS1 P4二染，场地水壶记录
 
         Boss2_CurseBuff = [0, 0, 0, 0];                     // BOSS2 记录分摊/天光轮回buff
         Boss2_isLongBuff = [false, false, false, false];    // BOSS2 记录长/短Buff
         Boss2_GoldenSilverBuff = [0, 0, 0, 0];              // BOSS2 记录金银Buff
+        Boss2_GoldenSilverField = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];     // BOSS2 金银Buff场地计算
+
         Boss3_StrikeTarget = [0, 0];                        // BOSS3 石火豪冲（被挡枪目标）记录
         Boss3_P4_BrandRot = [0, 0, 0];                      // BOSS3 咒具面向逻辑角度记录 
         Boss3_P4_PanelSid = [0, 0, 0];                      // BOSS3 魔法阵ID记录
@@ -127,6 +133,11 @@ public class ASS
         if (!DebugMode) return;
 
         // DEBUG CODE
+        string result = "[" + string.Join(", ", Boss2_GoldenSilverField.Select(row => "[" + string.Join(", ", row) + "]")) + "]";
+        DebugMsg($"{result}", accessory);
+
+        drawSafeSquare(1, 1, accessory);
+        drawSafeSquare(2, 3, accessory);
     }
 
     #region Mob1
@@ -588,24 +599,17 @@ public class ASS
     [ScriptMethod(name: "Boss2：冲锋前后刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3029[678]|3061[89]|30620)$"])]
     public void Boss2_RushCleave(Event @event, ScriptAccessory accessory)
     {
-        const uint ONE = 30296;
-        const uint TWO = 30297;
-        const uint THREE = 30298;
-        const uint ONE_SAVAGE = 30618;
-        const uint TWO_SAVAGE = 30619;
-        const uint THREE_SAVAGE = 30620;
+        HashSet<uint> ONE = [30296, 30618];
+        HashSet<uint> TWO = [30297, 30619];
+        HashSet<uint> THREE = [30298, 30620];
 
         var aid = @event.ActionId();
         var spos = @event.SourcePosition();
         var srot = @event.SourceRotation();
 
-        var _rushDistance = aid switch
-        {
-            ONE or ONE_SAVAGE => 20f,
-            TWO or TWO_SAVAGE => 27.5f,
-            THREE or THREE_SAVAGE => 35f,
-            _ => 20f
-        };
+        var _rushDistance = ONE.Contains(aid) ? 20f :
+                            TWO.Contains(aid) ? 27.5f :
+                            THREE.Contains(aid) ? 35f : 20f;
 
         var _radian = @event.SourceRotation().BaseInnGame2DirRad();
         var _target_pos = spos.ExtendPoint(_radian, _rushDistance);
@@ -675,39 +679,22 @@ public class ASS
     [ScriptMethod(name: "Boss2：蓄力钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3030[123456]|3062[345678])$"])]
     public void Boss2_ChariotDonut(Event @event, ScriptAccessory accessory)
     {
-        const uint CHARIOT_1 = 30301;
-        const uint CHARIOT_2 = 30302;
-        const uint CHARIOT_3 = 30303;
-        const uint DONUT_1 = 30306;
-        const uint DONUT_2 = 30305;
-        const uint DONUT_3 = 30304;
+        HashSet<uint> CHARIOT_1 = [30301, 30623];
+        HashSet<uint> CHARIOT_2 = [30302, 30624];
+        HashSet<uint> CHARIOT_3 = [30303, 30625];
 
-        const uint CHARIOT_1_SAVAGE = 30623;
-        const uint CHARIOT_2_SAVAGE = 30624;
-        const uint CHARIOT_3_SAVAGE = 30625;
-        const uint DONUT_1_SAVAGE = 30628;
-        const uint DONUT_2_SAVAGE = 30627;
-        const uint DONUT_3_SAVAGE = 30626;
+        HashSet<uint> DONUT_1 = [30306, 30628];
+        HashSet<uint> DONUT_2 = [30305, 30627];
+        HashSet<uint> DONUT_3 = [30304, 30626];
 
         var aid = @event.ActionId();
         var sid = @event.SourceId();
-        DrawTypeEnum _type;
+        DrawTypeEnum _type = CHARIOT_1.Contains(aid) || CHARIOT_2.Contains(aid) || CHARIOT_3.Contains(aid) ?
+                                DrawTypeEnum.Circle : DrawTypeEnum.Donut;
 
-        if (aid < CHARIOT_1_SAVAGE)
-            _type = aid < DONUT_3 ? DrawTypeEnum.Circle : DrawTypeEnum.Donut;
-        else
-            _type = aid < DONUT_3_SAVAGE ? DrawTypeEnum.Circle : DrawTypeEnum.Donut;
-
-        var _innerscale = aid switch
-        {
-            CHARIOT_1 or CHARIOT_1_SAVAGE => 8,
-            CHARIOT_2 or CHARIOT_2_SAVAGE => 13,
-            CHARIOT_3 or CHARIOT_3_SAVAGE => 18,
-            DONUT_1 or DONUT_1_SAVAGE => 8,
-            DONUT_2 or DONUT_2_SAVAGE => 13,
-            DONUT_3 or DONUT_3_SAVAGE => 18,
-            _ => 8,
-        };
+        var _innerscale = CHARIOT_1.Contains(aid) || DONUT_1.Contains(aid) ? 8f :
+                          CHARIOT_2.Contains(aid) || DONUT_2.Contains(aid) ? 13f :
+                          CHARIOT_3.Contains(aid) || DONUT_3.Contains(aid) ? 18f : 8f;
 
         if (_type == DrawTypeEnum.Circle)
         {
@@ -726,10 +713,8 @@ public class ASS
         }
     }
 
-    const uint GOLDEN_BEAM = 30319;
-    const uint SILVER_BEAM = 30320;
-    const uint GOLDEN_BEAM_SAVAGE = 30641;
-    const uint SILVER_BEAM_SAVAGE = 30642;
+    HashSet<uint> GOLDEN_BEAM = [30319, 30641];
+    HashSet<uint> SILVER_BEAM = [30320, 30642];
     const uint GOLDEN_BUFF = 3295;
     const uint SILVER_BUFF = 3296;
 
@@ -741,7 +726,8 @@ public class ASS
         var tidx = accessory.getPlayerIdIndex(tid);
         var param = @event.Param();
 
-        int _dx = stid == GOLDEN_BUFF ? 1 : -1;
+        // 此处金BUFF+1，银BUFF+10，与场地的金炮+10，银炮+1可反向对应
+        int _dx = stid == GOLDEN_BUFF ? 1 : 10;
         Boss2_GoldenSilverBuff[tidx] = Boss2_GoldenSilverBuff[tidx] + (int)param * _dx;
 
         if (stid != CURSE_SPREAD)
@@ -749,27 +735,54 @@ public class ASS
     }
 
     [ScriptMethod(name: "Boss2：金银射线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(303(19|20)|3064[12])$"])]
-    public void Boss2_GoldenSilverBeam(Event @event, ScriptAccessory accessory)
+    public async void Boss2_GoldenSilverBeam(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
         var aid = @event.ActionId();
+        var spos = @event.SourcePosition();
+        var srot = @event.SourceRotation();
 
         Vector4 _color = accessory.Data.DefaultDangerColor;
-        if (!Boss2_GoldenSilverBuff.All(x => x == 0))
-        {
-            _color = aid switch
-            {
-                GOLDEN_BEAM or GOLDEN_BEAM_SAVAGE => ColorHelper.colorYellow.V4,
-                SILVER_BEAM or SILVER_BEAM_SAVAGE => ColorHelper.colorWhite.V4,
-                _ => accessory.Data.DefaultDangerColor
-            };
-        }
-        var dp = accessory.drawRect(sid, 10, 40, 0, 9900, $"射线{aid}");
-        dp.Color = _color;
 
-        // aid % 2 == 0，SILVER BEAM相关为偶数
-        dp.Rotation = aid % 2 == 0 ? float.Pi : 0;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        if (Boss2_GoldenSilverBuff.All(x => x == 0))
+        {
+            // 无金银Buff时
+            var dp = accessory.drawRect(sid, 10, 40, 0, 9900, $"射线{aid}");
+            dp.Color = _color;
+            dp.Rotation = SILVER_BEAM.Contains(aid) ? float.Pi : 0;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+            return;
+        }
+
+        // 有金银Buff时
+        bool _is_golden = GOLDEN_BEAM.Contains(aid);
+        // _color = _is_golden ? ColorHelper.colorYellow.V4 : ColorHelper.colorWhite.V4;
+        var _idx = calcGoldenSilverRowCol(spos);
+        var _face_dir = calcGoldenSilverFaceDir(srot);
+        calcGoldenSilverField(_idx, _face_dir, _is_golden);
+
+        // 安全格高亮与指路
+        if (Drawn[0]) return;
+        Drawn[0] = true;
+        await Task.Delay(100);
+
+        var myIndex = accessory.getMyIndex();
+        // 11代表金银各1
+        if (Boss2_GoldenSilverBuff[myIndex] != 11)
+        {
+            int[] _idxs = findGoldenSilverIndex(Boss2_GoldenSilverBuff[myIndex], true);
+            drawSafeSquare(_idxs[0], _idxs[1], accessory);
+        }
+        else
+        {
+            int[] _priority = [0, 2, 3, 1];   // T 近 远 奶
+            var _my_prior = _priority[myIndex];
+            var _other_idx = Boss2_GoldenSilverBuff.IndexOf(11);
+            var _other_prior = _priority[myIndex];
+            var _is_first = _my_prior >= _other_prior;
+            int[] _idxs = findGoldenSilverIndex(Boss2_GoldenSilverBuff[myIndex], _is_first);
+            drawSafeSquare(_idxs[0], _idxs[1], accessory);
+        }
     }
 
     [ScriptMethod(name: "Boss2：隆起分散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30348|30653)$"])]
@@ -803,7 +816,105 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    // TODO 金银Buff指路
+    private int calcGoldenSilverRowCol(Vector3 pos)
+    {
+        // 1行 -35 521 -286
+        // 2行 -35 521 -276
+        // 3行 -35 521 -266
+        // 4行 -35 521 -256
+
+        // 1列 -50 521 -271
+        // 2列 -40 521 -271
+        // 3列 -30 521 -271
+        // 4列 -20 521 -271
+        int idx;
+        bool isHorizon = Math.Abs(pos.Z - -271) < 1.5f;
+        if (isHorizon)
+            idx = (int)((pos.X + 51) / 10);
+        else
+            idx = (int)((pos.Z + 287) / 10);
+        return idx;
+    }
+
+    private int calcGoldenSilverFaceDir(float rot)
+    {
+        int dir = (int)Math.Round(rot.BaseInnGame2DirRad() / (float.Pi / 2));
+        return dir;
+    }
+
+    /// <summary>
+    /// 计算金银激光对场地的影响
+    /// </summary>
+    /// <param name="idx">第几行/第几列</param>
+    /// <param name="face_dir">面向方向（0上1右2下3左）</param>
+    /// <param name="is_golden">是否为金炮</param>
+    private void calcGoldenSilverField(int idx, int face_dir, bool is_golden)
+    {
+        // 金+10，银+1，分别找11、20、2。
+        if (face_dir % 2 == 0)
+        {
+            // 如果face_dir是偶数，必是水平雕像，影响竖格
+            var _col = idx;
+            var _row = (face_dir + 2 * (is_golden ? 0 : 1)) % 4;
+            // [_row][_col], [_row+1][_col]
+            Boss2_GoldenSilverField[_row][_col] = Boss2_GoldenSilverField[_row][_col] + (is_golden ? 10 : 1);
+            Boss2_GoldenSilverField[_row + 1][_col] = Boss2_GoldenSilverField[_row + 1][_col] + (is_golden ? 10 : 1);
+        }
+        else
+        {
+            var _row = idx;
+            var _col = (face_dir + 1 + 2 * (is_golden ? 0 : 1)) % 4;
+            // [_row][_col], [_row][_col+1]
+            Boss2_GoldenSilverField[_row][_col] = Boss2_GoldenSilverField[_row][_col] + (is_golden ? 10 : 1);
+            Boss2_GoldenSilverField[_row][_col + 1] = Boss2_GoldenSilverField[_row][_col + 1] + (is_golden ? 10 : 1);
+        }
+    }
+    private void drawSafeSquare(int row, int col, ScriptAccessory accessory)
+    {
+        // 1行 -35 521 -286
+        // 2行 -35 521 -276
+        // 3行 -35 521 -266
+        // 4行 -35 521 -256
+
+        // 1列 -50 521 -271
+        // 2列 -40 521 -271
+        // 3列 -30 521 -271
+        // 4列 -20 521 -271
+        var _x = -50 + col * 10;
+        var _z = -286 + row * 10;
+        Vector3 pos = new Vector3(_x, 521f, _z);
+        var dp = accessory.drawStatic(pos, 0, 0, 8000, $"金银射线安全{row}{col}");
+        dp.Scale = new(10, 10);
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
+
+        var dp0 = accessory.dirPos(pos, 0, 8000, $"金银射线指路{row}{col}");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+    }
+
+    private int[] findGoldenSilverIndex(int value, bool is_first)
+    {
+        for (int i = 0; i < Boss2_GoldenSilverField.Count(); i++)
+        {
+            for (int j = 0; j < Boss2_GoldenSilverField[i].Count(); j++)
+            {
+                if (Boss2_GoldenSilverField[i][j] == value)
+                {
+                    if (value != 11)
+                        return [i, j];
+                    else
+                    {
+                        if ((is_first && j < 2) || (!is_first && j > 1))
+                            continue;
+                        else
+                            return [i, j];
+                    }
+                }
+            }
+        }
+        return [0, 0];
+    }
+    
     // TODO 连线指路
 
     #endregion

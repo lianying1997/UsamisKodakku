@@ -302,30 +302,6 @@ public static class DirectionCalc
     }
 
     /// <summary>
-    /// 将角度转为弧度
-    /// </summary>
-    /// <param name="angle">角度值</param>
-    /// <returns>对应的弧度值</returns>
-    public static float angle2Rad(this float angle)
-    {
-        // 输入角度转为弧度
-        float radian = (float)(angle * Math.PI / 180);
-        return radian;
-    }
-
-    /// <summary>
-    /// 将弧度转为角度
-    /// </summary>
-    /// <param name="radian">弧度值</param>
-    /// <returns>对应的角度值</returns>
-    public static float rad2Angle(this float radian)
-    {
-        // 输入角度转为弧度
-        float angle = (float)(radian / Math.PI * 180);
-        return angle;
-    }
-
-    /// <summary>
     /// 以逻辑基弧度旋转某点
     /// </summary>
     /// <param name="point">待旋转点坐标</param>

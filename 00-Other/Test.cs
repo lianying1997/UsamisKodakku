@@ -18,6 +18,7 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
+using ECommons.MathHelpers;
 
 namespace UsamisScript.test;
 
@@ -57,10 +58,7 @@ public class HelloTest
         if (!DebugMode) return;
 
         // DEBUG CODE
-        DebugMsg($"hello", accessory);
-        var me = IbcHelper.GetMe();
-        var a = me.ClassJob.GameData.Abbreviation;
-        DebugMsg($"{a}", accessory);
+        DebugMsg($"{float.Pi.RadToDeg()}, {180f.DegToRad()}", accessory);
 
     }
 
