@@ -102,6 +102,7 @@ public class ASS
     public void Init(ScriptAccessory accessory)
     {
         phase = ASS_Phase.Init;
+        Drawn = new bool[20].ToList();
         // phase = ASS_Phase.BOSS3_P3;
         Boss1_BubbleProperty = 0;                           // BOSS1 鼠鼠的泡泡属性
         Boss1_P2_FieldBubbleProperty = [0, 0, 0];           // BOSS1 P2一染，场地泡泡属性记录
