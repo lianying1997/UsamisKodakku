@@ -23,17 +23,21 @@ using ECommons.ExcelServices.TerritoryEnumeration;
 using System.Drawing;
 using System.Security.Cryptography.X509Certificates;
 using System.Diagnostics;
+using Dalamud.Utility;
+using System.Timers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.4", author: "Usami", note: noteStr)]
 
 public class ASS
 {
     const string noteStr =
     """
     请先按需求检查并设置“用户设置”栏目。
-    
+    v0.0.0.4
+    1. BOSS1鼠鼠指路完成（不含P5二拉球）
+
     v0.0.0.3
     初版完成，适配异闻与异闻零式。
     鸭门。
@@ -62,6 +66,10 @@ public class ASS
     public enum ASS_Phase
     {
         Init,                   // 初始
+        BOSS1_P2,               // BOSS1 一染
+        BOSS1_P3,               // BOSS1 一拉
+        BOSS1_P4,               // BOSS1 二染
+        BOSS1_P5,               // BOSS1 二拉
         BOSS3_P1,               // BOSS3 咒具一
         BOSS3_P2,               // BOSS3 咒具二
         BOSS3_P3,               // BOSS3 咒具三
@@ -76,6 +84,11 @@ public class ASS
     const int FIELDX_BOSS3 = 30;                                // BOSS3 场地X总长
     const int FIELDZ_BOSS3 = 40;                                // BOSS3 场地Z总长
     uint Boss1_BubbleProperty = 0;                              // BOSS1 鼠鼠的泡泡属性
+    List<uint> Boss1_P2_FieldBubbleProperty = [0, 0, 0];        // BOSS1 P2一染，场地泡泡属性记录
+    List<uint> Boss1_P2_FieldBubbleSid = [0, 0, 0];             // BOSS1 P2一染，场地泡泡ID记录
+    List<uint> Boss1_P3_FieldBubbleProperty = [0, 0, 0, 0];     // BOSS1 P3一拉，场地泡泡属性记录
+    List<uint> Boss1_P3_FieldBubbleSid = [];                    // BOSS1 P3一拉，场地泡泡ID记录
+    List<bool> Boss1_P4_WaterLine = new bool[4].ToList();       // BOSS1 P4二染，场地水壶记录
     List<uint> Boss2_CurseBuff = [0, 0, 0, 0];                  // BOSS2 记录分摊/天光轮回buff
     List<bool> Boss2_isLongBuff = [false, false, false, false]; // BOSS2 记录长/短Buff
     List<int> Boss2_GoldenSilverBuff = [0, 0, 0, 0];            // BOSS2 记录金银Buff
@@ -88,6 +101,11 @@ public class ASS
         phase = ASS_Phase.Init;
         // phase = ASS_Phase.BOSS3_P3;
         Boss1_BubbleProperty = 0;                           // BOSS1 鼠鼠的泡泡属性
+        Boss1_P2_FieldBubbleProperty = [0, 0, 0];           // BOSS1 P2一染，场地泡泡属性记录
+        Boss1_P2_FieldBubbleSid = [0, 0, 0];                // BOSS1 P2一染，场地泡泡ID记录
+        Boss1_P3_FieldBubbleProperty = [0, 0, 0, 0];        // BOSS1 P3一拉，场地泡泡属性记录
+        Boss1_P3_FieldBubbleSid = [];                       // BOSS1 P3一拉，场地泡泡ID记录
+
         Boss2_CurseBuff = [0, 0, 0, 0];                     // BOSS2 记录分摊/天光轮回buff
         Boss2_isLongBuff = [false, false, false, false];    // BOSS2 记录长/短Buff
         Boss2_GoldenSilverBuff = [0, 0, 0, 0];              // BOSS2 记录金银Buff
@@ -109,19 +127,6 @@ public class ASS
         if (!DebugMode) return;
 
         // DEBUG CODE
-        var tid = accessory.Data.Me;
-
-        // 逆奇，顺偶，左%5=2，右%2=1
-        // 或者，数小向上传送；数大向下传送
-        const uint LEFT_CW = 462;
-        const uint RIGHT_CW = 466;
-        const uint LEFT_CCW = 467;
-        const uint RIGHT_CCW = 461;
-
-        uint param = LEFT_CCW;
-        DebugMsg($"你好", accessory);
-        drawPlayerPortal(tid, param, 0, 2000, accessory);
-
     }
 
     #region Mob1
@@ -129,39 +134,17 @@ public class ASS
     [ScriptMethod(name: "Mob1：树人", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3107[567]|31099|3110[01])$"])]
     public void Mob1_Kaluk(Event @event, ScriptAccessory accessory)
     {
-        const uint LEFT_CLEAVE = 31076;
-        const uint RIGHT_CLEAVE = 31075;
-        const uint FRONT_CLEAVE = 31077;
-        const uint LEFT_CLEAVE_SAVAGE = 31100;
-        const uint RIGHT_CLEAVE_SAVAGE = 31099;
-        const uint FRONT_CLEAVE_SAVAGE = 31101;
+        HashSet<uint> LEFT_CLEAVE = [31076, 31100];
+        HashSet<uint> RIGHT_CLEAVE = [31075, 31099];
+        HashSet<uint> FRONT_CLEAVE = [31077, 31101];
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
-        var _scale = aid switch
-        {
-            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => 30,
-            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => 30,
-            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 10,
-            _ => 30
-        };
-
-        var _radian = aid switch
-        {
-            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 210,
-            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => float.Pi / 180 * 210,
-            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => float.Pi / 180 * 90,
-            _ => float.Pi / 180 * 210
-        };
-
-        var _rotation = aid switch
-        {
-            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 75,
-            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => -float.Pi / 180 * 75,
-            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 0,
-            _ => 0
-        };
+        var _scale = FRONT_CLEAVE.Contains(aid) ? 10 : 30;
+        var _radian = FRONT_CLEAVE.Contains(aid) ? float.Pi / 180 * 90 : float.Pi / 180 * 210;
+        var _rotation = FRONT_CLEAVE.Contains(aid) ? 0 :
+                        LEFT_CLEAVE.Contains(aid) ? float.Pi / 180 * 75 : -float.Pi / 180 * 75;
 
         var dp = accessory.drawFan(sid, _radian, _scale, 250, 3750, $"树人刀");
         // dp.Rotation正值为逆时针
@@ -172,22 +155,20 @@ public class ASS
     [ScriptMethod(name: "Mob1：花", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3107[23]|3109[67])$"])]
     public void Mob1_Belladonna(Event @event, ScriptAccessory accessory)
     {
-        const uint DONUT = 31072;
-        const uint SIGHT = 31073;
-        const uint DONUT_SAVAGE = 31072;
-        const uint SIGHT_SAVAGE = 31073;
+        HashSet<uint> DONUT = [31072, 31096];
+        HashSet<uint> SIGHT = [31073, 31097];
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
-        if (aid == DONUT || aid == DONUT_SAVAGE)
+        if (DONUT.Contains(aid))
         {
             var dp = accessory.drawDonut(sid, 0, 4000, $"花月环");
             dp.InnerScale = new(9f);
             dp.Scale = new(40f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
         }
-        else if (aid == SIGHT || aid == SIGHT_SAVAGE)
+        else if (SIGHT.Contains(aid))
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = $"花背对";
@@ -204,33 +185,17 @@ public class ASS
     [ScriptMethod(name: "Mob1：三头龙", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3106[789]|3109[123])$"])]
     public void Mob1_Udumbara(Event @event, ScriptAccessory accessory)
     {
-        // TODO 前刀范围未测试
-        const uint LEFT_CLEAVE = 31067;
-        const uint RIGHT_CLEAVE = 31068;
-        const uint FRONT_CLEAVE = 31069;
-        const uint LEFT_CLEAVE_SAVAGE = 31091;
-        const uint RIGHT_CLEAVE_SAVAGE = 31092;
-        const uint FRONT_CLEAVE_SAVAGE = 31093;
+        HashSet<uint> LEFT_CLEAVE = [31067, 31091];
+        HashSet<uint> RIGHT_CLEAVE = [31068, 31092];
+        HashSet<uint> FRONT_CLEAVE = [31069, 31093];
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
         var _scale = 30;
-        var _radian = aid switch
-        {
-            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 180,
-            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => float.Pi / 180 * 180,
-            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => float.Pi / 180 * 120,
-            _ => float.Pi / 180 * 180
-        };
-
-        var _rotation = aid switch
-        {
-            LEFT_CLEAVE or LEFT_CLEAVE_SAVAGE => float.Pi / 180 * 135,
-            RIGHT_CLEAVE or RIGHT_CLEAVE_SAVAGE => -float.Pi / 180 * 135,
-            FRONT_CLEAVE or FRONT_CLEAVE_SAVAGE => 0,
-            _ => 0
-        };
+        var _radian = FRONT_CLEAVE.Contains(aid) ? float.Pi / 180 * 120 : float.Pi / 180 * 180;
+        var _rotation = FRONT_CLEAVE.Contains(aid) ? 0 :
+                        LEFT_CLEAVE.Contains(aid) ? float.Pi / 180 * 135 : -float.Pi / 180 * 135;
 
         var dp = accessory.drawFan(sid, _radian, _scale, 250, 3750, $"三头龙刀");
         dp.Rotation = _rotation;
@@ -251,15 +216,29 @@ public class ASS
 
     #region BOSS1 鼠鼠
 
+    [ScriptMethod(name: "BOSS1：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30566|30601)$"])]
+    public void Boss1_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        phase = phase switch
+        {
+            ASS_Phase.Init => ASS_Phase.BOSS1_P2,
+            ASS_Phase.BOSS1_P2 => ASS_Phase.BOSS1_P3,
+            ASS_Phase.BOSS1_P3 => ASS_Phase.BOSS1_P4,
+            ASS_Phase.BOSS1_P4 => ASS_Phase.BOSS1_P5,
+            _ => ASS_Phase.BOSS1_P2
+        };
+        DebugMsg($"当前阶段为：{phase}", accessory);
+    }
+
     [ScriptMethod(name: "BOSS1：泡泡范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3055[567]|3056[89]|30570|3059[012]|3060[345])$"])]
     public void Boss1_Bubbles(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
-        List<uint> LIGHT_AIDS = [30557, 30570, 30592, 30605];
-        List<uint> WIND_AIDS = [30556, 30569, 30591, 30604];
-        List<uint> ICE_AIDS = [30555, 30568, 30590, 30603];
+        HashSet<uint> LIGHT_AIDS = [30557, 30570, 30592, 30605];
+        HashSet<uint> WIND_AIDS = [30556, 30569, 30591, 30604];
+        HashSet<uint> ICE_AIDS = [30555, 30568, 30590, 30603];
 
         if (LIGHT_AIDS.Contains(aid))
             drawLightFan(sid, true, accessory);
@@ -307,12 +286,12 @@ public class ASS
         var _scale = 10;
         var _rotation = float.Pi / 180 * 90;
 
-        var dp0 = accessory.drawRect(sid, _scale, 60, 0, 5000, $"冰泡泡十字");
+        var dp0 = accessory.drawRect(sid, _scale, 90, 0, 5000, $"冰泡泡十字");
         dp0.Color = Boss1_DefaultDangerColor ? accessory.Data.DefaultDangerColor : Boss1_SetDangerColor.V4;
         dp0.Rotation = _rotation;
         if (draw) accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp0);
 
-        var dp1 = accessory.drawRect(sid, _scale, 60, 0, 5000, $"冰泡泡十字");
+        var dp1 = accessory.drawRect(sid, _scale, 90, 0, 5000, $"冰泡泡十字");
         dp1.Color = Boss1_DefaultDangerColor ? accessory.Data.DefaultDangerColor : Boss1_SetDangerColor.V4;
         dp1.Rotation = 0;
         if (draw) accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp1);
@@ -324,28 +303,15 @@ public class ASS
     public void Boss1_SqueakyClean(Event @event, ScriptAccessory accessory)
     {
         // LEFT DOWN是左边安全，打右边
-        const uint LEFT_DOWN = 30545;
-        const uint RIGHT_DOWN = 30546;
-        const uint LEFT_DOWN_SAVAGE = 30580;
-        const uint RIGHT_DOWN_SAVAGE = 30581;
+        HashSet<uint> LEFT_DOWN = [30545, 30580];
+        HashSet<uint> RIGHT_DOWN = [30546, 30581];
 
         var sid = @event.SourceId();
         var aid = @event.ActionId();
 
-        var _scale = aid switch
-        {
-            LEFT_DOWN or LEFT_DOWN_SAVAGE => 60,
-            RIGHT_DOWN or RIGHT_DOWN_SAVAGE => 60,
-            _ => 30
-        };
+        var _scale = 60;
         var _radian = float.Pi / 180 * 225;
-
-        var _rotation = aid switch
-        {
-            LEFT_DOWN or LEFT_DOWN_SAVAGE => -float.Pi / 180 * 67.5f,
-            RIGHT_DOWN or RIGHT_DOWN_SAVAGE => float.Pi / 180 * 67.5f,
-            _ => 0
-        };
+        var _rotation = LEFT_DOWN.Contains(aid) ? -float.Pi / 180 * 67.5f : float.Pi / 180 * 67.5f;
 
         var dp = accessory.drawFan(sid, _radian, _scale, 0, 9000, $"擦拭");
         // dp.Rotation正值为逆时针
@@ -353,12 +319,9 @@ public class ASS
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
 
-    const uint LIGHT_BUBBLE = 30553;
-    const uint ICE_BUBBLE = 30552;
-    const uint WIND_BUBBLE = 30551;
-    const uint LIGHT_BUBBLE_SAVAGE = 30588;
-    const uint ICE_BUBBLE_SAVAGE = 30587;
-    const uint WIND_BUBBLE_SAVAGE = 30586;
+    HashSet<uint> LIGHT_BUBBLE = [30553, 30588];
+    HashSet<uint> ICE_BUBBLE = [30552, 30587];
+    HashSet<uint> WIND_BUBBLE = [30551, 30586];
     [ScriptMethod(name: "BOSS1：泡泡属性记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3055[123]|3058[678])$"], userControl: false)]
     public void Boss1_BubblePropertyRecord(Event @event, ScriptAccessory accessory)
     {
@@ -372,30 +335,29 @@ public class ASS
         var sid = @event.SourceId();
         DrawPropertiesEdit?[] dps;
         DrawTypeEnum _type;
-        switch (Boss1_BubbleProperty)
+
+        if (LIGHT_BUBBLE.Contains(Boss1_BubbleProperty))
         {
-            case LIGHT_BUBBLE:
-            case LIGHT_BUBBLE_SAVAGE:
-                // 雷泡泡叉字后带分散
-                dps = [drawLightFan(sid, false, accessory), null];
-                _type = DrawTypeEnum.Fan;
-                drawLightSpread(accessory);
-                break;
-            case ICE_BUBBLE:
-            case ICE_BUBBLE_SAVAGE:
-                dps = drawIcePlusShaped(sid, false, accessory);
-                _type = DrawTypeEnum.Straight;
-                accessory.Method.TextInfo($"保持移动", 4000, true);
-                break;
-            case WIND_BUBBLE:
-            case WIND_BUBBLE_SAVAGE:
-                // 风泡泡画月环是为了提醒击退
-                dps = [drawWindDonut(sid, true, accessory), null];
-                _type = DrawTypeEnum.Donut;
-                break;
-            default:
-                return;
+            // 雷泡泡叉字后带分散
+            dps = [drawLightFan(sid, false, accessory), null];
+            _type = DrawTypeEnum.Fan;
+            drawLightSpread(accessory);
         }
+        else if (ICE_BUBBLE.Contains(Boss1_BubbleProperty))
+        {
+            dps = drawIcePlusShaped(sid, false, accessory);
+            _type = DrawTypeEnum.Straight;
+            accessory.Method.TextInfo($"保持移动", 4000, true);
+        }
+        else if (WIND_BUBBLE.Contains(Boss1_BubbleProperty))
+        {
+            // 风泡泡画月环是为了提醒击退
+            dps = [drawWindDonut(sid, true, accessory), null];
+            _type = DrawTypeEnum.Donut;
+        }
+        else
+            return;
+
         for (int i = 0; i < 2; i++)
         {
             if (dps[i] == null) continue;
@@ -405,8 +367,192 @@ public class ASS
         }
     }
 
-    // TODO 一泡泡染色需要条件判断
-    // TODO 拉球，中央月环与中央十字分情况判断
+    [ScriptMethod(name: "BOSS1：一染色球名称记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:regex:^(4561)$", "SourceDataId:regex:^(1483[58])$"], userControl: false)]
+    public void Boss1_P2_BubbleSidRecord(Event @event, ScriptAccessory accessory)
+    {
+        var spos = @event.SourcePosition();
+        var sid = @event.SourceId();
+
+        if (phase == ASS_Phase.BOSS1_P2)
+        {
+            if (spos.X < CENTER_BOSS1.X - 5)
+                Boss1_P2_FieldBubbleSid[0] = sid;
+            else if (spos.X > CENTER_BOSS1.X + 5)
+                Boss1_P2_FieldBubbleSid[2] = sid;
+            else
+                Boss1_P2_FieldBubbleSid[1] = sid;
+        }
+
+        if (phase == ASS_Phase.BOSS1_P3)
+        {
+            Boss1_P3_FieldBubbleSid.Add(sid);
+        }
+
+    }
+
+    [ScriptMethod(name: "BOSS1：一染色提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(330[567])$"])]
+    public async void Boss1_P2_PrintBubble(Event @event, ScriptAccessory accessory)
+    {
+        const uint WIND = 3305;
+        const uint ICE = 3306;
+        const uint LIGHT = 3307;
+
+        if (phase != ASS_Phase.BOSS1_P2) return;
+        await Task.Delay(500);  // 等待SID记录
+
+        var tid = @event.TargetId();
+        if (!Boss1_P2_FieldBubbleSid.Contains(tid)) return;
+        var _idx = Boss1_P2_FieldBubbleSid.IndexOf(tid);
+
+        var stid = @event.StatusID();
+        Boss1_P2_FieldBubbleProperty[_idx] = stid;
+
+        await Task.Delay(100);  // 等待集合数值改变
+        if (Boss1_P2_FieldBubbleProperty.Count(x => x == WIND) != 2) return;
+
+        var _spec_idx = Boss1_P2_FieldBubbleProperty.IndexOf(x => x != WIND);
+        int _tidx;
+        if (Boss1_P2_FieldBubbleProperty[_spec_idx] == ICE)
+            // 剩冰球，去下半场另一只染色
+            _tidx = Math.Abs(2 - _spec_idx);
+        else
+            // 剩电球，去上半场染色
+            _tidx = 1;
+
+        var dp = accessory.drawRect(Boss1_P2_FieldBubbleSid[_tidx], 10, 20, 0, 10000, $"一染色提示");
+        dp.TargetPosition = CENTER_BOSS1;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+    }
+
+    [ScriptMethod(name: "BOSS1：一拉球记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(330[567])$"], userControl: false)]
+    public async void Boss1_P3_GrabBubbleRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS1_P3) return;
+        await Task.Delay(500);  // 等待SID记录
+
+        var tid = @event.TargetId();
+        if (!Boss1_P3_FieldBubbleSid.Contains(tid)) return;
+        var _idx = Boss1_P3_FieldBubbleSid.IndexOf(tid);
+
+        var stid = @event.StatusID();
+        Boss1_P3_FieldBubbleProperty[_idx] = stid;
+    }
+
+    [ScriptMethod(name: "BOSS1：一拉球提示", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(00D8)$"])]
+    public void Boss1_P3_GrabBubble(Event @event, ScriptAccessory accessory)
+    {
+        const uint WIND = 3305;
+        const uint ICE = 3306;
+        const uint LIGHT = 3307;
+        if (phase != ASS_Phase.BOSS1_P3) return;
+        var tid = @event.TargetId();
+        if (tid != accessory.Data.Me) return;
+
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
+
+        // 泡泡们默认朝向为下
+
+        // 先确认与自己相连的泡泡属性
+        var _bubble_idx = Boss1_P3_FieldBubbleSid.IndexOf(sid);
+        bool _is_light_bubble = Boss1_P3_FieldBubbleProperty[_bubble_idx] == LIGHT;
+
+        if (_is_light_bubble)
+            // 电球，无脑向外指
+            grabBubbleToOut(spos, 0, 10000, accessory);
+        else
+        {
+            // 冰球，看BOSS
+            if (ICE_BUBBLE.Contains(Boss1_BubbleProperty))
+                // 如果BOSS是冰球，无脑向外指
+                grabBubbleToOut(spos, 0, 10000, accessory);
+            else
+            {
+                // 如果BOSS是电球，视位置拉
+                grabBubbleToPos(spos, 0, 10000, accessory);
+            }
+        }
+    }
+
+    private void grabBubbleToOut(Vector3 bubble_pos, int delay, int destory, ScriptAccessory accessory)
+    {
+        var _dir = bubble_pos.PositionRoundToDirs(CENTER_BOSS1, 8);
+        var _rot_radian = _dir * float.Pi / 180 * 45;
+        var _spos = bubble_pos.ExtendPoint(_rot_radian, 5);
+        var dp0 = accessory.drawStatic(_spos, 0, delay, destory, $"一拉球提示");
+        dp0.Color = posColorPlayer.V4;
+        dp0.Scale = new(1f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+
+        var dp = accessory.dirPos(_spos, delay, destory, $"一拉球指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private void grabBubbleToPos(Vector3 bubble_pos, int delay, int destory, ScriptAccessory accessory)
+    {
+        var _dir = bubble_pos.PositionRoundToDirs(CENTER_BOSS1, 8);
+        // 不唯一，但简单
+        int[] _rot_dir = [2, 2, 0, 2, 2, 6, 0, 0];
+        var _rot_radian = _rot_dir[_dir] * float.Pi / 180 * 45;
+        var _spos = bubble_pos.ExtendPoint(_rot_radian, 5);
+        var dp0 = accessory.drawStatic(_spos, 0, delay, destory, $"一拉球提示");
+        dp0.Color = posColorPlayer.V4;
+        dp0.Scale = new(1f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+
+        var dp = accessory.dirPos(_spos, delay, destory, $"一拉球指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    [ScriptMethod(name: "BOSS1：一拉球提示移除", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(577|612|656))$"], userControl: false)]
+    public void Boss1_P3_GrabBubbleRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS1_P3) return;
+        accessory.Method.RemoveDraw($"一拉球提示");
+        accessory.Method.RemoveDraw($"一拉球指路");
+    }
+
+    [ScriptMethod(name: "BOSS1：二染水壶位置记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(574|609))$"], userControl: false)]
+    public void Boss1_P4_WaterRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS1_P4) return;
+        var spos = @event.SourcePosition();
+        // -347, -339, [-335], -331, -323, 
+        // -43, -42, -41, -40
+        int _idx = (int)(spos.X / 8) + 43;
+        DebugMsg($"检测到水壶出现在第{_idx + 1}列", accessory);
+        Boss1_P4_WaterLine[_idx] = true;
+    }
+
+    [ScriptMethod(name: "BOSS1：二染死刑位置提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(543|578))$"])]
+    public void Boss1_P4_TankBusterDir(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS1_P4) return;
+        if (!IbcHelper.isTank(accessory.Data.Me)) return;
+        // 没有被清掉的一侧为少
+        var _isleft = Boss1_P4_WaterLine.IndexOf(false) > 1;
+        DebugMsg($"第{Boss1_P4_WaterLine.IndexOf(false)}列被移除，T需去{(_isleft ? "左" : "右")}引导。", accessory);
+        Vector3 _pos = new Vector3(-350, 471, -155);    // 左侧
+        if (!_isleft)
+            _pos = _pos.FoldPointLR(CENTER_BOSS1.X);
+
+        var dp0 = accessory.drawStatic(_pos, 0, 0, 10000, $"二染死刑位置提示");
+        dp0.Color = posColorPlayer.V4;
+        dp0.Scale = new(1f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+
+        var dp = accessory.dirPos(_pos, 0, 10000, $"二染死刑位置指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    [ScriptMethod(name: "BOSS1：二染死刑位置提示移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(30(543|578))$"])]
+    public void Boss1_P4_TankBusterDirRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS1_P4) return;
+        accessory.Method.RemoveDraw($"二染死刑位置提示");
+        accessory.Method.RemoveDraw($"二染死刑位置指路");
+    }
 
     #endregion
 
