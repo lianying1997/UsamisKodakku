@@ -29,11 +29,11 @@ using ECommons.MathHelpers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.5", author: "Usami", note: noteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.5", author: "Usami", note: NoteStr)]
 
 public class ASS
 {
-    const string noteStr =
+    const string NoteStr =
     """
     请先按需求检查并设置“用户设置”栏目。
     v0.0.0.5

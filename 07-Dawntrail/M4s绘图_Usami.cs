@@ -17,7 +17,7 @@ using KodakkuAssist.Module.GameOperate;
 using System.Security.Cryptography;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.ComponentModel;
-using System.DirectoryServices.ActiveDirectory;
+// using System.DirectoryServices.ActiveDirectory;
 using System.Collections;
 using System.Text;
 
