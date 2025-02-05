@@ -56,7 +56,7 @@ public class Hello
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        
+
         // -- DEBUG CODE END --
     }
 }
@@ -379,14 +379,14 @@ public static class DirectionCalc
         // Vector3 v3 = new(point.X, point.Y, 2 * centerZ - point.Z);
         // return v3;
         return point with { Z = 2 * centerZ - point.Z };
-        
+
     }
 }
 
 public static class IndexHelper
 {
     /// <summary>
-    /// 输入玩家dataid，获得对应的位置index
+    /// 输入玩家dataId，获得对应的位置index
     /// </summary>
     /// <param name="pid">玩家SourceId</param>
     /// <param name="accessory"></param>
@@ -408,7 +408,7 @@ public static class IndexHelper
     }
 
     /// <summary>
-    /// 输入玩家dataid，获得对应的位置称呼，输出字符仅作文字输出用
+    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
     /// </summary>
     /// <param name="pid">玩家SourceId</param>
     /// <param name="accessory"></param>
@@ -544,6 +544,62 @@ public static class AssignDp
     }
 
     /// <summary>
+    /// 返回扇形左右刀
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="isLeftCleave">是左刀</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawLeftRightCleave(this ScriptAccessory accessory, uint ownerId, bool isLeftCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Radian = radian;
+        dp.Rotation = isLeftCleave ? float.Pi / 2 : -float.Pi / 2;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回扇形前后刀
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="isFrontCleave">是前刀</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawFrontBackCleave(this ScriptAccessory accessory, uint ownerId, bool isFrontCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Radian = radian;
+        dp.Rotation = isFrontCleave ? 0 : -float.Pi;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
     /// 返回距离某对象目标最近/最远的dp
     /// </summary>
     /// <param name="accessory"></param>
@@ -575,7 +631,7 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
-    
+
     /// <summary>
     /// 返回距离某坐标位置最近/最远的dp
     /// </summary>
@@ -637,7 +693,7 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
-    
+
     /// <summary>
     /// 返回ownerId仇恨相关的dp
     /// </summary>
@@ -798,7 +854,7 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         return dp;
     }
-    
+
     /// <summary>
     /// 返回静态圆圈dp，通常用于指引固定位置。
     /// </summary>
