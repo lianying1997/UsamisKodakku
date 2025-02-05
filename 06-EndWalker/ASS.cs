@@ -117,7 +117,7 @@ public class ASS
         Boss2_GoldenSilverField = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];     // BOSS2 金银Buff场地计算
 
         Boss3_StrikeTarget = [0, 0];                        // BOSS3 石火豪冲（被挡枪目标）记录
-        Boss3_P4_BrandRot = [0, 0, 0];                      // BOSS3 咒具面向逻辑角度记录 
+        Boss3_P4_BrandRot = [0, 0, 0];                      // BOSS3 咒具面向逻辑角度记录
         Boss3_P4_PanelSid = [0, 0, 0];                      // BOSS3 魔法阵ID记录
         accessory.Method.RemoveDraw(".*");
     }
@@ -530,7 +530,7 @@ public class ASS
     {
         if (phase != ASS_Phase.BOSS1_P4) return;
         var spos = @event.SourcePosition();
-        // -347, -339, [-335], -331, -323, 
+        // -347, -339, [-335], -331, -323,
         // -43, -42, -41, -40
         int _idx = (int)(spos.X / 8) + 43;
         DebugMsg($"检测到水壶出现在第{_idx + 1}列", accessory);
@@ -915,7 +915,7 @@ public class ASS
         }
         return [0, 0];
     }
-    
+
     // TODO 连线指路
 
     #endregion
