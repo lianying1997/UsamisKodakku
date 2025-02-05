@@ -228,7 +228,7 @@ public static class IbcHelper
 public static class DirectionCalc
 {
     // 以北为0建立list
-    // InnGame      List    Dir
+    // Game         List    Logic
     // 0            - 4     pi
     // 0.25 pi      - 3     0.75pi
     // 0.5 pi       - 2     0.5pi
@@ -237,74 +237,70 @@ public static class DirectionCalc
     // 1.25 pi      - 7     1.75pi
     // 1.5 pi       - 6     1.5pi
     // 1.75 pi      - 5     1.25pi
-    // Dir = Pi - InnGame (+ 2pi)
+    // Logic = Pi - Game (+ 2pi)
 
     /// <summary>
     /// 将游戏基角度（以南为0，逆时针增加）转为逻辑基角度（以北为0，顺时针增加）
+    /// 算法与Logic2Game完全相同，但为了代码可读性，便于区分。
     /// </summary>
     /// <param name="radian">游戏基角度</param>
     /// <returns>逻辑基角度</returns>
-    public static float BaseInnGame2DirRad(this float radian)
+    public static float Game2Logic(this float radian)
     {
-        var r = (float)Math.PI - radian;
-        if (r < 0) r = (float)(r + 2 * Math.PI);
-        if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
+        // if (r < 0) r = (float)(r + 2 * Math.PI);
+        // if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
+
+        var r = float.Pi - radian;
+        r %= float.Pi * 2;
         return r;
     }
 
     /// <summary>
     /// 将逻辑基角度（以北为0，顺时针增加）转为游戏基角度（以南为0，逆时针增加）
+    /// 算法与Game2Logic完全相同，但为了代码可读性，便于区分。
     /// </summary>
     /// <param name="radian">逻辑基角度</param>
     /// <returns>游戏基角度</returns>
-    public static float BaseDirRad2InnGame(this float radian)
+    public static float Logic2Game(this float radian)
     {
-        var r = (float)Math.PI - radian;
-        if (r < Math.PI) r = (float)(r + 2 * Math.PI);
-        if (r > Math.PI) r = (float)(r - 2 * Math.PI);
-        return r;
+        // var r = (float)Math.PI - radian;
+        // if (r < Math.PI) r = (float)(r + 2 * Math.PI);
+        // if (r > Math.PI) r = (float)(r - 2 * Math.PI);
+
+        return radian.Game2Logic();
     }
 
     /// <summary>
-    /// 输入逻辑基角度，获取逻辑方位
+    /// 输入逻辑基角度，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
     /// </summary>
     /// <param name="radian">逻辑基角度</param>
     /// <param name="dirs">方位总数</param>
+    /// <param name="diagDivision">斜分割，默认true</param>
     /// <returns>逻辑基角度对应的逻辑方位</returns>
-    public static int DirRadRoundToDirs(this float radian, int dirs)
+    public static int Rad2Dirs(this float radian, int dirs, bool diagDivision = true)
     {
-        var r = Math.Round(radian / (2f / dirs * Math.PI));
+        double dirsDouble = dirs;
+        var r = diagDivision
+            ? Math.Round(radian / (2f / dirsDouble * float.Pi))
+            : Math.Floor(radian / (2f / dirsDouble * float.Pi));
         r %= dirs;
         return (int)r;
     }
 
     /// <summary>
-    /// 输入坐标，获取正分割逻辑方位（以右上为0）
+    /// 输入坐标，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
     /// </summary>
     /// <param name="point">坐标点</param>
     /// <param name="center">中心点</param>
     /// <param name="dirs">方位总数</param>
+    /// <param name="diagDivision">斜分割，默认true</param>
     /// <returns>该坐标点对应的逻辑方位</returns>
-    public static int PositionFloorToDirs(this Vector3 point, Vector3 center, int dirs)
+    public static int Position2Dirs(this Vector3 point, Vector3 center, int dirs, bool diagDivision = true)
     {
-        // 正分割，0°为分界线，将360°分为dirs份
         double dirsDouble = dirs;
-        var r = Math.Floor(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble;
-        return (int)r;
-    }
-
-    /// <summary>
-    /// 输入坐标，获取斜分割逻辑方位（以正上为0）
-    /// </summary>
-    /// <param name="point">坐标点</param>
-    /// <param name="center">中心点</param>
-    /// <param name="dirs">方位总数</param>
-    /// <returns>该坐标点对应的逻辑方位</returns>
-    public static int PositionRoundToDirs(this Vector3 point, Vector3 center, int dirs)
-    {
-        // 斜分割，0° return 0，将360°分为dirs份
-        double dirsDouble = dirs;
-        var r = Math.Round(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble;
+        var r = diagDivision
+            ? Math.Round(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble
+            : Math.Floor(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble;
         return (int)r;
     }
 
@@ -417,18 +413,7 @@ public static class IndexHelper
     {
         // 获得玩家职能简称，无用处，仅作DEBUG输出
         var idx = accessory.Data.PartyList.IndexOf(pid);
-        var str = idx switch
-        {
-            0 => "MT",
-            1 => "ST",
-            2 => "H1",
-            3 => "H2",
-            4 => "D1",
-            5 => "D2",
-            6 => "D3",
-            7 => "D4",
-            _ => "unknown"
-        };
+        var str = accessory.GetPlayerJobByIndex(idx);
         return str;
     }
 
@@ -817,16 +802,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawDonut(this ScriptAccessory accessory, uint ownerId, float scale, float innerScale, int delay, int destroy, string name, bool byTime = false)
     {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.InnerScale = new Vector2(innerScale);
-        dp.Radian = float.Pi * 2;
-        dp.Owner = ownerId;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        var dp = accessory.DrawFan(ownerId, float.Pi * 2, 0, scale, innerScale, delay, destroy, name, byTime);
         return dp;
     }
 
@@ -834,7 +810,8 @@ public static class AssignDp
     /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
     /// </summary>
     /// <param name="center">绘图中心位置</param>
-    /// <param name="radian">旋转角度，以北为0度顺时针</param>
+    /// <param name="radian">图形角度</param>
+    /// <param name="rotation">旋转角度，以北为0度顺时针</param>
     /// <param name="width">绘图宽度</param>
     /// <param name="length">绘图长度</param>
     /// <param name="delay">延时delay ms出现</param>
@@ -842,13 +819,14 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, Vector3 center, float radian, float width, float length, int delay, int destroy, string name)
+    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, Vector3 center, float radian, float rotation, float width, float length, int delay, int destroy, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
         dp.Position = center;
-        dp.Rotation = radian.BaseDirRad2InnGame();
+        dp.Radian = radian;
+        dp.Rotation = rotation.Logic2Game();
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
@@ -868,13 +846,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Position = center;
-        dp.Color = color;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
+        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
         return dp;
     }
 
