@@ -29,16 +29,17 @@ using ECommons.MathHelpers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.5", author: "Usami", note: NoteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.6", author: "Usami", note: NoteStr)]
 
 public class ASS
 {
     const string NoteStr =
     """
-    请先按需求检查并设置“用户设置”栏目。
-    v0.0.0.5
+    请先按需求检查并设置“用户设置”栏目，
+    并在/KTeam中设置 T>H>近>远
+    v0.0.0.6
     1. BOSS1 鼠鼠指路完成（不含P5二拉球）
-    2. BOSS2 斗士金银BUFF指路完成
+    2. BOSS2 斗士指路完成
 
     v0.0.0.3
     初版完成，适配异闻与异闻零式。
@@ -80,7 +81,7 @@ public class ASS
     }
     ASS_Phase phase = ASS_Phase.Init;
     List<bool> Drawn = new bool[20].ToList();                   // 绘图记录
-    Vector3 CENTER_BOSS1 = new Vector3(-335f, 0, -155f);        // BOSS1 场地中心
+    Vector3 CENTER_BOSS1 = new Vector3(-335f, 471f, -155f);     // BOSS1 场地中心
     Vector3 CENTER_BOSS2 = new Vector3(-35f, 521f, -271f);      // BOSS2 场地中心
     Vector3 CENTER_BOSS3 = new Vector3(289f, 533f, -105f);      // BOSS3 场地中心
     const int FIELDX_BOSS3 = 30;                                // BOSS3 场地X总长
@@ -134,11 +135,6 @@ public class ASS
         if (!DebugMode) return;
 
         // DEBUG CODE
-        string result = "[" + string.Join(", ", Boss2_GoldenSilverField.Select(row => "[" + string.Join(", ", row) + "]")) + "]";
-        DebugMsg($"{result}", accessory);
-
-        drawSafeSquare(1, 1, accessory);
-        drawSafeSquare(2, 3, accessory);
     }
 
     #region Mob1
@@ -270,7 +266,7 @@ public class ASS
         return dp;
     }
 
-    private void drawLightSpread(ScriptAccessory accessory)
+    private void drawLightSpread(uint sid, ScriptAccessory accessory)
     {
         var _scale = 5;
         for (int i = 0; i < accessory.Data.PartyList.Count(); i++)
@@ -278,6 +274,17 @@ public class ASS
             var dp = accessory.drawCircle(accessory.Data.PartyList[i], 6000, 3000, $"雷滑行分散");
             dp.Scale = new(_scale);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+        
+        List<int> dirPosition = [2, 0, 1, 3];
+        var myIndex = accessory.getMyIndex();
+        for (int i = 0; i < dirPosition.Count(); i++)
+        {
+            var dp = accessory.drawRect(sid, 2, 10, 7000, 2000, $"分散位置指引{i}");
+            dp.Rotation = dirPosition[i] * float.Pi / 2;
+            dp.Color = i == myIndex ? posColorPlayer.V4.WithW(1.5f) : posColorNormal.V4;
+            dp.Scale = new Vector2(4f, 20f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
         }
     }
 
@@ -353,7 +360,7 @@ public class ASS
             // 雷泡泡叉字后带分散
             dps = [drawLightFan(sid, false, accessory), null];
             _type = DrawTypeEnum.Fan;
-            drawLightSpread(accessory);
+            drawLightSpread(sid, accessory);
         }
         else if (ICE_BUBBLE.Contains(Boss1_BubbleProperty))
         {
@@ -712,6 +719,17 @@ public class ASS
             dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
             accessory.Method.SendDraw(DrawModeEnum.Default, _type, dp);
         }
+
+        List<int> dirPosition = [0, 2, 3, 1];
+        var myIndex = accessory.getMyIndex();
+        for (int i = 0; i < dirPosition.Count(); i++)
+        {
+            var dp = accessory.dirPos2Pos(CENTER_BOSS2, CENTER_BOSS2.ExtendPoint(dirPosition[i] * float.Pi / 2, 20), 0,
+                8000, $"十字站位指引{i}");
+            dp.Color = i == myIndex ? posColorPlayer.V4.WithW(1.5f) : posColorNormal.V4;
+            dp.Scale = new Vector2(4f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        }
     }
 
     HashSet<uint> GOLDEN_BEAM = [30319, 30641];
@@ -748,7 +766,8 @@ public class ASS
         if (Boss2_GoldenSilverBuff.All(x => x == 0))
         {
             // 无金银Buff时
-            var dp = accessory.drawRect(sid, 10, 40, 0, 9900, $"射线{aid}");
+            // 显示时间无需过长，给九字切让路
+            var dp = accessory.drawRect(sid, 10, 40, 0, 8400, $"射线{aid}");
             dp.Color = _color;
             dp.Rotation = SILVER_BEAM.Contains(aid) ? float.Pi : 0;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
@@ -858,16 +877,16 @@ public class ASS
             var _col = idx;
             var _row = (face_dir + 2 * (is_golden ? 0 : 1)) % 4;
             // [_row][_col], [_row+1][_col]
-            Boss2_GoldenSilverField[_row][_col] = Boss2_GoldenSilverField[_row][_col] + (is_golden ? 10 : 1);
-            Boss2_GoldenSilverField[_row + 1][_col] = Boss2_GoldenSilverField[_row + 1][_col] + (is_golden ? 10 : 1);
+            Boss2_GoldenSilverField[_row][_col] += is_golden ? 10 : 1;
+            Boss2_GoldenSilverField[_row + 1][_col] += is_golden ? 10 : 1;
         }
         else
         {
             var _row = idx;
             var _col = (face_dir + 1 + 2 * (is_golden ? 0 : 1)) % 4;
             // [_row][_col], [_row][_col+1]
-            Boss2_GoldenSilverField[_row][_col] = Boss2_GoldenSilverField[_row][_col] + (is_golden ? 10 : 1);
-            Boss2_GoldenSilverField[_row][_col + 1] = Boss2_GoldenSilverField[_row][_col + 1] + (is_golden ? 10 : 1);
+            Boss2_GoldenSilverField[_row][_col] += is_golden ? 10 : 1;
+            Boss2_GoldenSilverField[_row][_col + 1] += is_golden ? 10 : 1;
         }
     }
     private void drawSafeSquare(int row, int col, ScriptAccessory accessory)
@@ -884,12 +903,12 @@ public class ASS
         var _x = -50 + col * 10;
         var _z = -286 + row * 10;
         Vector3 pos = new Vector3(_x, 521f, _z);
-        var dp = accessory.drawStatic(pos, 0, 0, 8000, $"金银射线安全{row}{col}");
+        var dp = accessory.drawStatic(pos, 0, 0, 7500, $"金银射线安全{row}{col}");
         dp.Scale = new(10, 10);
         dp.Color = accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
 
-        var dp0 = accessory.dirPos(pos, 0, 8000, $"金银射线指路{row}{col}");
+        var dp0 = accessory.dirPos(pos, 0, 7500, $"金银射线指路{row}{col}");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
     }
 
@@ -916,8 +935,180 @@ public class ASS
         return [0, 0];
     }
 
-    // TODO 连线指路
+    [ScriptMethod(name: "Boss2：连线集合提示绘图", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(310|632))$"])]
+    public void Boss2_TetherGatherFirstDraw(Event @event, ScriptAccessory accessory)
+    {
+        var dp = accessory.drawStatic(CENTER_BOSS2, 0, 0, 4000, $"连线集合");
+        dp.Scale = new Vector2(1.5f);
+        dp.Color = posColorPlayer.V4.WithW(1.5f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
 
+        var dp0 = accessory.dirPos(CENTER_BOSS2, 0, 4000, $"连线集合指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+    }
+    
+    [ScriptMethod(name: "Boss2：连线安全方向绘图", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(312|634))$"])]
+    public void Boss2_TetherSafePosDraw(Event @event, ScriptAccessory accessory)
+    {
+        var tpos = @event.TargetPosition();
+        var v = new Vector2(tpos.X - CENTER_BOSS2.X, tpos.Z - CENTER_BOSS2.Z);
+        if (v.Length() < 5) return;
+        
+        if (Drawn[1]) return;
+        Drawn[1] = true;
+        var tetherDangerPos = tpos.PositionRoundToDirs(CENTER_BOSS2, 4);
+        // AC先出
+        List<Vector3> safePos = [];
+        if (tetherDangerPos % 2 == 0)
+        {
+            // 初始安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * -45, 13 * float.Sqrt(2)));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 135, 13 * float.Sqrt(2)));
+            // 后续安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 0, 13));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 180, 13));
+        }
+        else
+        {
+            // 初始安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 45, 13 * float.Sqrt(2)));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * -135, 13 * float.Sqrt(2)));
+            // 后续安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 90, 13));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 270, 13));
+        }
+
+        var myIndex = accessory.getMyIndex();
+        DrawPropertiesEdit dp1;
+        DrawPropertiesEdit dp2;
+        if (myIndex % 2 == 0)
+        {
+            // 是T与近战，上半场
+            dp1 = accessory.dirPos(safePos[0], 0, 10000, $"第一步");
+            dp2 = accessory.dirPos2Pos(safePos[0], safePos[2], 0, 10000, $"第二步准备");
+        }
+        else
+        {
+            // 是H与远程，上半场
+            dp1 = accessory.dirPos(safePos[1], 0, 10000, $"第一步");
+            dp2 = accessory.dirPos2Pos(safePos[1], safePos[3], 0, 10000, $"第二步准备");
+        }
+        dp2.Color = accessory.Data.DefaultDangerColor;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp2);
+    }
+    
+    [ScriptMethod(name: "Boss2：连线安全方向指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(30(312|634))$"])]
+    public void Boss2_TetherSafePosDir(Event @event, ScriptAccessory accessory)
+    {
+        var tpos = @event.TargetPosition();
+        var v = new Vector2(tpos.X - CENTER_BOSS2.X, tpos.Z - CENTER_BOSS2.Z);
+        if (v.Length() < 5) return;
+        
+        if (Drawn[2]) return;
+        Drawn[2] = true;
+        var tetherDangerPos = tpos.PositionRoundToDirs(CENTER_BOSS2, 4);
+        // AC先出
+        List<Vector3> safePos = [];
+        if (tetherDangerPos % 2 == 0)
+        {
+            // 初始安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * -45, 13 * float.Sqrt(2)));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 135, 13 * float.Sqrt(2)));
+            // 后续安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 0, 13));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 180, 13));
+        }
+        else
+        {
+            // 初始安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 45, 13 * float.Sqrt(2)));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * -135, 13 * float.Sqrt(2)));
+            // 后续安全点
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 90, 13));
+            safePos.Add(CENTER_BOSS2.ExtendPoint(float.Pi / 180 * 270, 13));
+        }
+
+        var myIndex = accessory.getMyIndex();
+        DrawPropertiesEdit dp2;
+        if (myIndex % 2 == 0)
+            // 是T与近战，上半场
+            dp2 = accessory.dirPos(safePos[2], 0, 2000, $"第二步");
+        else
+            // 是H与远程，上半场
+            dp2 = accessory.dirPos(safePos[3], 0, 2000, $"第二步");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp2);
+        accessory.Method.RemoveDraw($"第一步");
+        accessory.Method.RemoveDraw($"第二步准备");
+    }
+
+    [ScriptMethod(name: "Boss2：踩塔与放圈安全方向指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(314|636))$"])]
+    public void Boss2_TowerAndChariotSafeDir(Event @event, ScriptAccessory accessory)
+    {
+        if (Drawn[3]) return;
+        Drawn[3] = true;
+        
+        var spos = @event.SourcePosition();
+        var pos = spos.PositionRoundToDirs(CENTER_BOSS2,4);
+        List<Vector3> chariotPos = [];
+        List<Vector3> towerPos = [];
+
+        if (pos % 2 == 0)
+        {
+            // 先上下塔，塔半径3
+            // 近战右上，远程左下
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(0 * float.Pi / 2, 7.5f));
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(2 * float.Pi / 2, 7.5f));
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(1 * float.Pi / 2, 7.5f));
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(3 * float.Pi / 2, 7.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(1 * float.Pi / 2, 19.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(3 * float.Pi / 2, 19.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(0 * float.Pi / 2, 19.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(2 * float.Pi / 2, 19.5f));
+        }
+        else
+        {
+            // 先左右塔，塔半径3
+            // 近战右上，远程左下
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(1 * float.Pi / 2, 7.5f));
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(3 * float.Pi / 2, 7.5f));
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(0 * float.Pi / 2, 7.5f));
+            towerPos.Add(CENTER_BOSS2.ExtendPoint(2 * float.Pi / 2, 7.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(0 * float.Pi / 2, 19.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(2 * float.Pi / 2, 19.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(1 * float.Pi / 2, 19.5f));
+            chariotPos.Add(CENTER_BOSS2.ExtendPoint(3 * float.Pi / 2, 19.5f));
+        }
+
+        // 若同组内数字相同，dps需互换
+        var swap = (Boss2_isLongBuff[0] && Boss2_isLongBuff[2]) || (Boss2_isLongBuff[1] && Boss2_isLongBuff[3]);
+        var myIndex = accessory.getMyIndex();
+        
+        // isLongBuff影响先踩塔还是先放圈
+        // playerIdx影响[0,2]还是[1,3]
+        List<bool> actionJudge = [false, false];
+        // actionJudge[0]: true则先踩塔，false则先放圈
+        // actionJudge[1]: true则视为近战组0-2，false则视为远程组1-3
+        if (Boss2_isLongBuff[myIndex])
+            actionJudge[0] = true;
+        if (myIndex % 2 == 0)
+            actionJudge[1] = true;
+        if (myIndex >= 2 && swap)
+            actionJudge[1] = !actionJudge[1];
+
+        DebugMsg($"我{(swap ? "要换" : "不换")}，先{(actionJudge[0] ? "踩塔" : "放圈")}，我是{(actionJudge[1] ? "右上" : "左下")}组。",
+            accessory);
+
+        Vector3 tpos1 = (actionJudge[0] ? towerPos : chariotPos)[actionJudge[1] ? 0 : 1];
+        Vector3 tpos2 = (actionJudge[0] ? chariotPos : towerPos)[actionJudge[1] ? 2 : 3];
+        var dp1 = accessory.dirPos(tpos1, 0, 6500, $"第一步");
+        var dp12 = accessory.dirPos2Pos(tpos1, tpos2, 0, 6500, $"第二步准备");
+        dp12.Color = accessory.Data.DefaultDangerColor;
+        var dp2 = accessory.dirPos(tpos2, 6500, 4500, $"第二步");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp12);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp2);
+    }
     #endregion
 
     #region BOSS3 键山雏
@@ -1070,7 +1261,7 @@ public class ASS
             Boss3_P4_PanelSid[_idx] = sid;
         }
         else
-            return; ;
+            return;
     }
 
     private DrawPropertiesEdit drawPanelStraight(uint sid, int delay, int destory, bool draw, ScriptAccessory accessory)
@@ -1928,56 +2119,4 @@ public static class AssignDp
 
 #endregion
 
-#region 测试区
-// --------------------------------------
-public static class ClassTest
-{
-    public static int Counting = 0;
-
-    public static void classTestMethod(Event @event, ScriptAccessory accessory)
-    {
-        accessory.Method.SendChat($"/e counting: {Counting++}");
-    }
-}
-
-// 事件调用
-// [ScriptMethod(name: "Test Class", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:133"])]
-// public void StartCasting(Event @event, ScriptAccessory accessory) => ClassTest.classTestMethod(@event, accessory);
-
-// List内数据打印
-// string rotateDirStr = string.Join(", ", RotateCircleDir);
-// DebugMsg(rotateDirStr, accessory);
-
-// CLASS
-public class Blade
-{
-    public UInt32 Id { get; set; }
-    public double X { get; set; }
-    public double Y { get; set; }
-    public double Rotation { get; set; }
-    public Blade(UInt32 id, double x, double y, double rotation)
-    {
-        Id = id;
-        X = x;
-        Y = y;
-        Rotation = rotation;
-    }
-}
-
-// ConcurrentBag 和 List 的区别：
-// Thread Safety: ConcurrentBag is designed to be used in multi-threaded scenarios.
-// It allows multiple threads to add and remove items concurrently
-
-// private ConcurrentBag<Blade> blades = new ConcurrentBag<Blade>();
-// blades.Add(new Blade(
-//     id: Convert.ToUInt32(@event["SourceId"], 16),
-//     x: Convert.ToDouble(pos.X),
-//     y: Convert.ToDouble(pos.Z),
-//     rotation: Convert.ToDouble(@event["SourceRotation"])
-// ));
-
-#endregion
-
-#region DEBUG代码
-
-#endregion
+// ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
