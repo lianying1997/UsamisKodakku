@@ -29,7 +29,7 @@ using ECommons.MathHelpers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.0.6", author: "Usami", note: NoteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.0", author: "Usami", note: NoteStr)]
 
 public class ASS
 {
@@ -37,12 +37,8 @@ public class ASS
     """
     请先按需求检查并设置“用户设置”栏目，
     并在/KTeam中设置 T>H>近>远
-    v0.0.0.6
-    1. BOSS1 鼠鼠指路完成（不含P5二拉球）
-    2. BOSS2 斗士指路完成
-
-    v0.0.0.3
-    初版完成，适配异闻与异闻零式。
+    v0.0.1.0
+    1. 初版完成，包含机制绘图与指路，适配异闻与异闻零式。
     鸭门。
     """;
 
@@ -81,9 +77,9 @@ public class ASS
     }
     ASS_Phase phase = ASS_Phase.Init;
     List<bool> Drawn = new bool[20].ToList();                   // 绘图记录
-    Vector3 CENTER_BOSS1 = new Vector3(-335f, 471f, -155f);     // BOSS1 场地中心
-    Vector3 CENTER_BOSS2 = new Vector3(-35f, 521f, -271f);      // BOSS2 场地中心
-    Vector3 CENTER_BOSS3 = new Vector3(289f, 533f, -105f);      // BOSS3 场地中心
+    static Vector3 CENTER_BOSS1 = new Vector3(-335f, 471f, -155f);     // BOSS1 场地中心
+    static Vector3 CENTER_BOSS2 = new Vector3(-35f, 521f, -271f);      // BOSS2 场地中心
+    static Vector3 CENTER_BOSS3 = new Vector3(289f, 533f, -105f);      // BOSS3 场地中心
     const int FIELDX_BOSS3 = 30;                                // BOSS3 场地X总长
     const int FIELDZ_BOSS3 = 40;                                // BOSS3 场地Z总长
     uint Boss1_BubbleProperty = 0;                              // BOSS1 鼠鼠的泡泡属性
@@ -97,8 +93,24 @@ public class ASS
     List<int> Boss2_GoldenSilverBuff = [0, 0, 0, 0];            // BOSS2 记录金银Buff
     List<List<int>> Boss2_GoldenSilverField = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]; // BOSS2 金银Buff场地计算
     List<int> Boss3_StrikeTarget = [0, 0];                      // BOSS3 石火豪冲（被挡枪目标）记录
+    List<int> Boss3_P2_PlayerBuff = [0, 0, 0, 0];               // BOSS3 P2麻将记录
     List<float> Boss3_P4_BrandRot = [0, 0, 0];                  // BOSS3 咒具面向逻辑角度记录
     List<uint> Boss3_P4_PanelSid = [0, 0, 0];                   // BOSS3 魔法阵ID记录
+    int Boss3_P3_myRotateRow = 0;                               // BOSS3 旋转buff决定所在行
+    List<Vector3> Boss3_P3_safeTeleportPos =
+    [
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0)
+    ];        // BOSS3 咒具旋转安全位置
+    List<Vector3> Boss3_P3_BaitPos =
+    [
+        new Vector3(289f, 533f, -119.5f),
+        new Vector3(297f, 533f, -111.75f),
+        new Vector3(297f, 533f, -111.75f).FoldPointUD(CENTER_BOSS3.Z).FoldPointLR(CENTER_BOSS3.X),
+        new Vector3(289f, 533f, -119.5f).FoldPointUD(CENTER_BOSS3.Z),
+    ];        // BOSS3 引导斧头安全位置
 
     public void Init(ScriptAccessory accessory)
     {
@@ -118,8 +130,26 @@ public class ASS
         Boss2_GoldenSilverField = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];     // BOSS2 金银Buff场地计算
 
         Boss3_StrikeTarget = [0, 0];                        // BOSS3 石火豪冲（被挡枪目标）记录
+        Boss3_P2_PlayerBuff = [0, 0, 0, 0];                 // BOSS3 P2麻将记录
         Boss3_P4_BrandRot = [0, 0, 0];                      // BOSS3 咒具面向逻辑角度记录
         Boss3_P4_PanelSid = [0, 0, 0];                      // BOSS3 魔法阵ID记录
+        Boss3_P3_myRotateRow = 0;                           // BOSS3 旋转buff决定所在行
+
+        Boss3_P3_safeTeleportPos =
+        [
+            new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0),
+            new Vector3(0, 0, 0)
+        ];        // BOSS3 咒具旋转安全位置
+        Boss3_P3_BaitPos =
+        [
+            new Vector3(289f, 533f, -119.5f),
+            new Vector3(297f, 533f, -111.75f),
+            new Vector3(297f, 533f, -111.75f).FoldPointUD(CENTER_BOSS3.Z).FoldPointLR(CENTER_BOSS3.X),
+            new Vector3(289f, 533f, -119.5f).FoldPointUD(CENTER_BOSS3.Z),
+        ];        // BOSS3 引导斧头安全位置
+        
         accessory.Method.RemoveDraw(".*");
     }
 
@@ -135,6 +165,12 @@ public class ASS
         if (!DebugMode) return;
 
         // DEBUG CODE
+        for (int i = 0; i<4; i++)
+        {
+            var dp = accessory.drawStatic(Boss3_P3_BaitPos[i], 0, i*1000, 2000, $"a");
+            dp.Scale = new(2f);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
+        }
     }
 
     #region Mob1
@@ -1278,14 +1314,117 @@ public class ASS
         var sid = @event.SourceId();
         accessory.Method.RemoveDraw($"圣火炮{sid}");
     }
+    
+    [ScriptMethod(name: "Boss3：咒具二麻将Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(32(6[89]|7[01]))$"], userControl: false)]
+    public void Boss3_P2_PlayerBuffRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS3_P2) return;
+        const uint one = 3268;
+        const uint two = 3269;
+        const uint three = 3270;
+        const uint four = 3271;
 
+        var aid = @event.StatusID();
+        var tid = @event.TargetId();
+        var tidx = accessory.getPlayerIdIndex(tid);
+        Boss3_P2_PlayerBuff[tidx] = aid switch
+        {
+            one => 1,
+            two => 2,
+            three => 3,
+            four => 4,
+            _ => 0
+        };
+        
+        DebugMsg($"检测到玩家{tidx}的Buff为{Boss3_P2_PlayerBuff[tidx]}", accessory);
+    }
+    
+    [ScriptMethod(name: "Boss3：咒具二剪线位置指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(45[01234567])$"])]
+    public async void Boss3_P2_CutLineDir(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS3_P2) return;
+        HashSet<uint> one = [450, 454];
+        HashSet<uint> two = [451, 455];
+        HashSet<uint> three = [452, 456];
+        HashSet<uint> four = [453, 457];
+
+        var param = @event.Param();
+        var tid = @event.TargetId();
+        var tpos = @event.TargetPosition();
+
+        await Task.Delay(100);
+        var myIndex = accessory.getMyIndex();
+        DebugMsg($"检测到线{tid}的Buff{(param - 450) % 4 + 1}", accessory);
+        
+        if ((param - 450) % 4 + 1 != Boss3_P2_PlayerBuff[myIndex]) return;
+        
+        DebugMsg($"检测到线{tid}的Buff与主视角的Buff相同", accessory);
+
+        var dpl = accessory.drawRect(tid, 4f, 40f, 0, 30000, $"线{tid}");
+        dpl.Color = accessory.Data.DefaultSafeColor;
+        dpl.Offset = new Vector3(0, -1.75f, 0);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dpl);
+        
+        // 寻找线的位置，确定剪线起始点
+        if (Drawn[4]) return;
+        Drawn[4] = true;
+        
+        var linePos = FindLineIdx(tpos);
+        DebugMsg($"我在寻找{tpos}位置的线，linePos为{linePos}", accessory);
+        Vector3 cutLinePos;
+        if (IsLineAtLeftDownSide(linePos))
+            cutLinePos = CENTER_BOSS3 with { X = CENTER_BOSS3.X - 10, Z = CENTER_BOSS3.Z + 10 };
+        else
+            cutLinePos = CENTER_BOSS3 with { X = CENTER_BOSS3.X + 10, Z = CENTER_BOSS3.Z - 10 };
+
+        var dp = accessory.drawStatic(cutLinePos, 0, 0,
+                8000, $"剪线起始点");
+        dp.Color = posColorPlayer.V4.WithW(1.5f);
+        dp.Scale = new Vector2(1.5f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+
+        var dp0 = accessory.dirPos(cutLinePos, 0, 8000, $"剪线起始点指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+    }
+
+    [ScriptMethod(name: "Boss3：咒具二线条删除", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:regex:^(7738)$"], userControl: false)]
+    public void Boss3_P2_CutLineRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS3_P2) return;
+        var sid = @event.SourceId();
+        accessory.Method.RemoveDraw($"线{sid}.*");
+    }
+    
+    private int FindLineIdx(Vector3 pos)
+    {
+        // 1,2,3,4与11,12,13,14，>10代表竖线
+        // 数小代表在左下
+        var idx = 0;
+        if (Math.Abs(pos.X - CENTER_BOSS3.X) < 5)
+        {
+            idx += 10;
+            idx += (int)Math.Floor(pos.X - 283) / 2;
+        }
+        else
+        {
+            idx += (int)Math.Floor(-pos.Z - 99) / 2;
+        }
+
+        return idx;
+    }
+
+    private bool IsLineAtLeftDownSide(int idx)
+    {
+        return idx % 10 <= 2;
+    }
+    
     [ScriptMethod(name: "Boss3：咒具三传送阵转转", eventType: EventTypeEnum.ObjectEffect, eventCondition: ["Id1:regex:^(64|256)$"])]
     public void Boss3_P3_Portal(Event @event, ScriptAccessory accessory)
     {
         if (phase != ASS_Phase.BOSS3_P3) return;
         var spos = @event.SourcePosition();
         var id1 = @event.Id1();
-
+        
         // 出特效的地方一定是有传送阵的地方
         Vector3 CENTER_LEFT = new(281f, 533, CENTER_BOSS3.Z);
         Vector3 CENTER_RIGHT = new(297f, 533, CENTER_BOSS3.Z);
@@ -1321,6 +1460,14 @@ public class ASS
         if (draw)
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp0);
 
+        if (!_isSafe) return dp;
+        
+        var row_tpos = (int)Math.Floor(_tpos.Z + 123) / 10;
+        var row_spos = (int)Math.Floor(spos.Z + 123) / 10;
+        Boss3_P3_safeTeleportPos[row_tpos] = _tpos;
+        Boss3_P3_safeTeleportPos[row_spos] = spos;
+        DebugMsg($"记录下了第{row_spos}行的安全坐标{spos}", accessory);
+        DebugMsg($"记录下了第{row_tpos}行的安全坐标{_tpos}", accessory);
         return dp;
     }
 
@@ -1334,21 +1481,36 @@ public class ASS
     }
 
     [ScriptMethod(name: "Boss3：咒具三玩家转转传送阵", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(2970)$"])]
-    public void Boss3_P3_PlayerPortal(Event @event, ScriptAccessory accessory)
+    public async void Boss3_P3_PlayerPortal(Event @event, ScriptAccessory accessory)
     {
         if (phase != ASS_Phase.BOSS3_P3) return;
         var tid = @event.TargetId();
         if (tid != accessory.Data.Me) return;
+        
+        await Task.Delay(1000);
 
         var param = @event.Param();
         // 逆奇，顺偶，左%5=2，右%2=1
         // 或者，数小向上传送；数大向下传送
-        const uint LEFT_CW = 462;
-        const uint RIGHT_CW = 466;
-        const uint LEFT_CCW = 467;
-        const uint RIGHT_CCW = 461;
+        const uint LEFT_CW = 462;   // 1
+        const uint RIGHT_CW = 466;  // 2
+        const uint LEFT_CCW = 467;  // 4
+        const uint RIGHT_CCW = 461; // 3
 
-        drawPlayerPortal(tid, param, 13000, 5000, accessory);
+        Boss3_P3_myRotateRow = param switch
+        {
+            LEFT_CW => 1,
+            RIGHT_CW => 2,
+            LEFT_CCW => 4,
+            RIGHT_CCW => 3,
+            _ => 0
+        };
+        
+        DebugMsg($"我应该去第{Boss3_P3_myRotateRow}行，对应坐标{Boss3_P3_safeTeleportPos[Boss3_P3_myRotateRow-1]}", accessory);
+        
+        drawPlayerPortal(tid, param, 14000, 3000, accessory);
+        var dp = accessory.dirPos(Boss3_P3_safeTeleportPos[Boss3_P3_myRotateRow-1], 0, 9000, $"玩家传送{Boss3_P3_myRotateRow}");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
 
     private DrawPropertiesEdit drawPlayerPortal(uint tid, uint param, int delay, int destory, ScriptAccessory accessory)
@@ -1366,6 +1528,60 @@ public class ASS
         return dp;
     }
 
+    [ScriptMethod(name: "Boss3：咒具三引导斧头", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(3278)$"])]
+    public void Boss3_P3_BaitAxe(Event @event, ScriptAccessory accessory)
+    {
+        if (phase != ASS_Phase.BOSS3_P3) return;
+        var tid = @event.TargetId();
+        var tidx = accessory.getPlayerIdIndex(tid);
+        var myIndex = accessory.getMyIndex();
+        if (tidx != myIndex) return;
+
+        Vector3 baitPos;
+        int myBaitRow;
+        if (!Drawn[5])
+        {
+            Drawn[5] = true;
+            myBaitRow = Boss3_P3_myRotateRow switch
+            {
+                1 => 1,
+                2 => 0,
+                3 => 3,
+                4 => 2,
+                _ => 0
+            };
+            baitPos = Boss3_P3_BaitPos[myBaitRow];
+        }
+        else if (!Drawn[6])
+        {
+            Drawn[6] = true;
+            myBaitRow = Boss3_P3_myRotateRow - 1;
+            baitPos = Boss3_P3_BaitPos[myBaitRow];
+        }
+        else
+            return;
+
+        for (int i = 0; i < 4; i++)
+        {
+            var dp0 = accessory.drawStatic(Boss3_P3_BaitPos[i], 0, 0,
+                10000, $"引导斧头位置{i}");
+            dp0.Color = i == myBaitRow ? posColorPlayer.V4.WithW(1.5f) : posColorNormal.V4;
+            dp0.Scale = new Vector2(0.5f);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp0);
+        }
+        
+        DebugMsg($"我应该去第{myBaitRow + 1}行引导斧头，对应坐标{baitPos}", accessory);
+        var dp = accessory.dirPos(baitPos, 0, 10000, $"引导斧头位置指路{myBaitRow}");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+    
+    [ScriptMethod(name: "Boss3：引导斧头指路消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(29883|30413)$"], userControl: false)]
+    public void Boss3_P3_BaitAxeRemove(Event @event, ScriptAccessory accessory)
+    {
+        accessory.Method.RemoveDraw("引导斧头位置{i}.*");
+        accessory.Method.RemoveDraw("引导斧头位置指路{i}.*");
+    }
+    
     // 日，写到最后发现可以通过咒具的面向看传送方向，吐了
     [ScriptMethod(name: "Boss3：咒具四立体魔法阵面向记录", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:regex:^(2013025)$", "Operate:Add"], userControl: false)]
     public void Boss3_P4_BrandRecord(Event @event, ScriptAccessory accessory)
@@ -1428,7 +1644,8 @@ public class ASS
         if (draw) accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
         return dp;
     }
-
+    
+    
     #endregion
 }
 
@@ -2080,7 +2297,7 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit drawRect(this ScriptAccessory accessory, uint owner_id, int width, int length, int delay, int destory, string name)
+    public static DrawPropertiesEdit drawRect(this ScriptAccessory accessory, uint owner_id, float width, float length, int delay, int destory, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;

@@ -82,9 +82,9 @@
     {
         "Name": "ASS [异闻希拉狄哈水道]",
         "Guid": "bdd73dbd-2a93-4232-9324-0c9093d4a646",
-        "Version": "0.0.0.6",
+        "Version": "0.0.1.0",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
-        "UpdateInfo": "1. BOSS1鼠鼠指路完成（不含P5二拉球）。\n2. BOSS2 斗士指路完成。"
+        "UpdateInfo": "1. 初版完成，包含机制绘图与指路，适配异闻与异闻零式。\n鸭门。"
     }
     ]
