@@ -23,7 +23,7 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
 
-[ScriptType(name: Name, territorys: [], guid: "1234567", 
+[ScriptType(name: Name, territorys: [968], guid: "1234567", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
@@ -46,7 +46,7 @@ public class DsrPatch
     鸭门。
     """;
 
-    private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
+    private const string Name = "New DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private const string Note = "";
@@ -101,7 +101,7 @@ public class DsrPatch
     
     public void Init(ScriptAccessory accessory)
     {
-        DebugMsg($"/e Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Enums;
@@ -19,27 +20,22 @@ using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 
-namespace UsamisKodakku.Scripts._04_StormBlood.UWU;
+namespace UsamisKodakku.Scripts._06_EndWalker.AAI;
 
-[ScriptType(name: Name, territorys: [777], guid: "d8caeb34-b631-4c13-a8d2-66d132b60a27",
+[ScriptType(name: Name, territorys: [1179, 1180], guid: "e664908f-4d38-4709-938d-0cced05642f1", 
     version: Version, author: "Usami", note: NoteStr)]
 
-// ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
-
-public class Uwu
+// ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
+public class Aai
 {
-    private const string NoteStr =
+    const string NoteStr =
     """
-    Original code by @RedBromine & @Baelixac, adjustments by Usami.
-    基于@RedBromine与@Baelixac绝神兵绘图的个人向修改与补充。
-    请先按需求检查并设置“用户设置”栏目。
-    
     v0.0.0.0
     测试。
     """;
-    
-    private const string Name = "UWU [究极神兵绝境战]";
-    private const string Version = "0.0.0.1";
+
+    private const string Name = "AAI [异闻阿罗阿罗岛]";
+    private const string Version = "0.0.0.0";
     private const string DebugVersion = "a";
     private const string Note = "";
     
@@ -50,11 +46,23 @@ public class Uwu
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
     
+    private readonly Vector3 _centerBoss1 = new(0f, 0f, 0f);
+    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    private List<bool> _boss1BubbleDontMove = new bool[4].ToList();     // Boss1气泡Buff是止步
+    private bool _boss1StackFirst = false;                              // Boss1水瀑先分摊
+    private List<Boss1Crystal> _boss1Crystal = [];                      // Boss1水晶属性
+    
+    
     public void Init(ScriptAccessory accessory)
     {
-        DebugMsg($"/e Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
+        
+        _drawn = new bool[20].ToList();                 // 绘图记录
+        _boss1BubbleDontMove = new bool[4].ToList();    // Boss1气泡Buff是止步
+        _boss1StackFirst = false;                       // Boss1水瀑先分摊
+        _boss1Crystal = [];                             // Boss1水晶属性
     }
 
     public static void DebugMsg(string str, ScriptAccessory accessory)
@@ -69,65 +77,435 @@ public class Uwu
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
 
+        string a = string.Join(", ", _boss1BubbleDontMove);
+        DebugMsg($"{a}", accessory);
+
+        List<int> b = [1, 2, 3];
+        DebugMsg($"{string.Join(",", b)}", accessory);
+
         // -- DEBUG CODE END --
     }
-    
-    #region P1 迦楼罗
-    
-    [ScriptMethod(name: "迦楼罗 螺旋气流", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11091)$"])]
-    public void Garuda_Cleave(Event @event, ScriptAccessory accessory)
+
+    #region Mob1
+    [ScriptMethod(name: "Mob1：龙卷", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:16590"])]
+    public void Mob1_Twister(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
-        var dp = accessory.DrawFan(sid, float.Pi / 2, 0, 12, 0, 0, 3000, $"螺旋气流{sid}");
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        
+        var dp = accessory.DrawCircle(sid, 6f, 0, 99999, $"龙卷{sid}", false);
+        dp.Color = ColorHelper.ColorDark.V4.WithW(1.5f);
+        accessory.Method.SendDraw(0, DrawTypeEnum.Circle, dp);
+        
+        var dp0 = accessory.DrawRect(sid, 1.5f, 6f, 0, 99999, $"龙卷方向{sid}", false);
+        dp0.Color = ColorHelper.ColorDark.V4.WithW(1.5f);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
     }
     
-    [ScriptMethod(name: "迦楼罗 大龙卷风", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11073)$"])]
-    public void Garuda_Tornado(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "Mob1：龙卷移除", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:16590"])]
+    public void Mob1_TwisterRemove(Event @event, ScriptAccessory accessory)
+    {
+        accessory.Method.RemoveDraw($"龙卷.*");
+        accessory.Method.RemoveDraw($"龙卷方向.*");
+    }
+    
+    [ScriptMethod(name: "Mob1：螃蟹 泡泡吐息", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(357(69|86))$"])]
+    public void Mob1_CrabFrontCleave(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
-        var tpos = @event.TargetPosition();
-        var dp = accessory.DrawStaticCircle(tpos, ColorHelper.ColorRed.V4, 0, 3000, $"大龙卷风{sid}", 8);
-        dp.ScaleMode |= ScaleMode.ByTime;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        var dp = accessory.DrawFrontBackCleave(sid, true, 0, 5000, $"泡泡吐息{sid}", float.Pi / 2, 9);
+        accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
     }
     
-    [ScriptMethod(name: "迦楼罗 飞翎羽", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:11085"])]
-    public void Garuda_FeatherRain(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "Mob1：螃蟹 蟹甲流", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(357(70|87))$"])]
+    public void Mob1_CrabBackCleave(Event @event, ScriptAccessory accessory)
     {
-        // TODO
+        var sid = @event.SourceId();
+        var dp = accessory.DrawFrontBackCleave(sid, false, 0, 1500, $"蟹甲流{sid}", float.Pi / 3 * 2, 6);
+        accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
     }
     
+    [ScriptMethod(name: "Mob1：风筝 水化炮", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(35(915|773))$"])]
+    public void Mob1_KiteCannon(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var dp = accessory.DrawRect(sid, 6, 15, 0, 5000, $"水化炮{sid}");
+        accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+    }    
+    
+    [ScriptMethod(name: "Mob1：风筝 钢铁", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(35(775|790))$"])]
+    public void Mob1_KiteChariot(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var dp = accessory.DrawCircle(sid, 8, 0, 5000, $"驱逐{sid}");
+        accessory.Method.SendDraw(0, DrawTypeEnum.Circle, dp);
+    }
+    
+    [ScriptMethod(name: "Mob1：鬼鱼", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(35(793|941))$"])]
+    public void Mob1_GhostFishTarget(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var sidx = accessory.GetPlayerIdIndex(sid);
+        var myIndex = accessory.GetMyIndex();
+        if (sidx != myIndex) return;
+        accessory.Method.TextInfo($"防击退", 5000, true);
+    }
     #endregion
 
-    #region P2 伊弗利特
-
-    [ScriptMethod(name: "伊弗利特 烈焰碎击分摊", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0075)$"])]
-    public void Ifrit_Stack(Event @event, ScriptAccessory accessory)
+    #region Boss1 泡泡鱼
+    
+    public class Boss1Crystal(uint id, int[] pos, bool isHorizontal, int quarter)
     {
+        public int[] Pos { get; set; } = pos;
+        public bool Horizontal { get; set; } = isHorizontal;
+        public uint Id { get; set; } = id;
+        public int Quarter { get; set; } = quarter;
+
+        /// <summary>
+        /// 获得经象限偏置后的行列坐标
+        /// </summary>
+        /// <returns></returns>
+        private int[] FindBiasPosInQuarter()
+        {
+            int[] dPos = Quarter switch
+            {
+                0 => [0, 0],
+                1 => [0, 2],
+                2 => [2, 2],
+                3 => [2, 0],
+                _ => [0, 0]
+            };
+            int[] biasPos = [Pos[0] - dPos[0], Pos[1] - dPos[1]];
+            return biasPos;
+        }
+
+        /// <summary>
+        /// 获得行列坐标的对角坐标
+        /// </summary>
+        /// <returns></returns>
+        public int[] FindDiagPos()
+        {
+            var biasPos = FindBiasPosInQuarter();
+            int[] biasDiagPos = [biasPos[0] == 0 ? 1 : 0, biasPos[1] == 0 ? 1 : 0];
+            var diagPos = ReturnRealPosInQuarter(biasDiagPos);
+            return diagPos;
+        }
+
+        /// <summary>
+        /// 获得水晶靠近短边一侧坐标
+        /// </summary>
+        /// <returns></returns>
+        public int[] FindShortEdgeNearPos()
+        {
+            var biasPos = FindBiasPosInQuarter();
+            if (Horizontal)
+                biasPos[1] = (biasPos[1] + 1) % 2;
+            else
+                biasPos[0] = (biasPos[0] + 1) % 2;
+            var realPos = ReturnRealPosInQuarter(biasPos);
+            return realPos;
+        }
+        
+        /// <summary>
+        /// 将象限偏置后的行列坐标返回为真实坐标
+        /// </summary>
+        /// <param name="biasPos">经象限偏置后的行列坐标</param>
+        /// <returns></returns>
+        private int[] ReturnRealPosInQuarter(int[] biasPos)
+        {
+            int[] dPos = Quarter switch
+            {
+                0 => [0, 0],
+                1 => [0, 2],
+                2 => [2, 2],
+                3 => [2, 0],
+                _ => [0, 0]
+            };
+            int[] realPos = [biasPos[0] + dPos[0], biasPos[1] + dPos[1]];
+            return realPos;
+        }
+
+        public bool LocatedAtUp()
+        {
+            return Quarter < 2;
+        }
+
+        public bool LocatedAtLeft()
+        {
+            return Quarter is 0 or 3;
+        }
+
+        public bool LocatedInside()
+        {
+            return !(Pos.Contains(0) || Pos.Contains(3));
+        }
+
+        public List<int[]> FindCrystalSafePos()
+        {
+            List<int[]> safePos = [];
+            var row = Pos[0];
+            var col = Pos[1];
+            if (Horizontal)
+            {
+                safePos.Add([0, col - 1]);
+                safePos.Add([3, col - 1]);
+                safePos.Add([0, col + 1]);
+                safePos.Add([3, col + 1]);
+            }
+            else
+            {
+                safePos.Add([row + 1, 0]);
+                safePos.Add([row + 1, 3]);
+                safePos.Add([row - 1, 0]);
+                safePos.Add([row - 1, 3]);
+            }
+            return safePos;
+        }
+        
+        /// <summary>
+        /// 找到横水晶象限内（一麻）的安全区
+        /// </summary>
+        /// <returns></returns>
+        public List<int[]> FindHorizonCrystalSafePos()
+        {
+            //TODO 这个和vertical有点问题
+            List<int[]> horizonCrystalSafePos = [];
+            var safePos = FindCrystalSafePos();
+            foreach (var pos in safePos)
+            {
+                var quarter = FindPositionQuarter(pos);
+                if (Horizontal)
+                {
+                    // 如果我是横水晶，那quarter的奇偶性与我的一致即可
+                    if (Math.Abs(quarter - Quarter) % 2 == 0)
+                        horizonCrystalSafePos.Add(pos);
+                }
+                else
+                {
+                    // 如果我是竖水晶，那quarter的奇偶性需与我不一致
+                    if (Math.Abs(quarter - Quarter) % 2 == 1)
+                        horizonCrystalSafePos.Add(pos);
+                }
+            }
+            return horizonCrystalSafePos;
+        }
+        
+        /// <summary>
+        /// 找到竖水晶象限内（二麻）的安全区
+        /// </summary>
+        /// <returns></returns>
+        public List<int[]> FindVerticalCrystalSafePos()
+        {
+            List<int[]> verticalCrystalSafePos = [];
+            var safePos = FindCrystalSafePos();
+            foreach (var pos in safePos)
+            {
+                var quarter = FindPositionQuarter(pos);
+                if (!Horizontal)
+                {
+                    // 如果我是竖水晶，那quarter的奇偶性与我的一致即可
+                    if (Math.Abs(quarter - Quarter) % 2 == 0)
+                        verticalCrystalSafePos.Add(pos);
+                }
+                else
+                {
+                    // 如果我是横水晶，那quarter的奇偶性需与我不一致
+                    if (Math.Abs(quarter - Quarter) % 2 == 1)
+                        verticalCrystalSafePos.Add(pos);
+                }
+            }
+            return verticalCrystalSafePos;
+        }
+
+        public List<int[]> FindEdgePos()
+        {
+            List<int[]> edgePos = [];
+            if (Horizontal)
+            {
+                edgePos.Add([Pos[0], 0]);
+                edgePos.Add([Pos[0], 3]);
+            }
+            else
+            {
+                edgePos.Add([0, Pos[1]]);
+                edgePos.Add([3, Pos[1]]);
+            }
+            return edgePos;
+        }
+    }
+    
+    [ScriptMethod(name: "Boss1：水晶状态记录", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1654[29])$"], userControl: false)]
+    public void Boss1_CrystalPosRecord(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
+        var crystalPos = FindCrystalPosition(spos);
+        var srot = @event.SourceRotation();
+        var isHorizontal = srot.Rad2Dirs(4) % 2 == 0;
+        var quarter = FindPositionQuarter(crystalPos);
+        _boss1Crystal.Add(new Boss1Crystal(sid, crystalPos, isHorizontal, quarter));
+    }
+    
+    [ScriptMethod(name: "Boss1：水晶安全区绘图", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1654[29])$"])]
+    public void Boss1_CrystalRect(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
+        var crystalPos = FindCrystalPosition(spos);
+        var srot = @event.SourceRotation();
+        var isHorizontal = srot.Rad2Dirs(4) % 2 == 0;
+        var quarter = FindPositionQuarter(crystalPos);
+        
+        var crystal = new Boss1Crystal(sid, crystalPos, isHorizontal, quarter);
+        if (!crystal.LocatedInside()) return;
+        
+        DebugMsg($"找到了场中的水晶({crystal.Pos[0]}行,{crystal.Pos[1]}列)", accessory);
+        var safePosIdxs = crystal.FindCrystalSafePos();
+        foreach (var pos in safePosIdxs)
+        {
+            DebugMsg($"画出安全区{pos[0]}行,{pos[1]}列)", accessory);
+            DrawSpecificSquare(pos, accessory.Data.DefaultSafeColor, accessory);
+        }
+    }
+
+    /// <summary>
+    /// 返回水晶位置
+    /// </summary>
+    /// <param name="pos">Vector3坐标</param>
+    /// <returns>[row, col]，从0开始</returns>
+    private int[] FindCrystalPosition(Vector3 pos)
+    {
+        var row = (int)Math.Floor((pos.Z + 16) / 10);
+        var col = (int)Math.Floor((pos.X + 16) / 10);
+        return [row, col];
+    }
+
+    /// <summary>
+    /// 返回输入行列对应的Vector3坐标中心
+    /// </summary>
+    /// <param name="pos">行列坐标位置</param>
+    /// <returns></returns>
+    private Vector3 Position2Vector3Center(int[] pos)
+    {
+        return new Vector3(pos[1] * 10 - 15f, _centerBoss1.Y, pos[0] * 10 - 15f);
+    }
+
+    /// <summary>
+    /// 输入坐标绘出对应方格安全区
+    /// </summary>
+    /// <param name="squarePos">对应方格所在行与列</param>
+    /// <param name="color"></param>
+    /// <param name="accessory"></param>
+    private void DrawSpecificSquare(int[] squarePos, Vector4 color, ScriptAccessory accessory)
+    {
+        var row = squarePos[0];
+        var col = squarePos[1];
+        var safeVec3 = Position2Vector3Center([row, col]);
+        var dp = accessory.DrawStatic(safeVec3, 0, 0, 10, 10, 0, 10000, $"水晶安全{row}{col}");
+        dp.Color = color;
+        accessory.Method.SendDraw(0, DrawTypeEnum.Straight, dp);
+    }
+
+    /// <summary>
+    /// 输入坐标得到对应方格象限，左上为0顺时针增加
+    /// </summary>
+    /// <param name="squarePos">对应方格所在行与列</param>
+    /// <returns></returns>
+    public static int FindPositionQuarter(int[] squarePos)
+    {
+        // 以左上为0，左上-右上-右下-左下顺时针
+        var quarter = 0;
+        if (squarePos[1] >= 2)
+            quarter += 1;
+        if (squarePos[0] >= 2)
+            quarter += 2;
+        return quarter;
+    }
+
+    /// <summary>
+    /// 输入吹风坐标得到对应方格象限，左上为0顺时针增加
+    /// </summary>
+    /// <param name="windPos">吹风马甲所在坐标</param>
+    /// <returns></returns>
+    private int FindWindQuarter(Vector3 windPos)
+    {
+        // 以左上为0，左上-右上-右下-左下顺时针
+        var quarter = 0;
+        if (windPos.X > _centerBoss1.X)
+            quarter += 1;
+        if (windPos.Z > _centerBoss1.Z)
+            quarter += 2;
+        return quarter;
+    }
+    
+    [ScriptMethod(name: "Boss1：泡泡Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(3743|3788)$"], userControl: false)]
+    public void Boss1_BubbleBuffRecord(Event @event, ScriptAccessory accessory)
+    {
+        const uint dontMove = 3788;
+        const uint floatUp = 3743;
         var tid = @event.TargetId();
-        var dp = accessory.DrawCircle(tid, 3f, 0, 5500, $"烈焰碎击{tid}");
-        dp.Color = accessory.Data.DefaultSafeColor;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        var stid = @event.StatusId();
+        _boss1BubbleDontMove[tidx] = stid == dontMove;
     }
-
-    #endregion
-
-    #region P3 泰坦
-
     
-
-    #endregion
-
-    #region P4 本体
-
+    [ScriptMethod(name: "Boss1：一水晶安全区指示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(35505)$"])]
+    public void Boss1_Crystal1SafeField(Event @event, ScriptAccessory accessory)
+    {
+        var myIndex = accessory.GetMyIndex();
+        var isDontMove = _boss1BubbleDontMove[myIndex];
+        // T与D2在北
+        var atWestOrNorth = myIndex is 0 or 3;
+        List<int[]> safePos = [];
+        
+        // 针对每块水晶寻找安全区
+        foreach (var crystal in _boss1Crystal)
+        {
+            if (!isDontMove)
+            {
+                if (atWestOrNorth && !crystal.LocatedAtUp()) continue;
+                if (!atWestOrNorth && crystal.LocatedAtUp()) continue;
+                // 是泡泡，找竖水晶对角或横水晶旁边
+                if (crystal.Horizontal)
+                    safePos.Add(crystal.FindShortEdgeNearPos());
+                else
+                    safePos.Add(crystal.FindDiagPos());
+            }
+            else
+            {
+                if (!crystal.LocatedInside()) continue;
+                
+                // 横水晶1，竖水晶2
+                // 是止步，在安全区准备移动
+                DebugMsg($"是{(_boss1StackFirst?"分摊":"分散")}，需要找{(_boss1StackFirst?"横":"竖")}水晶象限的安全区", accessory);
+                var tempSafePos = _boss1StackFirst ? crystal.FindHorizonCrystalSafePos() : crystal.FindVerticalCrystalSafePos();
+                DebugMsg($"找到了暂时的安全区，{string.Join(",",tempSafePos[0])}与{string.Join(",",tempSafePos[1])}", accessory);
+                var tempReadyPosList = crystal.FindEdgePos();
+                DebugMsg($"找到了预占位的位置，{string.Join(",",tempReadyPosList[0])}与{string.Join(",",tempReadyPosList[1])}", accessory);
+                
+                // 找到本职就位的位置
+                var tempReadyPos = atWestOrNorth
+                    ? tempReadyPosList[0].Contains(0)
+                        ? tempReadyPosList[0]
+                        : tempReadyPosList[1]
+                    : tempReadyPosList[0].Contains(3)
+                        ? tempReadyPosList[0]
+                        : tempReadyPosList[1];
+                foreach (var pos in tempSafePos)
+                {
+                    // 如果安全位置与就位位置只差1格，那就是安全区
+                    if (Math.Abs(pos[0] - tempReadyPos[0]) + Math.Abs(pos[1] - tempReadyPos[1]) == 1)
+                        safePos.Add(pos);
+                }
+            }
+        }
+        foreach (var pos in safePos)
+            DrawSpecificSquare(pos, PosColorPlayer.V4.WithW(2f), accessory);
+    }
     
-
     #endregion
 }
 
 #region 函数集
-
 public static class EventExtensions
 {
     private static bool ParseHexId(string? idStr, out uint id)
@@ -641,7 +1019,7 @@ public static class AssignDp
         dp.Name = name;
         dp.Scale = new Vector2(scale);
         dp.Radian = radian;
-        dp.Rotation = isFrontCleave ? 0 : -float.Pi;
+        dp.Rotation = isFrontCleave ? 0 : float.Pi;
         dp.Owner = ownerId;
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.Delay = delay;
@@ -913,6 +1291,27 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
         var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        dp.Color = color;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态月环dp，通常用于指引固定位置。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="center">月环中心位置</param>
+    /// <param name="color">月环颜色</param>
+    /// <param name="scale">月环外径，默认1.5f</param>
+    /// <param name="innerscale">月环内径，默认scale-0.05f</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f, float innerscale = 0)
+    {
+        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        dp.Color = color;
+        dp.InnerScale = new Vector2(innerscale == 0 ? scale - 0.05f : innerscale);
         return dp;
     }
 
