@@ -19,9 +19,10 @@ using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 
-namespace UsamisScript.Version.Name;
+namespace UsamisKodakku.Scripts.FolderName.SubFolderName;
 
-[ScriptType(name: "SampleScript", territorys: [], guid: "12345", version: "0.0.0.1", author: "Usami", note: NoteStr)]
+[ScriptType(name: Name, territorys: [], guid: "12345", 
+    version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
 
@@ -29,21 +30,25 @@ public class Hello
 {
     const string NoteStr =
     """
-    v0.0.0.1
+    v0.0.0.2
     模版文件，增加了AssignDp的一系列。
     """;
 
+    private const string Name = "SampleScript";
+    private const string Version = "0.0.0.2";
+    private const string DebugVersion = "a";
+    private const string Note = "";
+    
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
-
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
     public void Init(ScriptAccessory accessory)
     {
-        // DebugMsg($"/e Init Success.", accessory);
-        // accessory.Method.MarkClear();
+        DebugMsg($"/e Init {Name} v{Version}{DebugVersion} Success.", accessory);
+        accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }
 
@@ -849,6 +854,27 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
         var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        dp.Color = color;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态月环dp，通常用于指引固定位置。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="center">月环中心位置</param>
+    /// <param name="color">月环颜色</param>
+    /// <param name="scale">月环外径，默认1.5f</param>
+    /// <param name="innerscale">月环内径，默认scale-0.05f</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f, float innerscale = 0)
+    {
+        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        dp.Color = color;
+        dp.InnerScale = new Vector2(innerscale == 0 ? scale - 0.05f : innerscale);
         return dp;
     }
 

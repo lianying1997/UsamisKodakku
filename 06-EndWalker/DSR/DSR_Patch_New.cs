@@ -1,0 +1,1538 @@
+using System;
+using System.Linq;
+using System.Numerics;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Network.Structures.InfoProxy;
+using Newtonsoft.Json;
+using Dalamud.Utility.Numerics;
+using ECommons;
+using ECommons.DalamudServices;
+using ECommons.GameFunctions;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Module.Draw.Manager;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs;
+using KodakkuAssist.Module.Script.Type;
+
+namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
+
+[ScriptType(name: Name, territorys: [], guid: "1234567", 
+    version: Version, author: "Usami", note: NoteStr)]
+
+// ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
+
+public class DsrPatch
+{
+    const string NoteStr =
+    """
+    基于K佬绝龙诗绘图的个人向补充，
+    请先按需求检查并设置“用户设置”栏目。
+    v0.0.0.3
+    测试中。
+    
+    v0.0.0.2
+    1. 修复P7地火间隔错误问题。
+    2. 调整P7地火预设颜色，于“用户设置”增加一系列可选项。
+    
+    v0.0.0.1
+    初版完成。
+    鸭门。
+    """;
+
+    private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
+    private const string Version = "0.0.0.3";
+    private const string DebugVersion = "a";
+    private const string Note = "";
+    
+    [UserSetting("Debug模式，非开发用请关闭")]
+    public static bool DebugMode { get; set; } = false;
+    [UserSetting("站位提示圈绘图-普通颜色")]
+    public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
+    [UserSetting("站位提示圈绘图-玩家站位颜色")]
+    public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
+    [UserSetting("地火（百京核爆）使用程序预设颜色")]
+    public static bool ExaflareBuiltInColor { get; set; } = true;
+    [UserSetting("地火（百京核爆）爆炸区颜色")]
+    public ScriptColor ExaflareColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
+    [UserSetting("地火（百京核爆）是否绘制下一枚地火预警区")]
+    public static bool ExaflareWarnDrawn { get; set; } = true;
+    [UserSetting("地火（百京核爆）预警区颜色")]
+    public ScriptColor ExaflareWarnColor { get; set; } = new ScriptColor { V4 = new Vector4(0.6f, 0.6f, 1.0f, 1.0f) };
+    
+    private enum DsrPhase
+    {
+        Init,                   // 初始
+        Phase5HeavensWrath,     // P5 一运
+        Phase5HeavensDeath,     // P5 二运
+        Phase6IceAndFire1,      // P6 一冰火
+        Phase6NearOrFar1,       // P6 一远近
+        Phase6Flame,            // P6 十字火
+        Phase6NearOrFar2,       // P6 二远近
+        Phase6IceAndFire2,      // P6 二冰火
+        Phase6Cauterize,        // P6 俯冲
+        Phase7Exaflare1,        // P7 一地火
+        Phase7Stack1,           // P7 一分摊
+        Phase7Nuclear1,         // P7 一核爆
+        Phase7Exaflare2,        // P7 二地火
+        Phase7Stack2,           // P7 二分摊
+        Phase7Nuclear2,         // P7 二核爆
+        Phase7Exaflare3,        // P7 三地火
+        Phase7Stack3,           // P7 三分摊
+        Phase7Enrage,           // P7 狂暴
+    }
+    
+    private readonly Vector3 _center = new Vector3(100, 0, 100);
+    private DsrPhase _dsrPhase = DsrPhase.Init;
+    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    private List<bool> _p6DragonsGlowAction = [false, false];           // P6 双龙吐息记录
+    private List<bool> _p6DragonsWingAction = [false, false, false];    // P6 双龙远近记录 [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
+    private List<bool> _p7FirstEntityOrder = [false, false];            // P7 平A仇恨记录
+    private List<int> _p7TrinityOrderIdx = [4, 5, 6, 7, 2, 3];          // P7 接刀顺序
+    private bool _p7TrinityDisordered = false;                          // P7 接刀顺序是否出错
+    private bool _p7TrinityTankDisordered = false;                      // P7 坦克接刀仇恨是否出错
+    private int _p7TrinityNum = 0;                                      // P7 接刀次数
+    
+    public void Init(ScriptAccessory accessory)
+    {
+        DebugMsg($"/e Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        accessory.Method.MarkClear();
+        accessory.Method.RemoveDraw(".*");
+        
+        _dsrPhase = DsrPhase.Init;
+        _drawn = new bool[20].ToList();
+    }
+
+    public static void DebugMsg(string str, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
+    }
+
+    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
+    public void EchoDebug(Event @event, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        // ---- DEBUG CODE ----
+        
+        // -- DEBUG CODE END --
+    }
+    
+    #region P2
+
+    [ScriptMethod(name: "P2：引导不可视刀范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25545"])]
+    public void P2_AscalonConcealed(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var dp = accessory.DrawFan(sid, float.Pi / 6, 0, 30, 0, 0, 1500, $"不可视刀");
+        dp.Color = accessory.Data.DefaultDangerColor.WithW(1.5f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+    }
+    
+    #endregion
+    
+    #region P5
+
+    [ScriptMethod(name: "P5：一运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27529"], userControl: false)]
+    public void P5_HeavensWrath_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = DsrPhase.Phase5HeavensWrath;
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+
+    [ScriptMethod(name: "P5：旋风冲旋风预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27531"])]
+    public async void P5_TwistingDive(Event @event, ScriptAccessory accessory)
+    {
+        DrawTwister(3000, 3000, accessory);
+        await Task.Delay(3000);
+        accessory.Method.TextInfo("旋风", 3000, true);
+    }
+
+    [ScriptMethod(name: "P5：旋风危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001168", "Operate:Add"])]
+    public void TwisterField(Event @event, ScriptAccessory accessory)
+    {
+        var spos = @event.SourcePosition();
+        var dp = accessory.DrawStaticCircle(spos, ColorHelper.ColorRed.V4.WithW(3), 0, 4000, $"旋风{spos}");
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+    
+    private void DrawTwister(int delay, int destroy, ScriptAccessory accessory)
+    {
+        for (var i = 0; i < accessory.Data.PartyList.Count; i++)
+        {
+            var dp = accessory.DrawCircle(accessory.Data.PartyList[i], 1.5f, delay, destroy, $"旋风{i}", true);
+            dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+    }
+
+    [ScriptMethod(name: "P5：大圈火预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25573"])]
+    public void P5_AlterFlare(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase5HeavensWrath) return;
+        var spos = @event.SourcePosition();
+        var dp = accessory.DrawStaticCircle(spos, ColorHelper.ColorRed.V4.WithW(1.5f), 0, 4000, $"大圈火危险区", 8f);
+        dp.ScaleMode |= ScaleMode.ByTime;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    [ScriptMethod(name: "P5：二运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27538"], userControl: false)]
+    public void P5_HeavensDeath_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = DsrPhase.Phase5HeavensDeath;
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+
+    [ScriptMethod(name: "P5：二运，找到斧头哥方位", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12637"])]
+    public void P5_FindSerGuerrique(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
+        var spos = @event.SourcePosition();
+        DebugMsg($"找到斧头哥位置{spos}", accessory);
+        var dp = accessory.DrawDirPos2Pos(_center, spos, 0, 4000, $"场中指向斧头哥", 2f);
+        dp.Color = ColorHelper.ColorWhite.V4;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+    }
+
+    #endregion
+    
+    #region P6 冰火
+
+    [ScriptMethod(name: "P6：一冰火，阶段记录", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:12613"], userControl: false)]
+    public void P6_IceAndFire1_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        // 圣龙出现代表进入一冰火
+        if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
+        _dsrPhase = DsrPhase.Phase6IceAndFire1;
+        _p6DragonsGlowAction = [false, false];
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+
+    [ScriptMethod(name: "P6：二冰火，阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2794[79])$"], userControl: false)]
+    public void P6_IceAndFire2_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        // 以辣翅辣尾作为二冰火的开始
+        if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
+        _dsrPhase = DsrPhase.Phase6IceAndFire2;
+        _p6DragonsGlowAction = [false, false];
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+
+    [ScriptMethod(name: "P6：冰火吐息记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2795[4567])$"], userControl: false)]
+    public void P6_IceAndFireGlowRecord(Event @event, ScriptAccessory accessory)
+    {
+        const uint blackBuster = 27954;
+        const uint whiteBuster = 27956;
+        const uint blackGlow = 27955;
+        const uint whiteGlow = 27957;
+        
+        if (_dsrPhase != DsrPhase.Phase6IceAndFire1 && _dsrPhase != DsrPhase.Phase6IceAndFire2) return;
+        var aid = @event.ActionId();
+        switch (aid)
+        {
+            case blackBuster:
+            case blackGlow:
+                _p6DragonsGlowAction[0] = aid == blackGlow;
+                break;
+            case whiteBuster:
+            case whiteGlow:
+                _p6DragonsGlowAction[1] = aid == whiteGlow;
+                break;
+        }
+    }
+
+    [ScriptMethod(name: "P6：冰火死刑双T处理", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27960"])]
+    public async void P6_IceAndFireTankSolution(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase is not (DsrPhase.Phase6IceAndFire1 or DsrPhase.Phase6IceAndFire2))
+            return;
+        await Task.Delay(100);
+
+        var myIndex = accessory.GetMyIndex();
+        var tankBusterPosition = new Vector3[4];
+        tankBusterPosition[0] = new Vector3(84.5f, 0, 88f);
+        tankBusterPosition[1] = tankBusterPosition[0].FoldPointHorizon(_center.X);
+        tankBusterPosition[2] = tankBusterPosition[0];
+        tankBusterPosition[3] = tankBusterPosition[1].FoldPointVertical(_center.Z);
+
+        if (_p6DragonsGlowAction[0] && _p6DragonsGlowAction[1])
+        {
+            // 场中分摊死刑，自己不是T不显示指路
+            if (myIndex > 1) return;
+            // 删除K佬脚本中双T的小啾啾
+            accessory.Method.RemoveDraw("P6 第二次冰火线ND站位.*");
+            var dp = accessory.DrawDirPos(_center, 0, 6000, $"冰火场中分摊指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+        else
+        {
+            // 场边死刑，自己的死刑不显示圈，避免瞎眼
+            var busterIdx = _p6DragonsGlowAction.FindIndex(x => x == false);
+            DebugMsg($"黑龙喷:{_p6DragonsGlowAction[0]}, 白龙喷:{_p6DragonsGlowAction[1]}", accessory);
+            DebugMsg($"是{(busterIdx == 0 ? "黑龙" : "白龙")}的死刑。", accessory);
+
+            var isMyBuster = myIndex == busterIdx;
+            var dp = accessory.DrawCircle(accessory.Data.PartyList[busterIdx], isMyBuster ? 2f : 15f, 0, 6000, $"冰火死刑");
+            dp.Color = isMyBuster ? ColorHelper.ColorRed.V4 : ColorHelper.ColorYellow.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+
+            // 场边分散，自己不是T不显示指路
+            if (myIndex > 1) return;
+            // 删除K佬脚本中双T的小啾啾
+            accessory.Method.RemoveDraw("P6 第二次冰火线ND站位.*");
+            var isIceAndFire2 = _dsrPhase == DsrPhase.Phase6IceAndFire2;
+
+            var dp0 = accessory.DrawDirPos(tankBusterPosition[isIceAndFire2 ? myIndex + 2 : myIndex], 0, 6000,
+                $"冰火死刑位置指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+
+            var dp1 = accessory.DrawStaticCircle(tankBusterPosition[isIceAndFire2 ? myIndex + 2 : myIndex],
+                PosColorPlayer.V4.WithW(1.5f), 0, 6000, $"冰火死刑点区域", 1f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+        }
+    }
+
+    #endregion
+
+    #region P6 远近
+
+    [ScriptMethod(name: "P6：远近，阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:27970"], userControl: false)]
+    public void P6_NearOrFar_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        // 因为黑龙先飞，白龙后读条，所以用无尽轮回的ActionEffect做阶段节点
+        if (_dsrPhase is DsrPhase.Phase6NearOrFar1 or DsrPhase.Phase6NearOrFar2)
+            return;
+        _dsrPhase = _dsrPhase switch
+        {
+            DsrPhase.Phase6IceAndFire1 => DsrPhase.Phase6NearOrFar1,
+            DsrPhase.Phase6Flame => DsrPhase.Phase6NearOrFar2,
+            _ => DsrPhase.Phase6NearOrFar1,
+        };
+        _p6DragonsWingAction = [false, false, false];   // P6 双龙远近记录
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+    
+    [ScriptMethod(name: "P6：远近，翅膀记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"], userControl: false)]
+    public void P6_NearOrFar_WingsRecord(Event @event, ScriptAccessory accessory)
+    {
+        // LEFT左翼发光，玩家视角左侧安全。
+        const uint leftFar = 27940;
+        const uint leftNear = 27939;
+        const uint rightFar = 27943;
+        const uint rightNear = 27942;
+        
+        if (_dsrPhase is not (DsrPhase.Phase6NearOrFar1 or DsrPhase.Phase6NearOrFar2))
+            return;
+        
+        var aid = @event.ActionId();
+        // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
+        _p6DragonsWingAction[0] = aid is leftFar or rightFar;
+        _p6DragonsWingAction[1] = aid is leftFar or leftNear;
+        DebugMsg($"检测到{(_p6DragonsWingAction[0] ? "T远离" : "T靠近")}, {(_p6DragonsWingAction[1] ? "左" : "右")}安全", accessory);
+    }
+
+    [ScriptMethod(name: "P6：远近，俯冲记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12612"], userControl: false)]
+    public void P6_NearOrFar_CauterizeRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
+        var spos = @event.SourcePosition();
+        // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
+        _p6DragonsWingAction[2] = spos.X < _center.X;
+        DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "前安全" : "后安全")}", accessory);
+    }
+
+    [ScriptMethod(name: "P6：远近，内外记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"], userControl: false)]
+    public void P6_NearOrFar_BlackWingsRecord(Event @event, ScriptAccessory accessory)
+    {
+        const uint insideSafe = 27947;
+        const uint outsideSafe = 27949;
+        if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
+        var aid = @event.ActionId();
+        // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
+        _p6DragonsWingAction[2] = aid == insideSafe;
+        DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "内安全" : "外安全")}", accessory);
+    }
+
+    [ScriptMethod(name: "P6：一远近，指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"])]
+    public async void P6_NearOrFar1_Dir(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
+        await Task.Delay(100);
+
+        Vector3[] nearOrFarSafePos = GetQuarterSafePos(_p6DragonsWingAction);
+        var nearOrFarDirPosIdx = GetQuarterSafePosIdx(_p6DragonsWingAction);
+        DebugMsg($"MT去{nearOrFarDirPosIdx[0]}, ST去{nearOrFarDirPosIdx[1]}, 人群去{nearOrFarDirPosIdx[2]}", accessory);
+
+        var myIndex = accessory.GetMyIndex();
+        var myPartIdx = myIndex >= 2 ? 2 : myIndex;
+        var targetPos = nearOrFarSafePos[nearOrFarDirPosIdx[myPartIdx]];
+
+        for (var i = 0; i < 3; i++)
+        {
+            var tempPos = nearOrFarSafePos[nearOrFarDirPosIdx[i]];
+            var color = i == myPartIdx ? PosColorPlayer.V4.WithW(1.5f) : PosColorNormal.V4;
+            var dp0 = accessory.DrawStaticCircle(tempPos, color, 0, 7500, $"一远近位置{i}", 1f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+        }
+
+        var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"一远近指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private Vector3[] GetQuarterSafePos(List<bool> wings)
+    {
+        // 第一象限内的四个端点
+        // 象限内四个点Idx顺序为，以第一象限基准（面向白龙左上），从左上开始顺时针
+        // 上下平移，左右折叠
+        Vector3[] quarterSafePos = new Vector3[4];
+        quarterSafePos[0] = new Vector3(120f, 0, 80f);
+        quarterSafePos[1] = new Vector3(120f, 0, 98f);
+        quarterSafePos[2] = new Vector3(102f, 0, 98f);
+        quarterSafePos[3] = new Vector3(102f, 0, 80f);
+        for (var i = 0; i < 4; i++)
+        {
+            // 后安全，向后平移
+            if (!wings[2])
+                quarterSafePos[i] -= new Vector3(22f, 0, 0);
+            // 右安全，左右折叠
+            if (!wings[1])
+                quarterSafePos[i] = quarterSafePos[i].FoldPointVertical(_center.Z);
+        }
+        return quarterSafePos;
+    }
+
+    private static int[] GetQuarterSafePosIdx(List<bool> wings)
+    {
+        // return数组，代表MT、ST、人群的安全位置Index
+
+        // 打远，双T远离，人群靠近
+        // 打近，双T靠近，人群远离
+        return wings[0] ? [2, 3, 1] : [1, 0, 3];
+    }
+
+    [ScriptMethod(name: "P6：二远近，指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"])]
+    public async void P6_NearOrFar2_Dir(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
+
+        // 黑龙读条慢
+        await Task.Delay(100);
+
+        Vector3[] nearOrFarSafePos = GetLineSafePos(_p6DragonsWingAction);
+        int[] nearOrFarDirPosIdx = GetLineSafePosIdx(_p6DragonsWingAction);
+
+        var myIndex = accessory.GetMyIndex();
+        var myPartIdx = myIndex >= 2 ? 2 : myIndex;
+        var targetPos = nearOrFarSafePos[nearOrFarDirPosIdx[myPartIdx]];
+
+        for (var i = 0; i < 3; i++)
+        {
+            var color = i == myPartIdx ? PosColorPlayer.V4.WithW(1.5f) : PosColorNormal.V4;
+            var tempPos = nearOrFarSafePos[nearOrFarDirPosIdx[i]];
+            var dp0 = accessory.DrawStaticCircle(tempPos, color, 0, 7500, $"二远近位置{i}", 1f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+        }
+
+        var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"二远近指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private static Vector3[] GetLineSafePos(List<bool> wings)
+    {
+        // 直线近中远三点
+        Vector3[] lineSafePos = new Vector3[3];
+        lineSafePos[0] = new Vector3(120f, 0, 100f);
+        lineSafePos[1] = new Vector3(100f, 0, 100f);
+        lineSafePos[2] = new Vector3(80f, 0, 100f);
+
+        Vector3 dv3 = new(0f, 0f, 0f);
+
+        // 左安全减，右安全加
+        dv3 += new Vector3(0f, 0f, 2f) * (wings[1] ? -1 : 1);
+        // 内安全不动，外安全乘
+        dv3 *= wings[2] ? 1 : 5;
+
+        for (var i = 0; i < 3; i++)
+            lineSafePos[i] += dv3;
+        
+        return lineSafePos;
+    }
+
+    private static int[] GetLineSafePosIdx(List<bool> wings)
+    {
+        // return数组，代表MT、ST、人群的安全位置Index
+
+        // 打远，双T远离，人群靠近
+        // 打近，双T靠近，人群远离
+        return wings[0] ? [1, 2, 0] : [1, 0, 2];
+    }
+
+    #endregion
+    
+    #region P6 十字火
+
+    [ScriptMethod(name: "P6：十字火，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27973"], userControl: false)]
+    public void P6_Flame_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = DsrPhase.Phase6Flame;
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+
+    [ScriptMethod(name: "P6：十字火，分摊目标", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27974"])]
+    public void P6_FlameStackTarget(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase6Flame) return;
+        var tid = @event.TargetId();
+        var dp = accessory.DrawCircle(tid, 6, 0, 12500, $"死亡轮回目标");
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    #endregion
+
+    #region P6 俯冲
+
+    [ScriptMethod(name: "P6：俯冲，双T指路", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7737", "SourceDataId:12613"])]
+    public void P6_CauterizeDir(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase6IceAndFire2) return;
+        _dsrPhase = DsrPhase.Phase6Cauterize;
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+
+        Vector3[] cauterizePos = new Vector3[2];
+        cauterizePos[0] = new Vector3(95f, 0, 79f);
+        cauterizePos[1] = new Vector3(105f, 0, 79f);
+
+        var myIndex = accessory.GetMyIndex();
+        if (myIndex > 1) return;
+
+        var dp = accessory.DrawDirPos(cauterizePos[myIndex], 0, 5000, $"俯冲T挡枪位置{myIndex}");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    #endregion
+
+    #region P7 地火
+
+    [ScriptMethod(name: "P7：地火范围绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:28060"])]
+    public void P7_ExaflareDrawn(Event @event, ScriptAccessory accessory)
+    {
+        // 面相为前、左、右的扩散
+        var spos = @event.SourcePosition();
+        var srot = @event.SourceRotation();
+        const int intervalTime = 1850;
+        const int castTime = 7000;
+        const int extendDistance = 8;
+        const int dirNum = 3;
+        const int extNum = 6;
+        const int advWarnNum = 1;   // 预警向外延伸几个
+        float[] flareRot = [0, -float.Pi / 2, float.Pi / 2];
+        
+        Vector3[,] exaflarePos = BuildExaflareVector(spos, dirNum, extNum, srot, flareRot, extendDistance);
+        DrawExaflareScene(exaflarePos, ExaflareWarnDrawn, advWarnNum, castTime, intervalTime, accessory);
+    }
+
+    /// <summary>
+    /// 画地火场景
+    /// </summary>
+    /// <param name="exaflarePos">地火矩阵</param>
+    /// <param name="warnDrawn">是否画预警地火</param>
+    /// <param name="advWarnNum">画多少格预警地火</param>
+    /// <param name="castTime">初始地火技能施法时间</param>
+    /// <param name="intervalTime">地火间隔时间</param>
+    /// <param name="accessory"></param>
+    private void DrawExaflareScene(Vector3[,] exaflarePos, bool warnDrawn, int advWarnNum, int castTime, int intervalTime, ScriptAccessory accessory)
+    {
+        var dirNum = exaflarePos.GetLength(0);
+        var extNum = exaflarePos.GetLength(1);
+        
+        for (var ext = 0; ext < extNum; ext++)
+        {
+            // 计算各位置的出现时间与延时时间。往往第一枚地火需要特殊处理，后续采用同时间隔
+            var destroy = ext == 0 ? castTime : intervalTime;
+            var delay= ext == 0 ? 0 : castTime + (ext - 1) * intervalTime;
+            
+            if (ext == 0)
+            {
+                // 本体地火，对原地的地火(ext=0)，只画一个dir=0，不以任何角度向外延伸
+                DrawExaflare(exaflarePos[0, ext], delay, destroy, accessory);
+                DrawExaflareEdge(exaflarePos[0, ext], delay, destroy, accessory);
+            }
+            else
+            {
+                // 对后续的地火(ext>0)，以对应角度向外延伸
+                for (var dir = 0; dir < dirNum; dir++)
+                {
+                    DrawExaflare(exaflarePos[dir, ext], delay, destroy, accessory);
+                    DrawExaflareEdge(exaflarePos[dir, ext], delay, destroy, accessory);
+                }
+            }
+            
+            if (!warnDrawn) continue;
+            for (var adv = 1; adv <= advWarnNum; adv++)
+            {
+                if (ext >= extNum - adv) continue;
+                for (var dir = 0; dir < dirNum; dir++)
+                    DrawExaflareWarn(exaflarePos[dir, ext + adv], adv, delay, destroy, intervalTime, accessory);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 构建地火坐标矩阵
+    /// </summary>
+    /// <param name="sourcePos">地火本体位置</param>
+    /// <param name="dirNum">一枚地火涉及几个方向</param>
+    /// <param name="extNum">一枚地火延伸几次</param>
+    /// <param name="sourceRot">释放地火幻影旋转角度</param>
+    /// <param name="flareRot">各方向旋转角度</param>
+    /// <param name="extDistance">地火步进延伸距离</param>
+    private Vector3[,] BuildExaflareVector(Vector3 sourcePos, int dirNum, int extNum, float sourceRot, float[] flareRot, float extDistance)
+    {
+        Vector3[,] exaflarePos = new Vector3[dirNum, extNum];
+        if (flareRot.Length != dirNum) return exaflarePos;
+        for (var ext = 0; ext < extNum; ext++)
+            for (var dir = 0; dir < dirNum; dir++)
+                exaflarePos[dir, ext] = sourcePos.ExtendPoint(sourceRot.Game2Logic() + flareRot[dir], ext * extDistance);
+        return exaflarePos;
+    }
+    
+    private void DrawExaflare(Vector3 spos, int delay, int destroy, ScriptAccessory accessory)
+    {
+        const int scale = 6;
+        var color = ExaflareBuiltInColor ? ColorHelper.ColorExaflare.V4 : ExaflareColor.V4.WithW(1f);
+        var dp = accessory.DrawStaticCircle(spos, color, delay, destroy, $"地火{spos}", scale);
+        dp.ScaleMode |= ScaleMode.ByTime;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private void DrawExaflareEdge(Vector3 spos, int delay, int destroy, ScriptAccessory accessory)
+    {
+        const float scale = 6;
+        // const float innerScale = scale - 0.05f;
+        var color = ExaflareBuiltInColor ? ColorHelper.ColorExaflare.V4 : ExaflareColor.V4.WithW(1.5f);
+        var dp = accessory.DrawStaticDonut(spos, color, delay, destroy, $"地火边缘{spos}", scale);
+        // dp.Color = ColorHelper.colorDark.V4;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Donut, dp);
+    }
+
+    private void DrawExaflareWarn(Vector3 spos, int adv, int delay, int destroy, int interval, ScriptAccessory accessory)
+    {
+        const int scale = 6;
+        var destroyItv = interval * (adv - 1);
+        var color = ExaflareBuiltInColor ? ColorHelper.ColorExaflareWarn.V4.WithW(1f / adv) : ExaflareWarnColor.V4.WithW(1f / adv);
+        var dp = accessory.DrawStaticCircle(spos, color, delay, destroy + destroyItv, $"地火预警{spos}", scale);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private void DebugExaflare(Vector3 spos, float srot, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        // 面相为前、左、右的扩散
+        const int intervalTime = 1850;
+        const int castTime = 7000;
+        const int extendDistance = 8;
+        const int dirNum = 3;
+        const int extNum = 6;
+        const int advWarnNum = 1;   // 预警向外延伸几个
+        float[] flareRot = [0, -float.Pi / 2, float.Pi / 2];
+        
+        Vector3[,] exaflarePos = BuildExaflareVector(spos, dirNum, extNum, srot, flareRot, extendDistance);
+        DrawExaflareScene(exaflarePos, ExaflareWarnDrawn, advWarnNum, castTime, intervalTime, accessory);
+    }
+
+    private void DebugCircle(uint bossId, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        var dp = accessory.DrawCircle(bossId, 8f, 0, 7000, $"钢铁");
+        dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private void DebugDonut(uint bossId, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        var dp = accessory.DrawDonut(bossId, 50, 8, 0, 7000, $"月环");
+        dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+    }
+
+    #endregion
+    
+    // TODO P7接刀
+}
+
+#region 函数集
+public static class EventExtensions
+{
+    private static bool ParseHexId(string? idStr, out uint id)
+    {
+        id = 0;
+        if (string.IsNullOrEmpty(idStr)) return false;
+        try
+        {
+            var idStr2 = idStr.Replace("0x", "");
+            id = uint.Parse(idStr2, System.Globalization.NumberStyles.HexNumber);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public static uint ActionId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["ActionId"]);
+    }
+
+    public static uint SourceId(this Event @event)
+    {
+        return ParseHexId(@event["SourceId"], out var id) ? id : 0;
+    }
+
+    public static uint SourceDataId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["SourceDataId"]);
+    }
+
+    public static uint TargetId(this Event @event)
+    {
+        return ParseHexId(@event["TargetId"], out var id) ? id : 0;
+    }
+
+    public static uint TargetIndex(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["TargetIndex"]);
+    }
+
+    public static Vector3 SourcePosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
+    }
+
+    public static Vector3 TargetPosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
+    }
+
+    public static Vector3 EffectPosition(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
+    }
+
+    public static float SourceRotation(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
+    }
+
+    public static float TargetRotation(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<float>(@event["TargetRotation"]);
+    }
+
+    public static string SourceName(this Event @event)
+    {
+        return @event["SourceName"];
+    }
+
+    public static string TargetName(this Event @event)
+    {
+        return @event["TargetName"];
+    }
+
+    public static uint DurationMilliseconds(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
+    }
+
+    public static uint Index(this Event @event)
+    {
+        return ParseHexId(@event["Index"], out var id) ? id : 0;
+    }
+
+    public static uint State(this Event @event)
+    {
+        return ParseHexId(@event["State"], out var id) ? id : 0;
+    }
+
+    public static uint DirectorId(this Event @event)
+    {
+        return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
+    }
+    public static uint Id(this Event @event)
+    {
+        return ParseHexId(@event["Id"], out var id) ? id : 0;
+    }
+
+    public static uint StatusId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
+    }
+
+    public static uint StackCount(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["StackCount"]);
+    }
+
+    public static uint Param(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["Param"]);
+    }
+}
+
+public static class IbcHelper
+{
+    public static IBattleChara? GetById(uint id)
+    {
+        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+    }
+
+    public static IBattleChara? GetMe()
+    {
+        return Svc.ClientState.LocalPlayer;
+    }
+
+    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
+    {
+        return Svc.Objects.Where(x => x.DataId == dataId);
+    }
+
+    public static uint GetCharHpcur(uint id)
+    {
+        // 如果null，返回0
+        var hp = GetById(id)?.CurrentHp ?? 0;
+        return hp;
+    }
+
+    public static bool IsTank(uint id)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.GetRole() == CombatRole.Tank;
+    }
+    public static bool IsHealer(uint id)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.GetRole() == CombatRole.Healer;
+    }
+    public static bool IsDps(uint id)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.GetRole() == CombatRole.DPS;
+    }
+
+}
+
+public static class DirectionCalc
+{
+    // 以北为0建立list
+    // Game         List    Logic
+    // 0            - 4     pi
+    // 0.25 pi      - 3     0.75pi
+    // 0.5 pi       - 2     0.5pi
+    // 0.75 pi      - 1     0.25pi
+    // pi           - 0     0
+    // 1.25 pi      - 7     1.75pi
+    // 1.5 pi       - 6     1.5pi
+    // 1.75 pi      - 5     1.25pi
+    // Logic = Pi - Game (+ 2pi)
+
+    /// <summary>
+    /// 将游戏基角度（以南为0，逆时针增加）转为逻辑基角度（以北为0，顺时针增加）
+    /// 算法与Logic2Game完全相同，但为了代码可读性，便于区分。
+    /// </summary>
+    /// <param name="radian">游戏基角度</param>
+    /// <returns>逻辑基角度</returns>
+    public static float Game2Logic(this float radian)
+    {
+        // if (r < 0) r = (float)(r + 2 * Math.PI);
+        // if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
+
+        var r = float.Pi - radian;
+        r %= float.Pi * 2;
+        return r;
+    }
+
+    /// <summary>
+    /// 将逻辑基角度（以北为0，顺时针增加）转为游戏基角度（以南为0，逆时针增加）
+    /// 算法与Game2Logic完全相同，但为了代码可读性，便于区分。
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <returns>游戏基角度</returns>
+    public static float Logic2Game(this float radian)
+    {
+        // var r = (float)Math.PI - radian;
+        // if (r < Math.PI) r = (float)(r + 2 * Math.PI);
+        // if (r > Math.PI) r = (float)(r - 2 * Math.PI);
+
+        return radian.Game2Logic();
+    }
+
+    /// <summary>
+    /// 输入逻辑基角度，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <param name="dirs">方位总数</param>
+    /// <param name="diagDivision">斜分割，默认true</param>
+    /// <returns>逻辑基角度对应的逻辑方位</returns>
+    public static int Rad2Dirs(this float radian, int dirs, bool diagDivision = true)
+    {
+        double dirsDouble = dirs;
+        var r = diagDivision
+            ? Math.Round(radian / (2f / dirsDouble * float.Pi))
+            : Math.Floor(radian / (2f / dirsDouble * float.Pi));
+        r %= dirs;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 输入坐标，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
+    /// </summary>
+    /// <param name="point">坐标点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="dirs">方位总数</param>
+    /// <param name="diagDivision">斜分割，默认true</param>
+    /// <returns>该坐标点对应的逻辑方位</returns>
+    public static int Position2Dirs(this Vector3 point, Vector3 center, int dirs, bool diagDivision = true)
+    {
+        double dirsDouble = dirs;
+        var r = diagDivision
+            ? Math.Round(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble
+            : Math.Floor(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 以逻辑基弧度旋转某点
+    /// </summary>
+    /// <param name="point">待旋转点坐标</param>
+    /// <param name="center">中心</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <returns>旋转后坐标点</returns>
+    public static Vector3 RotatePoint(this Vector3 point, Vector3 center, float radian)
+    {
+        // 围绕某点顺时针旋转某弧度
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
+        var length = v2.Length();
+        return new Vector3(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
+
+        // 另一种方案待验证
+        // var nextPos = Vector3.Transform((point - center), Matrix4x4.CreateRotationY(radian)) + center;
+    }
+
+    /// <summary>
+    /// 以逻辑基角度从某中心点向外延伸
+    /// </summary>
+    /// <param name="center">待延伸中心点</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <param name="length">延伸长度</param>
+    /// <returns>延伸后坐标点</returns>
+    public static Vector3 ExtendPoint(this Vector3 center, float radian, float length)
+    {
+        // 令某点以某弧度延伸一定长度
+        return new Vector3(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
+    }
+
+    /// <summary>
+    /// 寻找外侧某点到中心的逻辑基弧度
+    /// </summary>
+    /// <param name="center">中心</param>
+    /// <param name="newPoint">外侧点</param>
+    /// <returns>外侧点到中心的逻辑基弧度</returns>
+    public static float FindRadian(this Vector3 newPoint, Vector3 center)
+    {
+        // 找到某点到中心的弧度
+        float radian = MathF.PI - MathF.Atan2(newPoint.X - center.X, newPoint.Z - center.Z);
+        if (radian < 0)
+            radian += 2 * MathF.PI;
+        return radian;
+    }
+
+    /// <summary>
+    /// 将输入点左右折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerX">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointHorizon(this Vector3 point, float centerX)
+    {
+        // Vector3 v3 = new(2 * centerX - point.X, point.Y, point.Z);
+        // return v3;
+        return point with { X = 2 * centerX - point.X };
+    }
+
+    /// <summary>
+    /// 将输入点上下折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerZ">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointVertical(this Vector3 point, float centerZ)
+    {
+        // Vector3 v3 = new(point.X, point.Y, 2 * centerZ - point.Z);
+        // return v3;
+        return point with { Z = 2 * centerZ - point.Z };
+
+    }
+}
+
+public static class IndexHelper
+{
+    /// <summary>
+    /// 输入玩家dataId，获得对应的位置index
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置index</returns>
+    public static int GetPlayerIdIndex(this ScriptAccessory accessory, uint pid)
+    {
+        // 获得玩家 IDX
+        return accessory.Data.PartyList.IndexOf(pid);
+    }
+
+    /// <summary>
+    /// 获得主视角玩家对应的位置index
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <returns>主视角玩家对应的位置index</returns>
+    public static int GetMyIndex(this ScriptAccessory accessory)
+    {
+        return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+    }
+
+    /// <summary>
+    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置称呼</returns>
+    public static string GetPlayerJobById(this ScriptAccessory accessory, uint pid)
+    {
+        // 获得玩家职能简称，无用处，仅作DEBUG输出
+        var idx = accessory.Data.PartyList.IndexOf(pid);
+        var str = accessory.GetPlayerJobByIndex(idx);
+        return str;
+    }
+
+    /// <summary>
+    /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="idx">位置index</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx)
+    {
+        var str = idx switch
+        {
+            0 => "MT",
+            1 => "ST",
+            2 => "H1",
+            3 => "H2",
+            4 => "D1",
+            5 => "D2",
+            6 => "D3",
+            7 => "D4",
+            _ => "unknown"
+        };
+        return str;
+    }
+}
+
+public static class ColorHelper
+{
+    public static ScriptColor ColorRed = new ScriptColor { V4 = new Vector4(1.0f, 0f, 0f, 1.0f) };
+    public static ScriptColor ColorPink = new ScriptColor { V4 = new Vector4(1f, 0f, 1f, 1.0f) };
+    public static ScriptColor ColorCyan = new ScriptColor { V4 = new Vector4(0f, 1f, 0.8f, 1.0f) };
+    public static ScriptColor ColorDark = new ScriptColor { V4 = new Vector4(0f, 0f, 0f, 1.0f) };
+    public static ScriptColor ColorLightBlue = new ScriptColor { V4 = new Vector4(0.48f, 0.40f, 0.93f, 1.0f) };
+    public static ScriptColor ColorWhite = new ScriptColor { V4 = new Vector4(1f, 1f, 1f, 2f) };
+    public static ScriptColor ColorYellow = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
+    public static ScriptColor ColorExaflare = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0.0f, 1.5f) };
+    public static ScriptColor ColorExaflareWarn = new ScriptColor { V4 = new Vector4(0.6f, 0.6f, 1f, 1.0f) };
+}
+
+public static class AssignDp
+{
+    /// <summary>
+    /// 返回自己指向某目标地点的dp，可修改dp.TargetPosition, dp.Scale
+    /// </summary>
+    /// <param name="targetPos">指向地点</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="scale">指路线条宽度</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawDirPos(this ScriptAccessory accessory, Vector3 targetPos, int delay, int destroy, string name, float scale = 1f)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Owner = accessory.Data.Me;
+        dp.TargetPosition = targetPos;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回起始地点指向某目标地点的dp，可修改dp.Position, dp.TargetPosition, dp.Scale
+    /// </summary>
+    /// <param name="startPos">起始地点</param>
+    /// <param name="targetPos">指向地点</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="scale">指路线条宽度</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawDirPos2Pos(this ScriptAccessory accessory, Vector3 startPos, Vector3 targetPos, int delay, int destroy, string name, float scale = 1f)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Position = startPos;
+        dp.TargetPosition = targetPos;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回自己指向某目标对象的dp，可修改dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="targetId">指向目标对象</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="scale">指路线条宽度</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawDirTarget(this ScriptAccessory accessory, uint targetId, int delay, int destroy, string name, float scale = 1f)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Owner = accessory.Data.Me;
+        dp.TargetObject = targetId;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回扇形左右刀
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="isLeftCleave">是左刀</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawLeftRightCleave(this ScriptAccessory accessory, uint ownerId, bool isLeftCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Radian = radian;
+        dp.Rotation = isLeftCleave ? float.Pi / 2 : -float.Pi / 2;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回扇形前后刀
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="isFrontCleave">是前刀</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawFrontBackCleave(this ScriptAccessory accessory, uint ownerId, bool isFrontCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Radian = radian;
+        dp.Rotation = isFrontCleave ? 0 : -float.Pi;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回距离某对象目标最近/最远的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="orderIdx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="isNear">true为最近，false为最远</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawTargetNearFarOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx,
+        bool isNear, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.CentreResolvePattern =
+            isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
+        dp.CentreOrderIndex = orderIdx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回距离某坐标位置最近/最远的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="position">特定坐标点</param>
+    /// <param name="orderIdx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="isNear">true为最近，false为最远</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawPositionNearFarOrder(this ScriptAccessory accessory, Vector3 position, uint orderIdx,
+        bool isNear, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Position = position;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.TargetResolvePattern =
+            isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
+        dp.TargetOrderIndex = orderIdx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回ownerId施法目标的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawOwnersTarget(this ScriptAccessory accessory, uint ownerId, float width, float length, int delay,
+        int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.CentreResolvePattern = PositionResolvePatternEnum.OwnerTarget;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回ownerId仇恨相关的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="orderIdx">仇恨顺序，从1开始</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawOwnersEntityOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.CentreResolvePattern = PositionResolvePatternEnum.OwnerEnmityOrder;
+        dp.CentreOrderIndex = orderIdx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回owner与target的dp，可修改 dp.Owner, dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己</param>
+    /// <param name="targetId">目标单位id</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, uint ownerId, uint targetId, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.TargetObject = targetId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回owner与target之间的连线dp，使用Line绘制
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为自己</param>
+    /// <param name="targetId">目标单位id</param>
+    /// <param name="scale">线条宽度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawConnectionBetweenTargets(this ScriptAccessory accessory, uint ownerId,
+        uint targetId, int delay, int destroy, string name, float scale = 1f)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Owner = ownerId;
+        dp.TargetObject = targetId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回圆形dp，跟随owner，可修改 dp.Owner, dp.Scale
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="scale">圆圈尺寸</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawCircle(this ScriptAccessory accessory, uint ownerId, float scale, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回环形dp，跟随owner，可修改 dp.Owner, dp.Scale
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="scale">外环实心尺寸</param>
+    /// <param name="innerScale">内环空心尺寸</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawDonut(this ScriptAccessory accessory, uint ownerId, float scale, float innerScale, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.DrawFan(ownerId, float.Pi * 2, 0, scale, innerScale, delay, destroy, name, byTime);
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
+    /// </summary>
+    /// <param name="center">绘图中心位置</param>
+    /// <param name="radian">图形角度</param>
+    /// <param name="rotation">旋转角度，以北为0度顺时针</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, Vector3 center, float radian, float rotation, float width, float length, int delay, int destroy, string name)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Position = center;
+        dp.Radian = radian;
+        dp.Rotation = rotation.Logic2Game();
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态圆圈dp，通常用于指引固定位置。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="center">圆圈中心位置</param>
+    /// <param name="color">圆圈颜色</param>
+    /// <param name="scale">圆圈尺寸，默认1.5f</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
+    {
+        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        dp.Color = color;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态月环dp，通常用于指引固定位置。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="center">月环中心位置</param>
+    /// <param name="color">月环颜色</param>
+    /// <param name="scale">月环外径，默认1.5f</param>
+    /// <param name="innerscale">月环内径，默认scale-0.05f</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f, float innerscale = 0)
+    {
+        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        dp.Color = color;
+        dp.InnerScale = new Vector2(innerscale == 0 ? scale - 0.05f : innerscale);
+        return dp;
+    }
+    
+    /// <summary>
+    /// 返回矩形
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="width">矩形宽度</param>
+    /// <param name="length">矩形长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawRect(this ScriptAccessory accessory, uint ownerId, float width, float length, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回扇形
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="radian">扇形弧度</param>
+    /// <param name="rotation">图形旋转角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="innerScale">扇形内环空心尺寸</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawFan(this ScriptAccessory accessory, uint ownerId, float radian, float rotation, float scale, float innerScale, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.InnerScale = new Vector2(innerScale);
+        dp.Radian = radian;
+        dp.Rotation = rotation;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+}
+
+#endregion
