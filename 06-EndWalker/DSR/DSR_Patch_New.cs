@@ -69,6 +69,7 @@ public class DsrPatch
     private enum DsrPhase
     {
         Init,                   // 初始
+        Phase3Nidhogg,          // P3 大师兄
         Phase5HeavensWrath,     // P5 一运
         Phase5HeavensDeath,     // P5 二运
         Phase6IceAndFire1,      // P6 一冰火
@@ -91,6 +92,7 @@ public class DsrPatch
     private readonly Vector3 _center = new Vector3(100, 0, 100);
     private DsrPhase _dsrPhase = DsrPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
     private List<bool> _p6DragonsGlowAction = [false, false];           // P6 双龙吐息记录
     private List<bool> _p6DragonsWingAction = [false, false, false];    // P6 双龙远近记录 [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
     private List<bool> _p7FirstEntityOrder = [false, false];            // P7 平A仇恨记录
@@ -136,7 +138,235 @@ public class DsrPatch
     }
     
     #endregion
+
+    #region P3
+    [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26376"], userControl:false)]
+    public void P3_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = DsrPhase.Phase3Nidhogg;
+        _diveFromGrace = new DiveFromGrace();
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+    }
+
+    public class DiveFromGrace
+    {
+        public uint[] LimitCut1 { get; set; } = [];
+        public uint[] LimitCut2 { get; set; } = [];
+        public uint[] LimitCut3 { get; set; } = [];
+        public int RecordedPlayerNum { get; set; } = 0;
+        public bool[] LimitCutFixed { get; set; } = [false, false, false];
+        public List<uint> LeftLimitCut { get; set; } = [];
+        public List<uint> RightLimitCut { get; set; } = [];
+        public List<uint> CenterLimitCut { get; set; } = [];
+
+        private const int left = 0;
+        private const int center = 1;
+        private const int right = 2;
+
+        private const int first = 0;
+        private const int second = 1;
+        private const int third = 2;
+        
+        public DiveFromGrace()
+        {
+        }
+
+        public void LimitCutAdd(uint id, int idx)
+        {
+            switch (idx)
+            {
+                case first:
+                    LimitCut1.Add(id);
+                    break;
+                case second:
+                    LimitCut2.Add(id);
+                    break;
+                case third:
+                    LimitCut3.Add(id);
+                    break;
+                default:
+                    return;
+            }
+        }
+        
+        /// <summary>
+        /// 添加麻将方位
+        /// </summary>
+        /// <param name="id">玩家id</param>
+        /// <param name="pos">方位，0左1中2右</param>
+        public void LimitCutPosAdd(uint id, int pos)
+        {
+            switch (pos)
+            {
+                case left:
+                    LeftLimitCut.Add(id);
+                    break;
+                case center:
+                    CenterLimitCut.Add(id);
+                    break;
+                case right:
+                    RightLimitCut.Add(id);
+                    break;
+                default:
+                    return;
+            }
+        }
+        
+        /// <summary>
+        /// 找到对应玩家的麻将序号
+        /// </summary>
+        /// <param name="id">玩家id</param>
+        /// <returns>序号，0一麻 1二麻 2三麻</returns>
+        public int FindPlayerLimitCutIndex(uint id)
+        {
+            if (LimitCut1.Contains(id))
+                return first;
+            if (LimitCut2.Contains(id))
+                return second;
+            if (LimitCut3.Contains(id))
+                return third;
+            return -1;
+        }
+        
+        /// <summary>
+        /// 找到对应玩家的麻将放置方位
+        /// </summary>
+        /// <param name="id">玩家id</param>
+        /// <returns>方位，0左 1中 2右</returns>
+        public int FindPlayerLimitCutPos(uint id)
+        {
+            if (LeftLimitCut.Contains(id))
+                return left;
+            if (CenterLimitCut.Contains(id))
+                return center;
+            if (RightLimitCut.Contains(id))
+                return right;
+            return 0;
+        }
+
+        /// <summary>
+        /// 通过玩家id设置麻将位置是否确定
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public void LimitCutFixedSet(uint id)
+        {
+            var idx = FindPlayerLimitCutIndex(id);
+            LimitCutFixed[idx] = true;
+        }
+
+        public bool AllPlayerRecorded()
+        {
+            return RecordedPlayerNum == 8;
+        }
+
+        private uint[] GetLimitCutPlayers(int idx)
+        {
+            return idx switch
+            {
+                first => LimitCut1,
+                second => LimitCut2,
+                third => LimitCut3,
+                _ => []
+            };
+        }
+
+        private int GetLimitCutIdxOfPos(int pos)
+        {
+            var idx = -1;
+            switch (pos)
+            {
+                case left:
+                {
+                    if (LeftLimitCut.Count != 0)
+                        idx = FindPlayerLimitCutIndex(LeftLimitCut[0]);
+                    break;
+                }
+                case right:
+                {
+                    if (RightLimitCut.Count != 0)
+                        idx = FindPlayerLimitCutIndex(RightLimitCut[0]);
+                    break;
+                }
+                case center:
+                {
+                    if (CenterLimitCut.Count != 0)
+                        idx = FindPlayerLimitCutIndex(CenterLimitCut[0]);
+                    break;
+                }
+            }
+
+            return idx;
+        }
+
+        public void SetRemainingPlayers()
+        {
+            // 第一步，先根据fixed情况找到对应的原地玩家，放置到Center
+            int limitCutIdx;
+            if (LimitCutFixed[left] && LeftLimitCut.Count == 2)
+            {
+                limitCutIdx = GetLimitCutIdxOfPos(left);
+                foreach (var player in LimitCut1)
+                {
+                    
+                }
+            }
+                
+            return;
+
+        }
+        
+    }
     
+    [ScriptMethod(name: "P3：麻将记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
+    public void P3_LimitCutRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        var stid = @event.StatusId();
+        var tid = @event.TargetId();
+
+        const uint limitCut1 = 3004;
+        const uint limitCut2 = 3005;
+        const uint limitCut3 = 3006;
+        _diveFromGrace.LimitCutAdd(tid, (int)stid - 3004);
+    }
+    
+    [ScriptMethod(name: "P3：箭头记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
+    public void P3_LimitCutPosRecord(Event @event, ScriptAccessory accessory)
+    {
+        // TODO StatusID 随上中下箭头 修改
+        if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        var stid = @event.StatusId();
+        var tid = @event.TargetId();
+        
+        const uint front = 11111;
+        const uint behind = 22222;
+        const uint inPlace = 33333;
+
+        const int left = 0;
+        const int center = 1;
+        const int right = 2;
+
+        lock (_diveFromGrace)
+        {
+            switch (stid)
+            {
+                case front:
+                    _diveFromGrace.LimitCutPosAdd(tid, right);
+                    break;
+                case behind:
+                    _diveFromGrace.LimitCutPosAdd(tid, left);
+                    break; 
+            }
+            _diveFromGrace.LimitCutFixedSet(tid);
+            _diveFromGrace.RecordedPlayerNum++;
+        }
+        
+        if (!_diveFromGrace.AllPlayerRecorded()) return;
+        
+    }
+    
+    #endregion
     #region P5
 
     [ScriptMethod(name: "P5：一运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27529"], userControl: false)]
@@ -665,7 +895,180 @@ public class DsrPatch
 
     #endregion
     
-    // TODO P7接刀
+    #region P7 接刀
+
+    [ScriptMethod(name: "P7：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179]|28206)$"], userControl: false)]
+    public void P7_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = _dsrPhase switch
+        {
+            DsrPhase.Phase6Cauterize => DsrPhase.Phase7Exaflare1,
+            DsrPhase.Phase7Exaflare1 => DsrPhase.Phase7Stack1,
+            DsrPhase.Phase7Stack1 => DsrPhase.Phase7Nuclear1,
+            DsrPhase.Phase7Nuclear1 => DsrPhase.Phase7Exaflare2,
+            DsrPhase.Phase7Exaflare2 => DsrPhase.Phase7Stack2,
+            DsrPhase.Phase7Stack2 => DsrPhase.Phase7Nuclear2,
+            DsrPhase.Phase7Nuclear2 => DsrPhase.Phase7Exaflare3,
+            DsrPhase.Phase7Exaflare3 => DsrPhase.Phase7Stack3,
+            DsrPhase.Phase7Stack3 => DsrPhase.Phase7Enrage,
+            _ => DsrPhase.Phase7Exaflare1,
+        };
+        DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
+
+        if (!_p7FirstEntityOrder.Contains(true))
+        {
+            // 初始化
+            _p7FirstEntityOrder = [true, false];
+            _p7TrinityDisordered = false;
+            _p7TrinityTankDisordered = false;
+            _p7TrinityNum = 0;
+        }
+        else
+        {
+            _p7FirstEntityOrder[0] = !_p7FirstEntityOrder[0];
+            _p7FirstEntityOrder[1] = !_p7FirstEntityOrder[1];
+            DebugMsg($"MT为{(_p7FirstEntityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEntityOrder[1] ? "一仇" : "二仇")}", accessory);
+        }
+    }
+
+    [ScriptMethod(name: "P7：三剑一体接刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179])$"])]
+    public async void P7_TrinityAttack(Event @event, ScriptAccessory accessory)
+    {
+        await Task.Delay(100);
+
+        var aid = @event.ActionId();
+        var sid = @event.SourceId();
+        const uint exaflare = 28059;
+        const uint stack = 28051;
+        const uint nuclear = 28057;
+
+        var delay = aid switch
+        {
+            exaflare => 15000,
+            stack => 16000,
+            nuclear => 26000,
+            _ => 0
+        };
+        
+        delay = _dsrPhase switch
+        {
+            DsrPhase.Phase7Stack1 => delay + 2000,
+            DsrPhase.Phase7Stack2 => delay + 3000,
+            DsrPhase.Phase7Stack3 => delay + 4000,
+            _ => delay
+        };
+
+        DrawTrinityAggro(sid, delay - 6000, 6000, 1, accessory);
+        DrawTrinityAggro(sid, delay - 6000, 6000, 2, accessory);
+        DrawTrinityAggro(sid, delay, 4000, 1, accessory);
+        DrawTrinityAggro(sid, delay, 4000, 2, accessory);
+
+        DrawTrinityNear(sid, delay - 6000, 6000, accessory);
+        DrawTrinityNear(sid, delay, 4000, accessory);
+    }
+
+    private void DrawTrinityAggro(uint sid, int delay, int destroy, uint aggroIdx, ScriptAccessory accessory)
+    {
+        var myIndex = accessory.GetMyIndex();
+        Vector4 color;
+
+        if (myIndex > 1 || _p7TrinityTankDisordered)
+            color = accessory.Data.DefaultDangerColor;
+        else
+        {
+            switch (_p7FirstEntityOrder[myIndex])
+            {
+                case true when aggroIdx == 1:
+                case false when aggroIdx == 2:
+                    color = accessory.Data.DefaultSafeColor;
+                    break;
+                default:
+                    color = accessory.Data.DefaultDangerColor;
+                    break;
+            }
+        }
+        
+        var dp = accessory.DrawOwnersEntityOrder(sid, aggroIdx, 3f, 3f, delay, destroy, $"三剑一体仇恨{aggroIdx}", byTime: true);
+        dp.Color = color.WithW(2f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    private void DrawTrinityNear(uint sid, int delay, int destroy, ScriptAccessory accessory)
+    {
+        var myIndex = accessory.GetMyIndex();
+
+        var dp = accessory.DrawTargetNearFarOrder(sid, 1, true, 3f, 3f, delay, destroy, $"三剑一体近距", byTime: true);
+        if (_p7TrinityDisordered)
+            dp.Color = accessory.Data.DefaultDangerColor;
+        else
+            dp.Color = myIndex == _p7TrinityOrderIdx[_p7TrinityNum] ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    [ScriptMethod(name: "P7：三剑一体接刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:28065"], userControl: false)]
+    public void P7_TrinityOrderRecord(Event @event, ScriptAccessory accessory)
+    {
+        // 主视角为T，忽略脚下接刀
+        var myIndex = accessory.GetMyIndex();
+        if (myIndex < 2) return;
+
+        var targetIdx = @event.TargetIndex();
+        if (targetIdx != 1)
+        {
+            if (_p7TrinityDisordered) return;
+            DebugMsg($"有人多接了一刀，失效", accessory);
+            accessory.Method.TextInfo($"有人多接了一刀，不再以安全色提示", 3000, true);
+            _p7TrinityDisordered = true;
+            return;
+        }
+
+        var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        if (_p7TrinityOrderIdx[_p7TrinityNum] != tidx && !_p7TrinityDisordered)
+        {
+            DebugMsg($"接刀人错误，失效", accessory);
+            accessory.Method.TextInfo($"接刀人错误，不再以安全色提示", 3000, true);
+            _p7TrinityDisordered = true;
+        }
+
+        _p7TrinityNum++;
+        if (_p7TrinityNum >= 6)
+            _p7TrinityNum = 0;
+
+        var targetRecent = accessory.GetPlayerJobByIndex(tidx);
+        var targetNext = accessory.GetPlayerJobByIndex(_p7TrinityOrderIdx[_p7TrinityNum]);
+        DebugMsg($"刚刚接刀的是{targetRecent}，下一个接刀人为{targetNext}", accessory);
+    }
+
+    [ScriptMethod(name: "P7：三剑一体T刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2806[34])$"], userControl: false)]
+    public void P7_TrinityTankRecord(Event @event, ScriptAccessory accessory)
+    {
+        var aid = @event.ActionId();
+        var tid = @event.TargetId();
+
+        // 非T玩家接到刀
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        if (tidx > 1) return;
+
+        // 主视角不是T
+        var myIndex = accessory.GetMyIndex();
+        if (myIndex > 1) return;
+
+        // 已经失效
+        if (_p7TrinityTankDisordered) return;
+
+        const uint aggro1 = 28063;
+        const uint aggro2 = 28064;
+
+        // 一仇效果，但目标是二仇 || 二仇效果，但目标是一仇
+        if ((_p7FirstEntityOrder[tidx] || aid != aggro1) && (!_p7FirstEntityOrder[tidx] || aid != aggro2)) return;
+        DebugMsg($"接刀仇恨错误，失效", accessory);
+        accessory.Method.TextInfo($"接刀仇恨错误，不再以安全色提示", 3000, true);
+        _p7TrinityTankDisordered = true;
+    }
+
+    #endregion
+
 }
 
 #region 函数集

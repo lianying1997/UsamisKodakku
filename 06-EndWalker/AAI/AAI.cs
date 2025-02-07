@@ -181,18 +181,28 @@ public class Aai
         _boss1Crystal.Clear();
     }
     
-    public class Boss1Crystal(uint id, int[] pos, bool isHorizontal, int quarter)
+    public class Boss1Crystal
     {
-        public int[] Pos { get; set; } = pos;
-        public bool Horizontal { get; set; } = isHorizontal;
-        public uint Id { get; set; } = id;
-        public int Quarter { get; set; } = quarter;
+        public int[] Pos { get; set; }
+        public bool Horizontal { get; set; }
+        public uint Id { get; set; }
+        public int Quarter { get; set; }
+        public List<int[]> DangerPos { get; private set; }
+        
+        public Boss1Crystal(uint id, int[] pos, bool isHorizontal, int quarter)
+        {
+            Id = id;
+            Pos = pos;
+            Horizontal = isHorizontal;
+            Quarter = quarter;
+            DangerPos = FindDangerPos();
+        }
         
         /// <summary>
         /// 获得水晶对应危险区
         /// </summary>
         /// <returns></returns>
-        public List<int[]> FindDangerPos()
+        private List<int[]> FindDangerPos()
         {
             List<int[]> dangerPos = [];
             for (var i = 0; i < 4; i++)
