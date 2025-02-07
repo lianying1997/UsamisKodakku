@@ -49,7 +49,7 @@ public class DsrPatch
     private const string Name = "New DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
-    private const string Note = "";
+    private const string Note = "龙诗P3";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -89,14 +89,16 @@ public class DsrPatch
         Phase7Enrage,           // P7 狂暴
     }
     
-    private readonly Vector3 _center = new Vector3(100, 0, 100);
+    private static readonly Vector3 Center = new Vector3(100, 0, 100);
     private DsrPhase _dsrPhase = DsrPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
+    private int _p3LimitCutStep = 0;                                    // P3 麻将机制流程
+    private uint _p3MyTowerPartner = 0;                                 // P3 我要踩的放塔搭档
     private List<bool> _p6DragonsGlowAction = [false, false];           // P6 双龙吐息记录
     private List<bool> _p6DragonsWingAction = [false, false, false];    // P6 双龙远近记录 [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
     private List<bool> _p7FirstEntityOrder = [false, false];            // P7 平A仇恨记录
-    private List<int> _p7TrinityOrderIdx = [4, 5, 6, 7, 2, 3];          // P7 接刀顺序
+    private readonly List<int> _p7TrinityOrderIdx = [4, 5, 6, 7, 2, 3]; // P7 接刀顺序
     private bool _p7TrinityDisordered = false;                          // P7 接刀顺序是否出错
     private bool _p7TrinityTankDisordered = false;                      // P7 坦克接刀仇恨是否出错
     private int _p7TrinityNum = 0;                                      // P7 接刀次数
@@ -116,12 +118,17 @@ public class DsrPatch
         if (!DebugMode) return;
         accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
-
+    
     [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
     public void EchoDebug(Event @event, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
+        for (var i = 0; i < 8; i++)
+        {
+            var str = _diveFromGrace.ShowPlayerAction(accessory.Data.PartyList[i]);
+            DebugMsg($"{accessory.GetPlayerJobByIndex(i)}{str}", accessory);
+        }
         
         // -- DEBUG CODE END --
     }
@@ -145,43 +152,46 @@ public class DsrPatch
     {
         _dsrPhase = DsrPhase.Phase3Nidhogg;
         _diveFromGrace = new DiveFromGrace();
+        _p3LimitCutStep = 0;
+        _p3MyTowerPartner = 0;
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
-    public class DiveFromGrace
+    public class DiveFromGrace()
     {
-        public uint[] LimitCut1 { get; set; } = [];
-        public uint[] LimitCut2 { get; set; } = [];
-        public uint[] LimitCut3 { get; set; } = [];
+        public List<uint> LimitCut1 { get; set; } = [];
+        public List<uint> LimitCut2 { get; set; } = [];
+        public List<uint> LimitCut3 { get; set; } = [];
         public int RecordedPlayerNum { get; set; } = 0;
-        public bool[] LimitCutFixed { get; set; } = [false, false, false];
+        public List<bool> LimitCutFixed { get; set; } = [false, false, false];
         public List<uint> LeftLimitCut { get; set; } = [];
         public List<uint> RightLimitCut { get; set; } = [];
-        public List<uint> CenterLimitCut { get; set; } = [];
+        public List<uint> MiddleLimitCut { get; set; } = [];
 
-        private const int left = 0;
-        private const int center = 1;
-        private const int right = 2;
+        private const int Left = 0;
+        private const int Middle = 1;
+        private const int Right = 2;
 
-        private const int first = 0;
-        private const int second = 1;
-        private const int third = 2;
-        
-        public DiveFromGrace()
-        {
-        }
+        private const int First = 0;
+        private const int Second = 1;
+        private const int Third = 2;
+
+        // 放塔倒计时
+        private const int FirstDuration = 9000;
+        private const int SecondDuration = 19000;
+        private const int ThirdDuration = 29000;
 
         public void LimitCutAdd(uint id, int idx)
         {
             switch (idx)
             {
-                case first:
+                case First:
                     LimitCut1.Add(id);
                     break;
-                case second:
+                case Second:
                     LimitCut2.Add(id);
                     break;
-                case third:
+                case Third:
                     LimitCut3.Add(id);
                     break;
                 default:
@@ -198,13 +208,13 @@ public class DsrPatch
         {
             switch (pos)
             {
-                case left:
+                case Left:
                     LeftLimitCut.Add(id);
                     break;
-                case center:
-                    CenterLimitCut.Add(id);
+                case Middle:
+                    MiddleLimitCut.Add(id);
                     break;
-                case right:
+                case Right:
                     RightLimitCut.Add(id);
                     break;
                 default:
@@ -220,11 +230,11 @@ public class DsrPatch
         public int FindPlayerLimitCutIndex(uint id)
         {
             if (LimitCut1.Contains(id))
-                return first;
+                return First;
             if (LimitCut2.Contains(id))
-                return second;
+                return Second;
             if (LimitCut3.Contains(id))
-                return third;
+                return Third;
             return -1;
         }
         
@@ -236,12 +246,12 @@ public class DsrPatch
         public int FindPlayerLimitCutPos(uint id)
         {
             if (LeftLimitCut.Contains(id))
-                return left;
-            if (CenterLimitCut.Contains(id))
-                return center;
+                return Left;
+            if (MiddleLimitCut.Contains(id))
+                return Middle;
             if (RightLimitCut.Contains(id))
-                return right;
-            return 0;
+                return Right;
+            return -1;
         }
 
         /// <summary>
@@ -260,62 +270,167 @@ public class DsrPatch
             return RecordedPlayerNum == 8;
         }
 
-        private uint[] GetLimitCutPlayers(int idx)
+        private List<uint> GetLimitCutPlayers(int idx)
         {
             return idx switch
             {
-                first => LimitCut1,
-                second => LimitCut2,
-                third => LimitCut3,
+                First => LimitCut1,
+                Second => LimitCut2,
+                Third => LimitCut3,
                 _ => []
             };
         }
-
-        private int GetLimitCutIdxOfPos(int pos)
+        
+        private List<uint> GetLimitCutPosPlayers(int pos)
         {
-            var idx = -1;
-            switch (pos)
+            return pos switch
             {
-                case left:
-                {
-                    if (LeftLimitCut.Count != 0)
-                        idx = FindPlayerLimitCutIndex(LeftLimitCut[0]);
-                    break;
-                }
-                case right:
-                {
-                    if (RightLimitCut.Count != 0)
-                        idx = FindPlayerLimitCutIndex(RightLimitCut[0]);
-                    break;
-                }
-                case center:
-                {
-                    if (CenterLimitCut.Count != 0)
-                        idx = FindPlayerLimitCutIndex(CenterLimitCut[0]);
-                    break;
-                }
+                Left => LeftLimitCut,
+                Middle => MiddleLimitCut,
+                Right => RightLimitCut,
+                _ => []
+            };
+        }
+        
+        /// <summary>
+        /// 找到同组麻将中未被放入方位的玩家
+        /// </summary>
+        /// <returns></returns>
+        private List<uint> FindUnaddedPlayer(int idx)
+        {
+            List<uint> unaddedPlayers = [];
+            var players = GetLimitCutPlayers(idx);
+            foreach (var player in players)
+            {
+                if (FindPlayerLimitCutPos(player) == -1)
+                    unaddedPlayers.Add(player);
             }
-
-            return idx;
+            return unaddedPlayers;
         }
 
         public void SetRemainingPlayers()
         {
             // 第一步，先根据fixed情况找到对应的原地玩家，放置到Center
-            int limitCutIdx;
-            if (LimitCutFixed[left] && LeftLimitCut.Count == 2)
+            for (var idx = 0; idx < 3; idx++)
             {
-                limitCutIdx = GetLimitCutIdxOfPos(left);
-                foreach (var player in LimitCut1)
+                if (!LimitCutFixed[idx]) continue;
+                var unaddedPlayers = FindUnaddedPlayer(idx);
+                if (unaddedPlayers.Count == 1)
+                    LimitCutPosAdd(unaddedPlayers[0], Middle);
+            }
+            // 第二步，没有fixed的就是全大圈，根据他们的位置放置到不同方位
+            for (var idx = 0; idx < 3; idx++)
+            {
+                if (LimitCutFixed[idx]) continue;
+                
+                var unaddedPlayers = GetLimitCutPlayers(idx);
+                var sortedPlayerIds = unaddedPlayers
+                    .OrderBy(playerId => IbcHelper.GetById(playerId).Position.X)
+                    .ToList();
+                
+                if (idx == Middle)
                 {
-                    
+                    LimitCutPosAdd(sortedPlayerIds[0], Left);
+                    LimitCutPosAdd(sortedPlayerIds[1], Right);
+                }
+                else
+                {
+                    LimitCutPosAdd(sortedPlayerIds[0], Left);
+                    LimitCutPosAdd(sortedPlayerIds[1], Middle);
+                    LimitCutPosAdd(sortedPlayerIds[2], Right);
+                    LimitCutFixed[idx] = true;
                 }
             }
-                
-            return;
+        }
 
+        /// <summary>
+        /// 可能因为踩的位置不同需要重置
+        /// </summary>
+        /// <param name="idx"></param>
+        public void ResetPlayers(int idx)
+        {
+            LeftLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
+            MiddleLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
+            RightLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
+            LimitCutFixed[idx] = false;
         }
         
+        public string ShowPlayerAction(uint id)
+        {
+            var idx = FindPlayerLimitCutIndex(id);
+            var pos = FindPlayerLimitCutPos(id);
+            var str = $"玩家为{idx + 1}麻，位置在{pos switch
+            {
+                0 => "左",
+                1 => "中",
+                2 => "右",
+                _ => "未知"
+            }}";
+            return str;
+        }
+
+        /// <summary>
+        /// 输入玩家id，得到需要踩对方塔的搭档玩家id
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        public uint FindTowerPartner(uint id)
+        {
+            var idx = FindPlayerLimitCutIndex(id);
+            var pos = FindPlayerLimitCutPos(id);
+
+            var idxPartner = (idx + 1) % 3;
+            if (idxPartner == Second && pos == Middle)
+                idxPartner = Third;
+
+            return FindSpecificPlayer(idxPartner, pos);
+        }
+
+        /// <summary>
+        /// 输入麻将序号与方向，找到特定玩家
+        /// </summary>
+        /// <param name="idx">麻将序号</param>
+        /// <param name="pos">方向</param>
+        /// <returns></returns>
+        public uint FindSpecificPlayer(int idx, int pos)
+        {
+            var ls1 = GetLimitCutPlayers(idx);
+            var ls2 = GetLimitCutPosPlayers(pos);
+            return ls1.FirstOrDefault(player => ls2.Contains(player));
+        }
+
+        /// <summary>
+        /// 输入麻将序号与方向，获得放塔基础坐标（不含钢铁月环）
+        /// </summary>
+        /// <param name="idx"></param>
+        /// <param name="pos"></param>
+        /// <returns></returns>
+        public Vector3 GetTowerPosV3(int idx, int pos)
+        {
+            if (idx == Second)
+            {
+                switch (pos)
+                {
+                    case Left:
+                        return new Vector3(91.75f, 0, 90.8f);
+                    case Right:
+                        return new Vector3(108.25f, 0, 90.8f);
+                }
+            }
+            else
+            {
+                switch (pos)
+                {
+                    case Left:
+                        return new Vector3(Center.X - 8, 0, Center.Z);
+                    case Middle:
+                        return new Vector3(Center.X, 0, Center.Z + 8);
+                    case Right:
+                        return new Vector3(Center.X + 8, 0, Center.Z);
+                }
+            }
+            return new Vector3(0, 0, 0);
+        }
     }
     
     [ScriptMethod(name: "P3：麻将记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
@@ -331,17 +446,16 @@ public class DsrPatch
         _diveFromGrace.LimitCutAdd(tid, (int)stid - 3004);
     }
     
-    [ScriptMethod(name: "P3：箭头记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
+    [ScriptMethod(name: "P3：箭头记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(275[567])$"], userControl: false)]
     public void P3_LimitCutPosRecord(Event @event, ScriptAccessory accessory)
     {
-        // TODO StatusID 随上中下箭头 修改
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
         var stid = @event.StatusId();
         var tid = @event.TargetId();
         
-        const uint front = 11111;
-        const uint behind = 22222;
-        const uint inPlace = 33333;
+        const uint front = 2756;
+        const uint behind = 2757;
+        const uint inPlace = 2755;
 
         const int left = 0;
         const int center = 1;
@@ -353,20 +467,59 @@ public class DsrPatch
             {
                 case front:
                     _diveFromGrace.LimitCutPosAdd(tid, right);
+                    _diveFromGrace.LimitCutFixedSet(tid);
                     break;
                 case behind:
                     _diveFromGrace.LimitCutPosAdd(tid, left);
+                    _diveFromGrace.LimitCutFixedSet(tid);
                     break; 
             }
-            _diveFromGrace.LimitCutFixedSet(tid);
             _diveFromGrace.RecordedPlayerNum++;
         }
         
         if (!_diveFromGrace.AllPlayerRecorded()) return;
-        
+        DebugMsg($"LimitCutFixed:{_diveFromGrace.LimitCutFixed.StringList()}", accessory);
+        _diveFromGrace.SetRemainingPlayers();
+        _p3MyTowerPartner = _diveFromGrace.FindTowerPartner(accessory.Data.Me);
     }
     
+    [ScriptMethod(name: "P3：麻将流程", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2368[67])$"])]
+    public void P3_LimitCutAction(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        _p3LimitCutStep++;
+
+        var aid = @event.ActionId();
+        var myId = accessory.Data.Me;
+        var idx = _diveFromGrace.FindPlayerLimitCutIndex(myId);
+        var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
+        var tpos = _diveFromGrace.GetTowerPosV3(idx, pos);
+        
+        const int Left = 0;
+        const int Middle = 1;
+        const int Right = 2;
+        const int First = 0;
+        const int Second = 1;
+        const int Third = 2;
+        const int FirstDuration = 9000;
+        const int SecondDuration = 19000;
+        const int ThirdDuration = 29000;
+        var stackPos = new Vector3(100, 0, 92);
+        var offset = new Vector3(0, 0, 1);
+        
+        // 第一轮钢铁月环，一麻准备放塔
+        if (idx == First)
+        {
+            // TODO
+            var dp = accessory.DrawDirPos(tpos, 0, 7000, $"一塔");
+            tpos = (tpos - Center) * 1 / 8 + tpos;      // 往外1
+            tpos = (tpos - Center) * -1 / 8 + tpos;     // 往里1
+        }
+            
+
+    }
     #endregion
+    
     #region P5
 
     [ScriptMethod(name: "P5：一运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27529"], userControl: false)]
@@ -425,7 +578,7 @@ public class DsrPatch
         if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
         var spos = @event.SourcePosition();
         DebugMsg($"找到斧头哥位置{spos}", accessory);
-        var dp = accessory.DrawDirPos2Pos(_center, spos, 0, 4000, $"场中指向斧头哥", 2f);
+        var dp = accessory.DrawDirPos2Pos(Center, spos, 0, 4000, $"场中指向斧头哥", 2f);
         dp.Color = ColorHelper.ColorWhite.V4;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
     }
@@ -487,9 +640,9 @@ public class DsrPatch
         var myIndex = accessory.GetMyIndex();
         var tankBusterPosition = new Vector3[4];
         tankBusterPosition[0] = new Vector3(84.5f, 0, 88f);
-        tankBusterPosition[1] = tankBusterPosition[0].FoldPointHorizon(_center.X);
+        tankBusterPosition[1] = tankBusterPosition[0].FoldPointHorizon(Center.X);
         tankBusterPosition[2] = tankBusterPosition[0];
-        tankBusterPosition[3] = tankBusterPosition[1].FoldPointVertical(_center.Z);
+        tankBusterPosition[3] = tankBusterPosition[1].FoldPointVertical(Center.Z);
 
         if (_p6DragonsGlowAction[0] && _p6DragonsGlowAction[1])
         {
@@ -497,7 +650,7 @@ public class DsrPatch
             if (myIndex > 1) return;
             // 删除K佬脚本中双T的小啾啾
             accessory.Method.RemoveDraw("P6 第二次冰火线ND站位.*");
-            var dp = accessory.DrawDirPos(_center, 0, 6000, $"冰火场中分摊指路");
+            var dp = accessory.DrawDirPos(Center, 0, 6000, $"冰火场中分摊指路");
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
         else
@@ -573,7 +726,7 @@ public class DsrPatch
         if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
         var spos = @event.SourcePosition();
         // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
-        _p6DragonsWingAction[2] = spos.X < _center.X;
+        _p6DragonsWingAction[2] = spos.X < Center.X;
         DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "前安全" : "后安全")}", accessory);
     }
 
@@ -632,7 +785,7 @@ public class DsrPatch
                 quarterSafePos[i] -= new Vector3(22f, 0, 0);
             // 右安全，左右折叠
             if (!wings[1])
-                quarterSafePos[i] = quarterSafePos[i].FoldPointVertical(_center.Z);
+                quarterSafePos[i] = quarterSafePos[i].FoldPointVertical(Center.Z);
         }
         return quarterSafePos;
     }
@@ -1462,6 +1615,20 @@ public static class ColorHelper
     public static ScriptColor ColorYellow = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
     public static ScriptColor ColorExaflare = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0.0f, 1.5f) };
     public static ScriptColor ColorExaflareWarn = new ScriptColor { V4 = new Vector4(0.6f, 0.6f, 1f, 1.0f) };
+}
+
+public static class ListHelper
+{
+    /// <summary>
+    /// 将List转为String以输出
+    /// </summary>
+    /// <param name="list"></param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public static string StringList<T>(this List<T> list)
+    {
+        return string.Join(", ", list);
+    }
 }
 
 public static class AssignDp
