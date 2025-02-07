@@ -13,6 +13,7 @@ using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
@@ -46,12 +47,23 @@ public class Aai
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
     
-    private readonly Vector3 _centerBoss1 = new(0f, 0f, 0f);
-    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
-    private List<bool> _boss1BubbleDontMove = new bool[4].ToList();     // Boss1气泡Buff是止步
-    private bool _boss1StackFirst = false;                              // Boss1水瀑先分摊
-    private List<Boss1Crystal> _boss1Crystal = [];                      // Boss1水晶属性
+    public enum AaiPhase
+    {
+        Init,                       // 初始
+        Boss1_Crystal_1,            // Boss1 水晶一
+        Boss1_Crystal_2,            // Boss1 水晶二
+        Boss1_Crystal_3,            // Boss1 水晶三
+        Boss1_Crystal_4,            // Boss1 水晶四
+    }
     
+    private readonly Vector3 _centerBoss1 = new(0f, 0f, 0f);
+    
+    private AaiPhase _phase = AaiPhase.Init;                            // 阶段记录
+    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    
+    private List<bool> _boss1BubbleDontMove = new bool[4].ToList();     // Boss1气泡Buff是止步
+    private bool _boss1StackLast = false;                               // Boss1水瀑后分摊
+    private List<Boss1Crystal> _boss1Crystal = [];                      // Boss1水晶属性
     
     public void Init(ScriptAccessory accessory)
     {
@@ -59,9 +71,10 @@ public class Aai
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         
+        _phase = AaiPhase.Init;                         // 阶段记录
         _drawn = new bool[20].ToList();                 // 绘图记录
         _boss1BubbleDontMove = new bool[4].ToList();    // Boss1气泡Buff是止步
-        _boss1StackFirst = false;                       // Boss1水瀑先分摊
+        _boss1StackLast = false;                        // Boss1水瀑后分摊
         _boss1Crystal = [];                             // Boss1水晶属性
     }
 
@@ -153,13 +166,40 @@ public class Aai
 
     #region Boss1 泡泡鱼
     
+    [ScriptMethod(name: "Boss1：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^()$"], userControl: false)]
+    public void Boss1_PhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        // TODO 读条“水晶”切阶段
+        _phase = _phase switch
+        {
+            AaiPhase.Init => AaiPhase.Boss1_Crystal_1,
+            AaiPhase.Boss1_Crystal_1 => AaiPhase.Boss1_Crystal_2,
+            AaiPhase.Boss1_Crystal_2 => AaiPhase.Boss1_Crystal_3,
+            AaiPhase.Boss1_Crystal_3 => AaiPhase.Boss1_Crystal_4,
+            _ => AaiPhase.Boss1_Crystal_1
+        };
+        _boss1Crystal.Clear();
+    }
+    
     public class Boss1Crystal(uint id, int[] pos, bool isHorizontal, int quarter)
     {
         public int[] Pos { get; set; } = pos;
         public bool Horizontal { get; set; } = isHorizontal;
         public uint Id { get; set; } = id;
         public int Quarter { get; set; } = quarter;
-
+        
+        /// <summary>
+        /// 获得水晶对应危险区
+        /// </summary>
+        /// <returns></returns>
+        public List<int[]> FindDangerPos()
+        {
+            List<int[]> dangerPos = [];
+            for (var i = 0; i < 4; i++)
+                dangerPos.Add(Horizontal ? [i, Pos[1]] : [Pos[0], i]);
+            return dangerPos;
+        }
+        
         /// <summary>
         /// 获得经象限偏置后的行列坐标
         /// </summary>
@@ -239,6 +279,11 @@ public class Aai
             return !(Pos.Contains(0) || Pos.Contains(3));
         }
 
+        /// <summary>
+        /// 寻找对应水晶的安全位置
+        /// 该函数仅适用于一水晶机制，且需对应水晶位于场中（即LocatedInside）
+        /// </summary>
+        /// <returns></returns>
         public List<int[]> FindCrystalSafePos()
         {
             List<int[]> safePos = [];
@@ -263,11 +308,11 @@ public class Aai
         
         /// <summary>
         /// 找到横水晶象限内（一麻）的安全区
+        /// 该函数仅适用于一水晶机制，且需对应水晶位于场中（即LocatedInside）
         /// </summary>
         /// <returns></returns>
         public List<int[]> FindHorizonCrystalSafePos()
         {
-            //TODO 这个和vertical有点问题
             List<int[]> horizonCrystalSafePos = [];
             var safePos = FindCrystalSafePos();
             foreach (var pos in safePos)
@@ -291,6 +336,7 @@ public class Aai
         
         /// <summary>
         /// 找到竖水晶象限内（二麻）的安全区
+        /// 该函数仅适用于一水晶机制，且需对应水晶位于场中（即LocatedInside）
         /// </summary>
         /// <returns></returns>
         public List<int[]> FindVerticalCrystalSafePos()
@@ -316,20 +362,14 @@ public class Aai
             return verticalCrystalSafePos;
         }
 
+        /// <summary>
+        /// 根据水晶所在位置寻找初始预站位位置
+        /// 该函数仅适用于一水晶机制，且需对应水晶位于场中（即LocatedInside）
+        /// </summary>
+        /// <returns></returns>
         public List<int[]> FindEdgePos()
         {
-            List<int[]> edgePos = [];
-            if (Horizontal)
-            {
-                edgePos.Add([Pos[0], 0]);
-                edgePos.Add([Pos[0], 3]);
-            }
-            else
-            {
-                edgePos.Add([0, Pos[1]]);
-                edgePos.Add([3, Pos[1]]);
-            }
-            return edgePos;
+            return Horizontal ? [[Pos[0], 0], [Pos[0], 3]] : [[0, Pos[1]], [3, Pos[1]]];
         }
     }
     
@@ -348,6 +388,8 @@ public class Aai
     [ScriptMethod(name: "Boss1：水晶安全区绘图", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1654[29])$"])]
     public void Boss1_CrystalRect(Event @event, ScriptAccessory accessory)
     {
+        if (_phase != AaiPhase.Boss1_Crystal_1) return;
+        
         var sid = @event.SourceId();
         var spos = @event.SourcePosition();
         var crystalPos = FindCrystalPosition(spos);
@@ -410,15 +452,14 @@ public class Aai
     /// </summary>
     /// <param name="squarePos">对应方格所在行与列</param>
     /// <returns></returns>
-    public static int FindPositionQuarter(int[] squarePos)
+    private static int FindPositionQuarter(int[] squarePos)
     {
         // 以左上为0，左上-右上-右下-左下顺时针
-        var quarter = 0;
-        if (squarePos[1] >= 2)
-            quarter += 1;
-        if (squarePos[0] >= 2)
-            quarter += 2;
-        return quarter;
+        var radian = MathF.Atan2( 1.5f - squarePos[0], 1.5f - squarePos[1]);
+        radian = radian < 0 ? radian + float.Pi * 2 : radian;
+        var dirs = 4;
+        var quarter = Math.Floor(radian / (float.Pi * 2 / dirs));
+        return (int)quarter;
     }
 
     /// <summary>
@@ -429,11 +470,8 @@ public class Aai
     private int FindWindQuarter(Vector3 windPos)
     {
         // 以左上为0，左上-右上-右下-左下顺时针
-        var quarter = 0;
-        if (windPos.X > _centerBoss1.X)
-            quarter += 1;
-        if (windPos.Z > _centerBoss1.Z)
-            quarter += 2;
+        var quarter = windPos.Position2Dirs(_centerBoss1, 4, false);
+        quarter = (quarter + 1) % 4;
         return quarter;
     }
     
@@ -448,9 +486,20 @@ public class Aai
         _boss1BubbleDontMove[tidx] = stid == dontMove;
     }
     
-    [ScriptMethod(name: "Boss1：一水晶安全区指示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(35505)$"])]
-    public void Boss1_Crystal1SafeField(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "Boss1：分摊分散记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^()$"], userControl: false)]
+    public void Boss1_StackSpreadRecord(Event @event, ScriptAccessory accessory)
     {
+        const uint stack = 12345;
+        const uint spread = 12346;
+        var stid = @event.StatusId();
+        _boss1StackLast = stid == stack;
+    }
+    
+    [ScriptMethod(name: "Boss1：一水晶站位点指示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(35505)$"])]
+    public void Boss1_Crystal1PosDir(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != AaiPhase.Boss1_Crystal_1) return;
+        
         var myIndex = accessory.GetMyIndex();
         var isDontMove = _boss1BubbleDontMove[myIndex];
         // T与D2在北
@@ -462,13 +511,16 @@ public class Aai
         {
             if (!isDontMove)
             {
-                if (atWestOrNorth && !crystal.LocatedAtUp()) continue;
-                if (!atWestOrNorth && crystal.LocatedAtUp()) continue;
                 // 是泡泡，找竖水晶对角或横水晶旁边
-                if (crystal.Horizontal)
-                    safePos.Add(crystal.FindShortEdgeNearPos());
-                else
-                    safePos.Add(crystal.FindDiagPos());
+                switch (atWestOrNorth, crystal.LocatedAtUp())
+                {
+                    case (true, false):
+                    case (false, true):
+                        break;
+                    default:
+                        safePos.Add(crystal.Horizontal ? crystal.FindShortEdgeNearPos() : crystal.FindDiagPos());
+                        break;
+                }
             }
             else
             {
@@ -476,11 +528,12 @@ public class Aai
                 
                 // 横水晶1，竖水晶2
                 // 是止步，在安全区准备移动
-                DebugMsg($"是{(_boss1StackFirst?"分摊":"分散")}，需要找{(_boss1StackFirst?"横":"竖")}水晶象限的安全区", accessory);
-                var tempSafePos = _boss1StackFirst ? crystal.FindHorizonCrystalSafePos() : crystal.FindVerticalCrystalSafePos();
-                DebugMsg($"找到了暂时的安全区，{string.Join(",",tempSafePos[0])}与{string.Join(",",tempSafePos[1])}", accessory);
+                // 一水晶只有分摊或分散
+                DebugMsg($"是{(_boss1StackLast ? "分摊" : "分散")}，需要找{(_boss1StackLast ? "横" : "竖")}水晶象限的安全区", accessory);
+                var tempSafePos = _boss1StackLast ? crystal.FindHorizonCrystalSafePos() : crystal.FindVerticalCrystalSafePos();
+                DebugMsg($"找到了待选择的安全区，{string.Join(",",tempSafePos[0])}与{string.Join(",",tempSafePos[1])}", accessory);
                 var tempReadyPosList = crystal.FindEdgePos();
-                DebugMsg($"找到了预占位的位置，{string.Join(",",tempReadyPosList[0])}与{string.Join(",",tempReadyPosList[1])}", accessory);
+                DebugMsg($"找到了水晶边缘，{string.Join(",",tempReadyPosList[0])}与{string.Join(",",tempReadyPosList[1])}", accessory);
                 
                 // 找到本职就位的位置
                 var tempReadyPos = atWestOrNorth
@@ -490,16 +543,23 @@ public class Aai
                     : tempReadyPosList[0].Contains(3)
                         ? tempReadyPosList[0]
                         : tempReadyPosList[1];
+                DebugMsg($"找到了本职先预站位的位置，{tempReadyPos}", accessory);
                 foreach (var pos in tempSafePos)
                 {
                     // 如果安全位置与就位位置只差1格，那就是安全区
-                    if (Math.Abs(pos[0] - tempReadyPos[0]) + Math.Abs(pos[1] - tempReadyPos[1]) == 1)
-                        safePos.Add(pos);
+                    if (!IsBeside(pos, tempReadyPos)) continue;
+                    safePos.Add(pos);
+                    DebugMsg($"找到了本职最终的安全位置，{safePos}", accessory);
                 }
             }
         }
         foreach (var pos in safePos)
             DrawSpecificSquare(pos, PosColorPlayer.V4.WithW(2f), accessory);
+    }
+
+    private bool IsBeside(int[] pos1, int[] pos2)
+    {
+        return Math.Abs(pos1[0] - pos2[0]) + Math.Abs(pos1[1] - pos2[1]) == 1;
     }
     
     #endregion

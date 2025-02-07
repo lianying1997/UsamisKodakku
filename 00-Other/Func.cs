@@ -351,7 +351,6 @@ public static class DirectionCalc
     /// <returns>外侧点到中心的逻辑基弧度</returns>
     public static float FindRadian(this Vector3 newPoint, Vector3 center)
     {
-        // 找到某点到中心的弧度
         float radian = MathF.PI - MathF.Atan2(newPoint.X - center.X, newPoint.Z - center.Z);
         if (radian < 0)
             radian += 2 * MathF.PI;
@@ -366,8 +365,6 @@ public static class DirectionCalc
     /// <returns></returns>
     public static Vector3 FoldPointHorizon(this Vector3 point, float centerX)
     {
-        // Vector3 v3 = new(2 * centerX - point.X, point.Y, point.Z);
-        // return v3;
         return point with { X = 2 * centerX - point.X };
     }
 
@@ -379,8 +376,6 @@ public static class DirectionCalc
     /// <returns></returns>
     public static Vector3 FoldPointVertical(this Vector3 point, float centerZ)
     {
-        // Vector3 v3 = new(point.X, point.Y, 2 * centerZ - point.Z);
-        // return v3;
         return point with { Z = 2 * centerZ - point.Z };
 
     }
