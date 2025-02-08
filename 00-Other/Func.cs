@@ -229,7 +229,30 @@ public static class IbcHelper
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.DPS;
     }
-
+    public static bool AtNorth(uint id, float centerZ)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.Position.Z <= centerZ;
+    }
+    public static bool AtSouth(uint id, float centerZ)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.Position.Z > centerZ;
+    }
+    public static bool AtWest(uint id, float centerX)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.Position.X <= centerX;
+    }
+    public static bool AtEast(uint id, float centerX)
+    {
+        var chara = GetById(id);
+        if (chara == null) return false;
+        return chara.Position.X > centerX;
+    }
 }
 
 public static class DirectionCalc

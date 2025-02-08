@@ -50,8 +50,8 @@ public class DsrPatch
 
     private const string Name = "New DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.3";
-    private const string DebugVersion = "a";
-    private const string Note = "龙诗P3";
+    private const string DebugVersion = "b";
+    private const string Note = "增加P3麻将流程指引";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
