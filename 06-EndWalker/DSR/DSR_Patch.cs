@@ -544,6 +544,7 @@ public class DsrPatch
                 {
                     DebugMsg($"一麻{posStr}第一轮，先去{posStr}放塔，再回人群", accessory);
                     DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", accessory);
+                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
                     DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
                     break;
                 }
@@ -596,6 +597,7 @@ public class DsrPatch
                 {
                     DebugMsg($"三麻{posStr}第二轮，先去{posStr}放塔，再回人群", accessory);
                     DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", accessory);
+                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
                     DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
                     break;
                 }
