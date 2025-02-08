@@ -170,6 +170,11 @@ public static class EventExtensions
     {
         return ParseHexId(@event["Id"], out var id) ? id : 0;
     }
+    
+    public static uint DataId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["DataId"]);
+    }
 
     public static uint StatusId(this Event @event)
     {
