@@ -20,7 +20,6 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using KodakkuAssist.Module.GameOperate;
-using UsamisKodakku.Scripts._04_StormBlood.UWU;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.TOP;
 
@@ -29,7 +28,7 @@ namespace UsamisKodakku.Scripts._06_EndWalker.TOP;
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
 
-public class Hello
+public class TopPatch
 {
     const string NoteStr =
     """

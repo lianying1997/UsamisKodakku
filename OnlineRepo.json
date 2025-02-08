@@ -74,10 +74,10 @@
     {
         "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
         "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-        "Version": "0.0.0.2",
+        "Version": "0.0.0.3",
         "Author": "Usami",
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR_Patch.cs",
-        "UpdateInfo": "1. 修复P7地火间隔错误问题。\n2. 调整P7地火预设颜色，于“用户设置”增加一系列可选项。"
+        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
+        "UpdateInfo": "1. 增加P3堕天龙炎冲（麻将塔）指引。"
     },
     {
         "Name": "ASS [异闻希拉狄哈水道]",

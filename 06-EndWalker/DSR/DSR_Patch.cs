@@ -20,12 +20,10 @@ using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using KodakkuAssist.Module.Script.Type;
-using Lumina.Data.Parsing.Uld;
-using UsamisKodakku.Scripts.FolderName.SubFolderName;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
 
-[ScriptType(name: Name, territorys: [968], guid: "1234567", 
+[ScriptType(name: Name, territorys: [968], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
@@ -36,8 +34,8 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
-    v0.0.0.3 测试中
-    1. 增加P3麻将流程指引
+    v0.0.0.3
+    1. 增加P3堕天龙炎冲（麻将塔）指引
     
     v0.0.0.2
     1. 修复P7地火间隔错误问题。
@@ -48,9 +46,9 @@ public class DsrPatch
     鸭门。
     """;
 
-    private const string Name = "New DSR_Patch [幻想龙诗绝境战 补丁]";
+    private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.3";
-    private const string DebugVersion = "b";
+    private const string DebugVersion = "d";
     private const string Note = "增加P3麻将流程指引";
     
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -109,7 +107,7 @@ public class DsrPatch
     
     public void Init(ScriptAccessory accessory)
     {
-        DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        // DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         
@@ -133,7 +131,6 @@ public class DsrPatch
             var str = _diveFromGrace.ShowPlayerAction(accessory.Data.PartyList[i]);
             DebugMsg($"{accessory.GetPlayerJobByIndex(i)}{str}", accessory);
         }
-        
         // -- DEBUG CODE END --
     }
     
@@ -485,11 +482,11 @@ public class DsrPatch
             {
                 case front:
                     _diveFromGrace.LimitCutPosAdd(tid, right);
-                    // _diveFromGrace.LimitCutFixedSet(tid);
+                    _diveFromGrace.LimitCutFixedSet(tid);
                     break;
                 case behind:
                     _diveFromGrace.LimitCutPosAdd(tid, left);
-                    // _diveFromGrace.LimitCutFixedSet(tid);
+                    _diveFromGrace.LimitCutFixedSet(tid);
                     break; 
             }
             _diveFromGrace.RecordedPlayerNum++;
@@ -502,15 +499,15 @@ public class DsrPatch
         DebugMsg($"我需要踩他的塔：{_diveFromGrace.ShowPlayerAction(_p3MyTowerPartner)}", accessory);
     }
     
-    [ScriptMethod(name: "P3：麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2368[67])$"])]
+    [ScriptMethod(name: "P3：麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
     public void P3_LimitCutAction(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
         _p3LimitCutStep++;
 
         var aid = @event.ActionId();
-        const int chariotFirst = 23686;
-        const int donutFirst = 23687;
+        const int chariotFirst = 26386;
+        const int donutFirst = 26387;
         _p3OutsideSafeFirst = aid == chariotFirst;
         
         var myId = accessory.Data.Me;
@@ -557,6 +554,7 @@ public class DsrPatch
                     const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
                     const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
                     DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", accessory);
+                    DrawTowerPosDir(towerPos, pos, jump2DelayTime, jump2Destroy, $"放塔2面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
                     break;
                 }
                 case Third:
@@ -596,7 +594,7 @@ public class DsrPatch
                 }
                 case Third:
                 {
-                    DebugMsg($"二麻{posStr}第二轮，先回人群，再去{posStr}放塔", accessory);
+                    DebugMsg($"三麻{posStr}第二轮，先去{posStr}放塔，再回人群", accessory);
                     DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", accessory);
                     DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
                     break;
@@ -627,6 +625,25 @@ public class DsrPatch
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         return dp;
     }
+    private DrawPropertiesEdit DrawTowerPosDir(Vector3 towerPos, int pos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
+    {
+        const int Left = 0;
+        const int Middle = 1;
+        const int Right = 2;
+
+        var rotation = pos switch
+        {
+            Left => -float.Pi / 2,
+            Right => float.Pi / 2,
+            _ => 0
+        };
+        var targetPos = towerPos.ExtendPoint(rotation, 4f);
+        var dp = accessory.DrawDirPos2Pos(towerPos, targetPos, delay, destroy, name);
+        dp.Scale = new Vector2(3f);
+        if (draw)
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        return dp;
+    }
     
     private DrawPropertiesEdit DrawBackToGroup(int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
     {
@@ -637,29 +654,54 @@ public class DsrPatch
         return dp;
     }
 
-    private DrawPropertiesEdit DrawTowerRange(uint sid, int delay, int destroy, string name,
+    private DrawPropertiesEdit[] DrawTowerRange(uint sid, int delay, int destroy, string name,
         ScriptAccessory accessory, bool isSafe, uint type, bool draw = true)
     {
         const uint inPlace = 26382;
         const uint front = 26383;
         const uint behind = 26384;
+        const int towerCastingTime = 3000;
+        const int syncTime = 300;
+        
+        // 后面生成塔位置的sid已经不是原来的sid了，需要在这里找到他经偏置后的位置
+        var tpos = FindTowerAppearPos(sid, type, accessory);
         
         DebugMsg($"画出塔范围，{(isSafe ? "我的" : "不是我的")}塔", accessory);
-        var dp = accessory.DrawCircle(sid, 5f, delay, destroy, $"踩塔");
-        dp.Color = isSafe ? accessory.Data.DefaultSafeColor.WithW(1.5f) : accessory.Data.DefaultDangerColor;
+        var color = isSafe ? accessory.Data.DefaultSafeColor.WithW(1.5f) : accessory.Data.DefaultDangerColor;
+        var dp = accessory.DrawCircle(sid, 5f, delay, destroy - towerCastingTime, $"踩塔{sid}");
+        dp.Color = color;
         dp.Offset = type == inPlace ? new Vector3(0, 0, 0) : new Vector3(0, 0, -14);
+        var dp1 = accessory.DrawStaticCircle(tpos, color, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔确定{sid}", 5f);
         if (draw)
+        {
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+        }
         
-        // TODO 待测试
-        if (!isSafe) return dp;
+        if (!isSafe) return [dp, dp1];
+        
         DebugMsg($"准备去踩塔", accessory);
-        var dp0 = accessory.DrawDirTarget(sid, delay, destroy, $"踩塔指路");
-        dp0.Offset = type == inPlace ? new Vector3(0, 0, 0) : new Vector3(0, 0, -14);
+        var dp01 = accessory.DrawDirPos(tpos, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔指路确定{sid}");
         if (draw)
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
-
-        return dp;
+        {
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp01);
+        }
+        return [dp, dp1, dp01];
+    }
+    
+    private Vector3 FindTowerAppearPos(uint sid, uint type, ScriptAccessory accessory)
+    {
+        const uint inPlace = 26382;
+        const uint front = 26383;
+        const uint behind = 26384;
+        
+        var chara = IbcHelper.GetById(sid);
+        var srot = chara.Rotation;
+        var spos = chara.Position;
+        
+        if (type == inPlace) return spos;
+        var newPos = spos.ExtendPoint(srot.Game2Logic(), 14);
+        return newPos;
     }
     
     // 0        Casting LashGnash           0
