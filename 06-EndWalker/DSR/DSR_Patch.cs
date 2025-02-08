@@ -636,7 +636,7 @@ public class DsrPatch
         var rotation = pos switch
         {
             Left => -float.Pi / 2,
-            Right => float.Pi / 2,
+            Right => -float.Pi / 2,
             _ => 0
         };
         var targetPos = towerPos.ExtendPoint(rotation, 4f);
