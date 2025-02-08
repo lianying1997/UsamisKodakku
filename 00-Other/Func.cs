@@ -325,9 +325,6 @@ public static class DirectionCalc
         var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
         var length = v2.Length();
         return new Vector3(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
-
-        // 另一种方案待验证
-        // var nextPos = Vector3.Transform((point - center), Matrix4x4.CreateRotationY(radian)) + center;
     }
 
     /// <summary>
@@ -351,7 +348,7 @@ public static class DirectionCalc
     /// <returns>外侧点到中心的逻辑基弧度</returns>
     public static float FindRadian(this Vector3 newPoint, Vector3 center)
     {
-        float radian = MathF.PI - MathF.Atan2(newPoint.X - center.X, newPoint.Z - center.Z);
+        var radian = MathF.PI - MathF.Atan2(newPoint.X - center.X, newPoint.Z - center.Z);
         if (radian < 0)
             radian += 2 * MathF.PI;
         return radian;
@@ -377,7 +374,21 @@ public static class DirectionCalc
     public static Vector3 FoldPointVertical(this Vector3 point, float centerZ)
     {
         return point with { Z = 2 * centerZ - point.Z };
-
+    }
+    
+    /// <summary>
+    /// 将输入点朝某中心点往内/外同角度延伸，默认向内
+    /// </summary>
+    /// <param name="point">待延伸点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="length">延伸长度</param>
+    /// <param name="isOutside">是否向外延伸</param>>
+    /// <returns></returns>
+    public static Vector3 PointInOutside(this Vector3 point, Vector3 center, float length, bool isOutside = false)
+    {
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
+        return targetPos;
     }
 }
 

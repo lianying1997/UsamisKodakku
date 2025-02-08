@@ -20,6 +20,8 @@ using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using KodakkuAssist.Module.Script.Type;
+using Lumina.Data.Parsing.Uld;
+using UsamisKodakku.Scripts.FolderName.SubFolderName;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
 
@@ -34,8 +36,8 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
-    v0.0.0.3
-    测试中。
+    v0.0.0.3 测试中
+    1. 增加P3麻将流程指引
     
     v0.0.0.2
     1. 修复P7地火间隔错误问题。
@@ -95,6 +97,8 @@ public class DsrPatch
     private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
     private int _p3LimitCutStep = 0;                                    // P3 麻将机制流程
     private uint _p3MyTowerPartner = 0;                                 // P3 我要踩的放塔搭档
+    private uint _p3MyTowerSource = 0;                                  // P3 我的放塔师兄
+    private bool _p3OutsideSafeFirst = false;                           // P3 先钢铁，先外安全
     private List<bool> _p6DragonsGlowAction = [false, false];           // P6 双龙吐息记录
     private List<bool> _p6DragonsWingAction = [false, false, false];    // P6 双龙远近记录 [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
     private List<bool> _p7FirstEntityOrder = [false, false];            // P7 平A仇恨记录
@@ -154,6 +158,8 @@ public class DsrPatch
         _diveFromGrace = new DiveFromGrace();
         _p3LimitCutStep = 0;
         _p3MyTowerPartner = 0;
+        _p3OutsideSafeFirst = false;
+        _p3MyTowerSource = 0;
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
@@ -255,7 +261,7 @@ public class DsrPatch
         }
 
         /// <summary>
-        /// 通过玩家id设置麻将位置是否确定
+        /// 通过玩家id设置麻将位置是否确定，已弃用
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
@@ -338,7 +344,6 @@ public class DsrPatch
                     LimitCutPosAdd(sortedPlayerIds[0], Left);
                     LimitCutPosAdd(sortedPlayerIds[1], Middle);
                     LimitCutPosAdd(sortedPlayerIds[2], Right);
-                    LimitCutFixed[idx] = true;
                 }
             }
         }
@@ -352,7 +357,6 @@ public class DsrPatch
             LeftLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
             MiddleLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
             RightLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
-            LimitCutFixed[idx] = false;
         }
         
         public string ShowPlayerAction(uint id)
@@ -378,11 +382,24 @@ public class DsrPatch
         {
             var idx = FindPlayerLimitCutIndex(id);
             var pos = FindPlayerLimitCutPos(id);
-
+            
+            // 第一步，确定对方的麻将序号
+            // 一般情况下，first -> second, second -> third, third -> first
             var idxPartner = (idx + 1) % 3;
+            // 特殊情况，second无middle，即first -> third
             if (idxPartner == Second && pos == Middle)
                 idxPartner = Third;
 
+            // 第二步，如果对方是带箭头的组，且自己是left or right，要交换pos
+            // 即，你去左，但你的左塔是右侧玩家释放
+            if (LimitCutFixed[idxPartner])
+                pos = pos switch
+                {
+                    Left => Right,
+                    Right => Left,
+                    _ => Middle
+                };
+            
             return FindSpecificPlayer(idxPartner, pos);
         }
 
@@ -421,12 +438,13 @@ public class DsrPatch
             {
                 switch (pos)
                 {
+                    // TODO 箭头上距离不确定，需验证数值
                     case Left:
-                        return new Vector3(Center.X - 8, 0, Center.Z);
+                        return new Vector3(Center.X - 7.5f, 0, Center.Z);
                     case Middle:
-                        return new Vector3(Center.X, 0, Center.Z + 8);
+                        return new Vector3(Center.X, 0, Center.Z + 7.5f);
                     case Right:
-                        return new Vector3(Center.X + 8, 0, Center.Z);
+                        return new Vector3(Center.X + 7.5f, 0, Center.Z);
                 }
             }
             return new Vector3(0, 0, 0);
@@ -458,7 +476,7 @@ public class DsrPatch
         const uint inPlace = 2755;
 
         const int left = 0;
-        const int center = 1;
+        const int middle = 1;
         const int right = 2;
 
         lock (_diveFromGrace)
@@ -467,11 +485,11 @@ public class DsrPatch
             {
                 case front:
                     _diveFromGrace.LimitCutPosAdd(tid, right);
-                    _diveFromGrace.LimitCutFixedSet(tid);
+                    // _diveFromGrace.LimitCutFixedSet(tid);
                     break;
                 case behind:
                     _diveFromGrace.LimitCutPosAdd(tid, left);
-                    _diveFromGrace.LimitCutFixedSet(tid);
+                    // _diveFromGrace.LimitCutFixedSet(tid);
                     break; 
             }
             _diveFromGrace.RecordedPlayerNum++;
@@ -481,43 +499,189 @@ public class DsrPatch
         DebugMsg($"LimitCutFixed:{_diveFromGrace.LimitCutFixed.StringList()}", accessory);
         _diveFromGrace.SetRemainingPlayers();
         _p3MyTowerPartner = _diveFromGrace.FindTowerPartner(accessory.Data.Me);
+        DebugMsg($"我需要踩他的塔：{_diveFromGrace.ShowPlayerAction(_p3MyTowerPartner)}", accessory);
     }
     
-    [ScriptMethod(name: "P3：麻将流程", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2368[67])$"])]
+    [ScriptMethod(name: "P3：麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2368[67])$"])]
     public void P3_LimitCutAction(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
         _p3LimitCutStep++;
 
         var aid = @event.ActionId();
+        const int chariotFirst = 23686;
+        const int donutFirst = 23687;
+        _p3OutsideSafeFirst = aid == chariotFirst;
+        
         var myId = accessory.Data.Me;
         var idx = _diveFromGrace.FindPlayerLimitCutIndex(myId);
         var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
-        var tpos = _diveFromGrace.GetTowerPosV3(idx, pos);
+        var towerPos = _diveFromGrace.GetTowerPosV3(idx, pos);
+        
+        const int First = 0;
+        const int Second = 1;
+        const int Third = 2;
         
         const int Left = 0;
         const int Middle = 1;
         const int Right = 2;
-        const int First = 0;
-        const int Second = 1;
-        const int Third = 2;
-        const int FirstDuration = 9000;
-        const int SecondDuration = 19000;
-        const int ThirdDuration = 29000;
-        var stackPos = new Vector3(100, 0, 92);
-        var offset = new Vector3(0, 0, 1);
-        
-        // 第一轮钢铁月环，一麻准备放塔
-        if (idx == First)
-        {
-            // TODO
-            var dp = accessory.DrawDirPos(tpos, 0, 7000, $"一塔");
-            tpos = (tpos - Center) * 1 / 8 + tpos;      // 往外1
-            tpos = (tpos - Center) * -1 / 8 + tpos;     // 往里1
-        }
-            
 
+        var posStr = pos switch
+        {
+            Left => "左",
+            Middle => "中",
+            Right => "右",
+            _ => "未知"
+        };
+
+        const int lashGnashCastTime = 7600;
+        const int inOutCastFirst = 3700;
+        const int inOutCastSecond = 3100;
+        const int towerExistTime = 6800;
+
+        if (_p3LimitCutStep == 1)
+        {
+            switch (idx)
+            {
+                case First:
+                {
+                    DebugMsg($"一麻{posStr}第一轮，先去{posStr}放塔，再回人群", accessory);
+                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", accessory);
+                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
+                    break;
+                }
+                case Second:
+                {
+                    DebugMsg($"二麻{posStr}第一轮，先回人群，再去{posStr}放塔", accessory);
+                    DrawBackToGroup(0, lashGnashCastTime, $"人群", accessory);
+                    const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
+                    const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
+                    DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", accessory);
+                    break;
+                }
+                case Third:
+                {
+                    DebugMsg($"三麻{posStr}第一轮，回人群", accessory);
+                    DrawBackToGroup(0, lashGnashCastTime, $"人群", accessory);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            switch (idx)
+            {
+                // 第二轮钢铁月环，一麻准备分摊
+                case First:
+                {
+                    // 分摊前需先引导，引导位置可以作个向外指的指引
+                    // 因为有先引导，回去分摊的延时和消失时间由时间节点计算
+                    if (pos != Middle)
+                    {
+                        DebugMsg($"一麻{posStr}第二轮，引导后回人群", accessory);
+                        DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", accessory);
+                    }
+                    else
+                    {
+                        DebugMsg($"一麻{posStr}第二轮，回人群", accessory);
+                        DrawBackToGroup(0, lashGnashCastTime, $"分摊", accessory);
+                    }
+                    break;
+                }
+                case Second:
+                {
+                    DebugMsg($"二麻{posStr}第二轮，回人群", accessory);
+                    DrawBackToGroup(0, lashGnashCastTime, $"分摊", accessory);
+                    break;
+                }
+                case Third:
+                {
+                    DebugMsg($"二麻{posStr}第二轮，先回人群，再去{posStr}放塔", accessory);
+                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", accessory);
+                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
+                    break;
+                }
+            }
+        }
     }
+    
+    [ScriptMethod(name: "P3：麻将流程，踩塔", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
+    public void P3_TowerAfterPlaced(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        var tid = @event.TargetId();
+        var aid = @event.ActionId();
+        var sid = @event.SourceId();
+        var towerPos = @event.SourcePosition();
+        var isMyTower = tid == _p3MyTowerPartner;
+        if (isMyTower)
+            _p3MyTowerSource = sid;
+        const int towerExistTime = 6800;
+        DrawTowerRange(sid, 0, towerExistTime, $"踩塔", accessory, isMyTower, aid);
+    }
+    
+    private DrawPropertiesEdit DrawTowerDir(Vector3 towerPos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
+    {
+        var dp = accessory.DrawDirPos(towerPos, delay, destroy, name);
+        if (draw)
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        return dp;
+    }
+    
+    private DrawPropertiesEdit DrawBackToGroup(int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
+    {
+        var stackPos = new Vector3(100, 0, 92);
+        var dp = accessory.DrawDirPos(stackPos, delay, destroy, name);
+        if (draw)
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        return dp;
+    }
+
+    private DrawPropertiesEdit DrawTowerRange(uint sid, int delay, int destroy, string name,
+        ScriptAccessory accessory, bool isSafe, uint type, bool draw = true)
+    {
+        const uint inPlace = 26382;
+        const uint front = 26383;
+        const uint behind = 26384;
+        
+        DebugMsg($"画出塔范围，{(isSafe ? "我的" : "不是我的")}塔", accessory);
+        var dp = accessory.DrawCircle(sid, 5f, delay, destroy, $"踩塔");
+        dp.Color = isSafe ? accessory.Data.DefaultSafeColor.WithW(1.5f) : accessory.Data.DefaultDangerColor;
+        dp.Offset = type == inPlace ? new Vector3(0, 0, 0) : new Vector3(0, 0, -14);
+        if (draw)
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        
+        // TODO 待测试
+        if (!isSafe) return dp;
+        DebugMsg($"准备去踩塔", accessory);
+        var dp0 = accessory.DrawDirTarget(sid, delay, destroy, $"踩塔指路");
+        dp0.Offset = type == inPlace ? new Vector3(0, 0, 0) : new Vector3(0, 0, -14);
+        if (draw)
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+
+        return dp;
+    }
+    
+    // 0        Casting LashGnash           0
+    // +7600    Stack #1 + Jump #1          7600
+    // +3700    Chariot/Donut #1            11300
+    // +3100    Donut/Chariot #1            14400
+    // +0       Towers #1                   14400
+    // +2500    StartCast Geirskogul #1     16900
+    // +800     Jump #2                     17700
+    // +3800    Casting LashGnash           21500
+    // +2800    Towers #2                   24300
+    // +2600    StartCast Geirskogul #2     26900
+    // +2200    Stack #2 + Jump #3          28900
+    // +3700    Chariot/Donut #2            32600
+    // +3100    Donut/Chariot #2            35700
+    // +0       Towers #3                   35700
+    // +2000    StartCast Geirskogul #3     37700
+    // +4500    Geirskogul #3               42200
+    
+    // TowerExistTime       6800, 6600, 6800
+    // PlaceTowerTimeNode   7600, 17700, 28900
+    
     #endregion
     
     #region P5
@@ -1538,7 +1702,21 @@ public static class DirectionCalc
         // Vector3 v3 = new(point.X, point.Y, 2 * centerZ - point.Z);
         // return v3;
         return point with { Z = 2 * centerZ - point.Z };
+    }
 
+    /// <summary>
+    /// 将输入点朝某中心点往内/外同角度延伸，默认向内
+    /// </summary>
+    /// <param name="point">待延伸点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="length">延伸长度</param>
+    /// <param name="isOutside">是否向外延伸</param>>
+    /// <returns></returns>
+    public static Vector3 PointInOutside(this Vector3 point, Vector3 center, float length, bool isOutside = false)
+    {
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
+        return targetPos;
     }
 }
 
