@@ -37,10 +37,16 @@ public class TopPatch
     请先按需求检查并设置“用户设置”栏目。
     
     v0.0.0.0
-    测试
+    [ ] P5 一运
+    [ ] P5 一传
+    [x] P5 二运
+    [ ] P5 二传
+    [ ] P5 三运
+    [ ] P5 三传
+    [ ] P5 四传
     """;
 
-    private const string Name = "TOP Patch [欧米茄绝境验证战 补丁]";
+    private const string Name = "TOP_Patch [欧米茄绝境验证战 补丁]";
     private const string Version = "0.0.0.0";
     private const string DebugVersion = "a";
     private const string Note = "";
