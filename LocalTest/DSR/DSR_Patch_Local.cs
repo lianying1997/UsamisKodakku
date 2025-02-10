@@ -657,9 +657,10 @@ public class DsrPatch
             Right => -float.Pi / 2,
             _ => 0
         };
-        var targetPos = towerPos.ExtendPoint(rotation, 4f);
+        var targetPos = towerPos.ExtendPoint(rotation, 3.1f);
         var dp = accessory.DrawDirPos2Pos(towerPos, targetPos, delay, destroy, name);
         dp.Scale = new Vector2(3f);
+        dp.Color = ColorHelper.ColorYellow.V4;
         if (draw)
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         return dp;
@@ -1141,7 +1142,6 @@ public class DsrPatch
         var srot = @event.SourceRotation();
         const int intervalTime = 1850;
         const int castTime = 7000;
-        // TODO 这个务必验证一下，地火延伸是7还是8？先改成7了
         const int extendDistance = 7;
         const int dirNum = 3;
         const int extNum = 6;
@@ -1251,7 +1251,6 @@ public class DsrPatch
         // 面相为前、左、右的扩散
         const int intervalTime = 1850;
         const int castTime = 7000;
-        // TODO 这个务必验证一下，地火延伸是7还是8？先改成7了
         const int extendDistance = 7;
         const int dirNum = 3;
         const int extNum = 6;

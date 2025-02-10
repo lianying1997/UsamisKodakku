@@ -34,6 +34,10 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
+    v0.0.0.4
+    1. 调整了P3放塔面向颜色避免误解。
+    2. 修复P7地火步进距离错误问题。
+    
     v0.0.0.3
     1. 增加P3堕天龙炎冲（麻将塔）指引
     
@@ -47,9 +51,9 @@ public class DsrPatch
     """;
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.3";
-    private const string DebugVersion = "d";
-    private const string Note = "增加P3麻将流程指引";
+    private const string Version = "0.0.0.4";
+    private const string DebugVersion = "a";
+    private const string Note = "";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -126,11 +130,7 @@ public class DsrPatch
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        for (var i = 0; i < 8; i++)
-        {
-            var str = _diveFromGrace.ShowPlayerAction(accessory.Data.PartyList[i]);
-            DebugMsg($"{accessory.GetPlayerJobByIndex(i)}{str}", accessory);
-        }
+
         // -- DEBUG CODE END --
     }
     
@@ -639,9 +639,10 @@ public class DsrPatch
             Right => -float.Pi / 2,
             _ => 0
         };
-        var targetPos = towerPos.ExtendPoint(rotation, 4f);
+        var targetPos = towerPos.ExtendPoint(rotation, 3.1f);
         var dp = accessory.DrawDirPos2Pos(towerPos, targetPos, delay, destroy, name);
         dp.Scale = new Vector2(3f);
+        dp.Color = ColorHelper.ColorYellow.V4;
         if (draw)
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         return dp;
@@ -1119,7 +1120,7 @@ public class DsrPatch
         var srot = @event.SourceRotation();
         const int intervalTime = 1850;
         const int castTime = 7000;
-        const int extendDistance = 8;
+        const int extendDistance = 7;
         const int dirNum = 3;
         const int extNum = 6;
         const int advWarnNum = 1;   // 预警向外延伸几个
@@ -1228,7 +1229,7 @@ public class DsrPatch
         // 面相为前、左、右的扩散
         const int intervalTime = 1850;
         const int castTime = 7000;
-        const int extendDistance = 8;
+        const int extendDistance = 7;
         const int dirNum = 3;
         const int extNum = 6;
         const int advWarnNum = 1;   // 预警向外延伸几个
