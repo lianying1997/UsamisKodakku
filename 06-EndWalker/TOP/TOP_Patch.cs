@@ -141,7 +141,7 @@ public class TopPatch
     public void P5_RunMi_Sigma_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         _phase = TopPhase.P5_Sigma;
-        _sv = new SigmaVersion();
+        _sv = new SigmaVersion(DebugMode);
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
@@ -352,9 +352,8 @@ public class DeltaVersion
     }
 }
     
-public class SigmaVersion
+public class SigmaVersion(bool debugMode = false)
 {
-    private readonly bool _debugMode = true;    // 测试完成后置为False
     private List<uint> CircleGroup { get; set; } = [];
     private List<uint> CrossGroup { get; set; } = [];
     private List<uint> TriangleGroup { get; set; } = [];
@@ -387,7 +386,7 @@ public class SigmaVersion
                 SquareGroup.Add(id);
                 break;
         }
-        accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", _debugMode);
+        accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", debugMode);
     }
 
     public void BuildTargetTowerPos(ScriptAccessory accessory)
@@ -398,12 +397,12 @@ public class SigmaVersion
             if (towerIdx == -1)
             {
                 TargetTowerPos[i] = 0;
-                accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", _debugMode);
+                accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", debugMode);
             }
             else
             {
                 TargetTowerPos[i] = towerIdx;
-                accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", _debugMode);
+                accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", debugMode);
             }
         }
     }
@@ -442,14 +441,14 @@ public class SigmaVersion
     public void SetSpreadTrueNorth(int pos, ScriptAccessory accessory)
     {
         SpreadTrueNorth = pos;
-        accessory.DebugMsg($"设置分散真北方向为{pos}", _debugMode);
+        accessory.DebugMsg($"设置分散真北方向为{pos}", debugMode);
     }
 
     public void SetTargetedPlayer(uint id, ScriptAccessory accessory)
     {
         var idx = accessory.GetPlayerIdIndex(id);
         IsTargeted[idx] = true;
-        accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", _debugMode);
+        accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", debugMode);
     }
 
     public void BuildUntargetedGroup(ScriptAccessory accessory)
@@ -461,7 +460,7 @@ public class SigmaVersion
             .ToList();
         
         foreach (var player in UntargetedGroup)
-            accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", _debugMode);
+            accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", debugMode);
     }
 
     public IconId FindIconGroup(uint id)
@@ -556,7 +555,7 @@ public class SigmaVersion
                 posV3 = posV3.PointInOutside(center, 0.5f, true);
             SpreadPosV3[i] = posV3;
             accessory.DebugMsg($"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的分散位置{SpreadPosV3[i]}",
-                _debugMode);
+                debugMode);
         }
     }
 
@@ -570,7 +569,7 @@ public class SigmaVersion
             var posV3 = basicPoint.RotatePoint(center, TargetTowerPos[i] * float.Pi / 8);
             TargetTowerPosV3[i] = posV3;
             accessory.DebugMsg($"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的击退塔位置{TargetTowerPosV3[i]}",
-                _debugMode);
+                debugMode);
         }
     }
    
@@ -578,14 +577,14 @@ public class SigmaVersion
     {
         var idx = accessory.GetPlayerIdIndex(id);
         Marker[idx] = marker;
-        accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", _debugMode);
+        accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", debugMode);
     }
     
     public void SetMarkerBySelf(uint id, MarkType marker, ScriptAccessory accessory)
     {
         var idx = accessory.GetPlayerIdIndex(id);
         Marker[idx] = marker;
-        accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", _debugMode);
+        accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", debugMode);
     }
 
     public void SetTowerType(DataId towerId, Vector3 towerPos, Vector3 center, ScriptAccessory accessory)
@@ -598,7 +597,7 @@ public class SigmaVersion
             _ => 0
         };
         TowerType[pos] = towerType;
-        accessory.DebugMsg($"检测到方位{pos}的{towerType}人塔", _debugMode);
+        accessory.DebugMsg($"检测到方位{pos}的{towerType}人塔", debugMode);
     }
     
     public bool IsMarkered(int idx)

@@ -3,7 +3,6 @@ using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent.Struct;
 using KodakkuAssist.Module.Draw;
-using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ECommons;
