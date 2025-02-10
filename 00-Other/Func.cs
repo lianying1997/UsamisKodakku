@@ -286,7 +286,7 @@ public static class DirectionCalc
         // if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
 
         var r = float.Pi - radian;
-        r %= float.Pi * 2;
+        r = (r + float.Pi * 2) % (float.Pi * 2);
         return r;
     }
 
@@ -318,7 +318,7 @@ public static class DirectionCalc
         var r = diagDivision
             ? Math.Round(radian / (2f / dirsDouble * float.Pi))
             : Math.Floor(radian / (2f / dirsDouble * float.Pi));
-        r %= dirs;
+        r = (r + dirs) % dirs;
         return (int)r;
     }
 
@@ -904,11 +904,11 @@ public static class AssignDp
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f, float innerscale = 0)
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        var dp = accessory.DrawStatic(center, float.Pi * 2, 0, scale, scale, delay, destroy, name);
         dp.Color = color;
-        dp.InnerScale = new Vector2(innerscale == 0 ? scale - 0.05f : innerscale);
+        dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
 

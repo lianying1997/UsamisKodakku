@@ -13,6 +13,7 @@ using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
@@ -23,7 +24,7 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
 
-[ScriptType(name: Name, territorys: [968], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", 
+[ScriptType(name: Name, territorys: [968, 1112], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
@@ -34,6 +35,10 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
+    v0.0.0.5
+    感谢贾老板的帮助，孩子抄代码抄的很开心！
+    1. 增加P7地火特殊跑法指引
+    
     v0.0.0.4
     1. 调整了P3放塔面向颜色避免误解。
     2. 修复P7地火步进距离错误问题。
@@ -51,9 +56,9 @@ public class DsrPatch
     """;
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.4";
+    private const string Version = "0.0.0.5";
     private const string DebugVersion = "a";
-    private const string Note = "";
+    private const string Note = "测试模拟器";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -61,6 +66,18 @@ public class DsrPatch
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
+    
+    public enum ExaflareSpecStrategyEnum
+    {
+        绝不去前方_NeverFront,
+        绝不跑无脑火_NeverUniverse,
+        绝不多跑_LeastMovement,
+        绝对前方_AlwaysFront,
+        关闭_PleaseDontDoThat,
+    }
+    [UserSetting("地火指路特殊策略")]
+    public static ExaflareSpecStrategyEnum ExaflareStrategy { get; set; } = ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat;
+    
     [UserSetting("地火（百京核爆）使用程序预设颜色")]
     public static bool ExaflareBuiltInColor { get; set; } = true;
     [UserSetting("地火（百京核爆）爆炸区颜色")]
@@ -93,7 +110,7 @@ public class DsrPatch
         Phase7Enrage,           // P7 狂暴
     }
     
-    private static readonly Vector3 Center = new Vector3(100, 0, 100);
+    private static Vector3 Center = new Vector3(100, 0, 100);
     private DsrPhase _dsrPhase = DsrPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
@@ -108,15 +125,19 @@ public class DsrPatch
     private bool _p7TrinityDisordered = false;                          // P7 接刀顺序是否出错
     private bool _p7TrinityTankDisordered = false;                      // P7 坦克接刀仇恨是否出错
     private int _p7TrinityNum = 0;                                      // P7 接刀次数
+    private DsrExaflare? _p7Exaflare = null;                            // P7 地火Class
+    private uint _p7BossId = 0;                                         // P7 boss Id
     
     public void Init(ScriptAccessory accessory)
     {
-        // DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         
-        _dsrPhase = DsrPhase.Init;
+        // _dsrPhase = DsrPhase.Init;
+        _dsrPhase = DsrPhase.Phase7Exaflare2;
         _drawn = new bool[20].ToList();
+        _p7BossId = 0;
     }
 
     public static void DebugMsg(string str, ScriptAccessory accessory)
@@ -130,7 +151,25 @@ public class DsrPatch
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
+        
+        Center = new Vector3(400, -54.97f, -400);
+        Random random = new Random();
+        float bossRotLogicDeg = random.Next(0, 360);
+        var bossRotLogicRad = bossRotLogicDeg.DegToRad();
+        DebugMsg($"随机到的Boss面向为{bossRotLogicRad.RadToDeg()}", accessory);
+        float[] srot =
+        [
+            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
+            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
+            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game()
+        ];
+        Vector3 bossFace = Center.ExtendPoint(bossRotLogicRad, 8f);
+        var dp = accessory.DrawDirPos2Pos(Center, bossFace, 0, 7000, $"面相", 7.9f);
+        dp.Color = ColorHelper.ColorDark.V4;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        DebugExaflare(srot, bossRotLogicRad.Logic2Game(), (uint)random.Next(0, 2) + 42, accessory);
 
+        
         // -- DEBUG CODE END --
     }
     
@@ -542,7 +581,7 @@ public class DsrPatch
             {
                 case First:
                 {
-                    DebugMsg($"一麻{posStr}第一轮，先去{posStr}放塔，再回人群", accessory);
+                    DebugMsg($"一麻{posStr}第一轮，先去{posStr}{towerPos}放塔，再回人群", accessory);
                     DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", accessory);
                     DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
                     DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
@@ -550,7 +589,7 @@ public class DsrPatch
                 }
                 case Second:
                 {
-                    DebugMsg($"二麻{posStr}第一轮，先回人群，再去{posStr}放塔", accessory);
+                    DebugMsg($"二麻{posStr}第一轮，先回人群，再去{posStr}{towerPos}放塔", accessory);
                     DrawBackToGroup(0, lashGnashCastTime, $"人群", accessory);
                     const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
                     const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
@@ -595,7 +634,7 @@ public class DsrPatch
                 }
                 case Third:
                 {
-                    DebugMsg($"三麻{posStr}第二轮，先去{posStr}放塔，再回人群", accessory);
+                    DebugMsg($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群", accessory);
                     DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", accessory);
                     DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
                     DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
@@ -643,7 +682,7 @@ public class DsrPatch
         var dp = accessory.DrawDirPos2Pos(towerPos, targetPos, delay, destroy, name);
         dp.Scale = new Vector2(3f);
         dp.Color = ColorHelper.ColorYellow.V4;
-        if (draw)
+        if (draw && pos != Middle)
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         return dp;
     }
@@ -742,7 +781,6 @@ public class DsrPatch
     public async void P5_TwistingDive(Event @event, ScriptAccessory accessory)
     {
         DrawTwister(3000, 3000, accessory);
-        await Task.Delay(3000);
         accessory.Method.TextInfo("旋风", 3000, true);
     }
 
@@ -1112,12 +1150,39 @@ public class DsrPatch
 
     #region P7 地火
 
+    [ScriptMethod(name: "P7：BossId记录与地火类初始化", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:12616"], userControl: false)]
+    public void P7_BossIdRecord(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        _p7BossId = sid;
+        List<int> scoreList = ExaflareStrategy switch
+        {
+            // moveStep,isFront,isUniverse
+            ExaflareSpecStrategyEnum.绝不去前方_NeverFront => [2, 100, 50],
+            ExaflareSpecStrategyEnum.绝不跑无脑火_NeverUniverse => [2, 10, 100],
+            ExaflareSpecStrategyEnum.绝不多跑_LeastMovement => [20, 10, 50],
+            ExaflareSpecStrategyEnum.绝对前方_AlwaysFront => [2, -10, 50],
+            _ => [-10, 100, 0],
+        };
+        _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
+    }
+    
+    [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"], userControl: false)]
+    public void P7_BossBladeRecord(Event @event, ScriptAccessory accessory)
+    {
+        var stc = @event.StackCount();
+        _p7Exaflare?.SetBladeType(stc);
+    }
+    
     [ScriptMethod(name: "P7：地火范围绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:28060"])]
     public void P7_ExaflareDrawn(Event @event, ScriptAccessory accessory)
     {
         // 面相为前、左、右的扩散
         var spos = @event.SourcePosition();
         var srot = @event.SourceRotation();
+        var bossChara = IbcHelper.GetById(_p7BossId);
+        var bossRot = bossChara?.Rotation ?? float.Pi;
+        var bossPos = bossChara?.Position ?? Center;
         const int intervalTime = 1850;
         const int castTime = 7000;
         const int extendDistance = 7;
@@ -1128,8 +1193,51 @@ public class DsrPatch
         
         Vector3[,] exaflarePos = BuildExaflareVector(spos, dirNum, extNum, srot, flareRot, extendDistance);
         DrawExaflareScene(exaflarePos, ExaflareWarnDrawn, advWarnNum, castTime, intervalTime, accessory);
+        
+        if (_p7Exaflare == null) return;
+        lock (_p7Exaflare)
+        {
+            _p7Exaflare.SetBossPos(bossPos, accessory);
+            _p7Exaflare.AddExaflare(spos, bossRot, srot, accessory);
+        }
     }
+    
+    [ScriptMethod(name: "P7：地火特殊解法指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"])]
+    public async void P7_ExaflareGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // 记录完钢铁月环后可计算
+        if (_p7Exaflare == null) return;
+        if (!IsExaflarePhase()) return;
+        if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
+        if (!_p7Exaflare.ExaflareRecordComplete()) return;
 
+        List<Vector3> guidePosList;
+        await Task.Delay(500);
+        guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
+        accessory.DebugMsg($"你选择的策略是{ExaflareStrategy}", DebugMode);
+        DrawExaflareGuidePos(guidePosList, accessory);
+    }
+    
+    private void DrawExaflareGuidePos(List<Vector3> guidePosList, ScriptAccessory accessory)
+    {
+        const int intervalTime = 1850;
+        const int castTime = 7000;
+        const int baseTime = castTime - 500;
+
+        for (var i = 0; i < guidePosList.Count; i++)
+        {
+            var delay = i == 0 ? 0 : baseTime + (i - 1) * intervalTime;
+            var destroy = i == 0 ? baseTime : intervalTime;
+
+            var dp01 = accessory.DrawDirPos(guidePosList[i], delay, destroy, $"地火第{i}步-玩家-位置");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp01);
+            if (i >= guidePosList.Count - 1) continue;
+            var dp12 = accessory.DrawDirPos2Pos(guidePosList[i], guidePosList[i + 1], delay, destroy, $"地火第{i}步-位置-位置");
+            dp12.Color = accessory.Data.DefaultDangerColor;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp12);
+        }
+    }
+    
     /// <summary>
     /// 画地火场景
     /// </summary>
@@ -1223,10 +1331,35 @@ public class DsrPatch
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    private void DebugExaflare(Vector3 spos, float srot, ScriptAccessory accessory)
+    private void DebugExaflare(float[] srot, float bossRotRad, uint bladeType, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
+        
+        accessory.DebugMsg($"你选择的策略是{ExaflareStrategy}", DebugMode);
+        
+        List<int> scoreList = ExaflareStrategy switch
+        {
+            // moveStep,isFront,isUniverse
+            ExaflareSpecStrategyEnum.绝不去前方_NeverFront => [2, 100, 50],
+            ExaflareSpecStrategyEnum.绝不跑无脑火_NeverUniverse => [2, 10, 100],
+            ExaflareSpecStrategyEnum.绝不多跑_LeastMovement => [20, 10, 50],
+            ExaflareSpecStrategyEnum.绝对前方_AlwaysFront => [2, -10, 50],
+            _ => [-10, 100, 0],
+        };
+        _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
+        
         // 面相为前、左、右的扩散
+        // var spos = @event.SourcePosition();
+        // var srot = @event.SourceRotation();
+        Vector3[] spos =
+        [
+            Center.ExtendPoint(bossRotRad.Game2Logic() - float.Pi, 8),
+            Center.ExtendPoint(bossRotRad.Game2Logic() + 60f.DegToRad(), 8),
+            Center.ExtendPoint(bossRotRad.Game2Logic() - 60f.DegToRad(), 8)
+        ];
+        var bossChara = IbcHelper.GetById(_p7BossId);
+        var bossRot = bossChara?.Rotation ?? bossRotRad;
+        var bossPos = bossChara?.Position ?? Center;
         const int intervalTime = 1850;
         const int castTime = 7000;
         const int extendDistance = 7;
@@ -1234,25 +1367,52 @@ public class DsrPatch
         const int extNum = 6;
         const int advWarnNum = 1;   // 预警向外延伸几个
         float[] flareRot = [0, -float.Pi / 2, float.Pi / 2];
+
+        for (int i = 0; i < 3; i++)
+        {
+            Vector3[,] exaflarePos = BuildExaflareVector(spos[i], dirNum, extNum, srot[i], flareRot, extendDistance);
+            // 画地火箭头
+            var dp1 = accessory.DrawDirPos2Pos(spos[i], spos[i].ExtendPoint(srot[i].Game2Logic() + flareRot[0], 6), 0, castTime, $"箭头1", 5.9f);
+            var dp2 = accessory.DrawDirPos2Pos(spos[i], spos[i].ExtendPoint(srot[i].Game2Logic() + flareRot[1], 6), 0, castTime, $"箭头2", 5.9f);
+            var dp3 = accessory.DrawDirPos2Pos(spos[i], spos[i].ExtendPoint(srot[i].Game2Logic() + flareRot[2], 6), 0, castTime, $"箭头3", 5.9f);
+            dp1.Color = ColorHelper.ColorRed.V4;
+            dp2.Color = ColorHelper.ColorRed.V4;
+            dp3.Color = ColorHelper.ColorRed.V4;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp2);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp3);
+            
+            DrawExaflareScene(exaflarePos, ExaflareWarnDrawn, advWarnNum, castTime, intervalTime, accessory);
+            if (_p7Exaflare == null) return;
+            lock (_p7Exaflare)
+            {
+                _p7Exaflare.SetBossPos(bossPos, accessory);
+                _p7Exaflare.AddExaflare(spos[i], bossRot, srot[i], accessory);
+            }
+        }
+        _p7Exaflare.SetBladeType(bladeType);
+        switch (bladeType)
+        {
+            case 42:
+                var dp1 = accessory.DrawStaticCircle(Center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"钢铁", 8f);
+                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+                break;
+            case 43:
+                var dp2 = accessory.DrawStaticDonut(Center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"月环", 50f, 8f);
+                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp2);
+                break;
+        }
         
-        Vector3[,] exaflarePos = BuildExaflareVector(spos, dirNum, extNum, srot, flareRot, extendDistance);
-        DrawExaflareScene(exaflarePos, ExaflareWarnDrawn, advWarnNum, castTime, intervalTime, accessory);
-    }
+        // 记录完钢铁月环后可计算
+        if (_p7Exaflare == null) return;
+        if (!IsExaflarePhase()) return;
+        if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
+        accessory.DebugMsg($"{_p7Exaflare._recordedExaflareNum}", DebugMode);
+        if (!_p7Exaflare.ExaflareRecordComplete()) return;
 
-    private void DebugCircle(uint bossId, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-        var dp = accessory.DrawCircle(bossId, 8f, 0, 7000, $"钢铁");
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-    }
-
-    private void DebugDonut(uint bossId, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-        var dp = accessory.DrawDonut(bossId, 50, 8, 0, 7000, $"月环");
-        dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+        List<Vector3> guidePosList;
+        guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
+        DrawExaflareGuidePos(guidePosList, accessory);
     }
 
     #endregion
@@ -1291,6 +1451,28 @@ public class DsrPatch
             _p7FirstEntityOrder[1] = !_p7FirstEntityOrder[1];
             DebugMsg($"MT为{(_p7FirstEntityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEntityOrder[1] ? "一仇" : "二仇")}", accessory);
         }
+
+        if (!IsStackPhase()) return;
+        List<int> scoreList = ExaflareStrategy switch
+        {
+            // moveStep,isFront,isUniverse
+            ExaflareSpecStrategyEnum.绝不去前方_NeverFront => [2, 100, 50],
+            ExaflareSpecStrategyEnum.绝不跑无脑火_NeverUniverse => [2, 10, 100],
+            ExaflareSpecStrategyEnum.绝不多跑_LeastMovement => [20, 10, 50],
+            ExaflareSpecStrategyEnum.绝对前方_AlwaysFront => [2, -10, 50],
+            _ => [-10, 100, 0],
+        };
+        _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
+    }
+    
+    private bool IsExaflarePhase()
+    {
+        return _dsrPhase is DsrPhase.Phase7Exaflare1 or DsrPhase.Phase7Exaflare2 or DsrPhase.Phase7Exaflare3;
+    }
+    
+    private bool IsStackPhase()
+    {
+        return _dsrPhase is DsrPhase.Phase7Stack1 or DsrPhase.Phase7Stack2 or DsrPhase.Phase7Stack3;
     }
 
     [ScriptMethod(name: "P7：三剑一体接刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179])$"])]
@@ -1432,6 +1614,555 @@ public class DsrPatch
     #endregion
 
 }
+
+#region Class 地火
+
+public class DsrExaflare(bool debugMode, List<int> scoreList)
+{
+    // 右上0，下1，左2
+    private bool DebugMode = debugMode;
+    private List<Vector3> ExaflarePosList { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 3).ToList();
+    private Vector3 BossPos { get; set; } = new Vector3(0, 0, 0);
+    private List<int> ExaflareDirList { get; set; } = [0, 0, 0];
+    private uint BladeType { get; set; } = 0;
+    private List<ExaflareSolution> ExaflareSolutionList { get; set; } = [];
+    public int _recordedExaflareNum = 0;
+    
+    private ExaflareSolution BuildOneStepSolution(ScriptAccessory accessory)
+    {
+        // 一步火
+        var backExaflarePos = ExaflarePosList[1];
+        const bool isUniverse = false;
+        var moveStep = 0;
+
+        Vector3 pos2;
+        Vector3 pos3;
+
+        int targetExaflareIdx;
+        if (IsBackExaflareRightDir())
+        {
+            accessory.DebugMsg($"[一步火] 检测到背后地火为正地火", DebugMode);
+            // 若背后地火为正地火
+            if (IsBothFrontExaflareRightDir())
+            {
+                accessory.DebugMsg($"[一步火] 检测到前方地火都是正地火", DebugMode);
+                // 观察左右地火是否被指向
+                if (IsFrontPointedByExaflare(0, accessory))
+                {
+                    targetExaflareIdx = 0;
+                    accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
+                    pos2 = ExaflarePosList[targetExaflareIdx];
+                    pos3 = pos2;
+                }
+                else if (IsFrontPointedByExaflare(2, accessory))
+                {
+                    targetExaflareIdx = 2;
+                    accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
+                    pos2 = ExaflarePosList[targetExaflareIdx];
+                    pos3 = pos2;
+                }
+                else
+                {
+                    targetExaflareIdx = 0;
+                    accessory.DebugMsg($"[一步火] 检测到前方地火均被指向，随便取左上作安全点", DebugMode);
+                    pos2 = ExaflarePosList[targetExaflareIdx];
+                    pos3 = ExaflarePosList[1].PointInOutside(BossPos, 12f);
+                    moveStep++;
+                }
+            }
+            else
+            {
+                // 找到前方正地火序列，为目的地。如果前方为两个斜火，随便找一个。
+                targetExaflareIdx = IsBothFrontExaflareOpliqueDir() ? 0 : FindFrontRightDirExaflare();
+                // pos2 pos3 定义目的地
+                pos2 = ExaflarePosList[targetExaflareIdx];
+                pos3 = pos2;
+            }
+            accessory.DebugMsg($"[一步火] 找到基于{GetExaflareIdxStr(targetExaflareIdx)}正地火的初始安全区", DebugMode);
+        }
+        else
+        {
+            accessory.DebugMsg($"[一步火] 检测到背后地火为斜地火", DebugMode);
+            // 若背后地火为斜地火
+            if (!IsFrontPointedByExaflare(0, accessory))
+            {
+                targetExaflareIdx = 0;
+                // 若右上地火未被指向，可作为安全点
+                accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
+                pos2 = ExaflarePosList[targetExaflareIdx];
+                pos3 = pos2;
+            }
+            else if (!IsFrontPointedByExaflare(2, accessory))
+            {
+                targetExaflareIdx = 2;
+                // 若左上地火未被指向，可作为安全点
+                accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
+                pos2 = ExaflarePosList[targetExaflareIdx];
+                pos3 = pos2;
+            }
+            else
+            {
+                // 若左上右上两枚地火均被指向，走通用面前火。从背后火的位置向Boss方向延长12
+                moveStep++;
+                targetExaflareIdx = 2;
+                accessory.DebugMsg($"[一步火] 检测到前方两枚地火均被指向，随便取左上作为安全点", DebugMode);
+                pos2 = ExaflarePosList[targetExaflareIdx];
+                pos3 = ExaflarePosList[1].PointInOutside(BossPos, 12f);
+            }
+        }
+        // pos1 根据职能定义起跑点
+        var myIndex = accessory.GetMyIndex();
+        var pos1 = FindFirstSafePosAtFront(targetExaflareIdx, myIndex < 1);
+        moveStep++;
+        
+        return new ExaflareSolution([pos1, pos2, pos3], moveStep, true, isUniverse, "一步火", scoreList, DebugMode,
+            accessory);
+    }
+    
+    private ExaflareSolution BuildTwoStepSolution(ScriptAccessory accessory)
+    {
+        // 两步火
+        var backExaflarePos = ExaflarePosList[1];
+        var isUniverse = false;
+        var moveStep = 0;
+        // pos1 读条时，找背后地火的钢铁月环安全区
+        var pos1 = FindFirstSafePos(1, true);
+        moveStep++;
+        // pos2 一炸后，找背后地火位置
+        var pos2 = backExaflarePos;
+        // pos3 二炸后，观察前面两枚
+        Vector3 pos3;
+        
+        // 前方两地火是否指向背后
+        var idx0Point = IsBackPointedByExaflare(0, accessory);
+        var idx2Point = IsBackPointedByExaflare(2, accessory);
+
+        if (!idx0Point && !idx2Point)
+        {
+            // 都未指向背后，原地
+            pos3 = backExaflarePos;
+            accessory.DebugMsg($"[两步火]前方地火都未指向背后，原地", DebugMode);
+        }
+        else if (!idx0Point && idx2Point)
+        {
+            // 右上未指向背后，去左侧
+            pos3 = backExaflarePos.RotatePoint(BossPos, 45f.DegToRad());
+            moveStep++;
+            accessory.DebugMsg($"[两步火]右上地火未指向背后，去左侧", DebugMode);
+        }
+        else if (idx0Point && !idx2Point)
+        {
+            // 左上未指向背后，去右侧
+            pos3 = backExaflarePos.RotatePoint(BossPos, -45f.DegToRad());
+            moveStep++;
+            accessory.DebugMsg($"[两步火]左上地火未指向背后，去右侧", DebugMode);
+        }
+        else
+        {
+            // 全部指向背后，无脑火
+            pos3 = FindUniversalSafePos();
+            isUniverse = true;
+            moveStep++;
+            accessory.DebugMsg($"[两步火]地火全指向背后，无脑火", DebugMode);
+        }
+
+        return new ExaflareSolution([pos1, pos2, pos3], moveStep, false, isUniverse, "两步火", scoreList, DebugMode,
+            accessory);
+    }
+
+    /// <summary>
+    /// 以某一枚地火开始，顺时针或逆时针处就位
+    /// </summary>
+    /// <param name="exaflareIdx">某一枚地火</param>
+    /// <param name="isCw">顺时针找</param>
+    /// <returns></returns>
+    private Vector3 FindFirstSafePos(int exaflareIdx, bool isCw)
+    {
+        var exaflarePos = ExaflarePosList[exaflareIdx];
+        var rad = exaflarePos.FindRadian(BossPos) + (isCw ? 50f.DegToRad() : -50f.DegToRad());
+        var firstSafePos = BossPos.ExtendPoint(rad, IsChariot() ? 8.5f : 7.5f);
+        return firstSafePos;
+    }
+
+    private Vector3 FindFirstSafePosAtFront(int exaflareIdx, bool isTank)
+    {
+        var exaflarePos = ExaflarePosList[exaflareIdx];
+        if (isTank) // 是坦克，则前方起跑
+        {
+            if (exaflareIdx == 0)
+                return FindFirstSafePos(exaflareIdx, false);
+            if (exaflareIdx == 2)
+                return FindFirstSafePos(exaflareIdx, true);
+        }
+        else
+        {
+            if (exaflareIdx == 0)
+                return FindFirstSafePos(exaflareIdx, true);
+            if (exaflareIdx == 2)
+                return FindFirstSafePos(exaflareIdx, false);
+        }
+        return new Vector3(0, 0, 0);
+    }
+
+    private Vector3 FindUniversalSafePos()
+    {
+        return ExaflarePosList[1].PointInOutside(BossPos, 13.2f - 8f, true);
+    }
+    
+    public void SetBossPos(Vector3 bossPosV3, ScriptAccessory accessory)
+    {
+        BossPos = bossPosV3;
+        // accessory.DebugMsg($"设置Boss位置{BossPos}", debugMode);
+    }
+    
+    /// <summary>
+    /// 增加地火属性
+    /// </summary>
+    /// <param name="exaflarePosV3">地火位置</param>
+    /// <param name="bossRotation">Boss旋转角度</param>
+    /// <param name="exaflareRot">地火旋转角度</param>
+    /// <param name="accessory"></param>
+    public void AddExaflare(Vector3 exaflarePosV3, float bossRotation, float exaflareRot, ScriptAccessory accessory)
+    {
+        var idx = FindExaflareIdx(exaflarePosV3, bossRotation);
+        // 差值无需互转
+        var exaflareRelativeDir = exaflareRot.Game2Logic() - bossRotation.Game2Logic();
+        var dir = exaflareRelativeDir.Rad2Dirs(8);
+        ExaflareDirList[idx] = dir;
+        ExaflarePosList[idx] = exaflarePosV3;
+        accessory.DebugMsg($"添加{GetExaflareIdxStr(idx)}地火，坐标{exaflarePosV3}，面向{GetDirStr(dir)}", DebugMode);
+        _recordedExaflareNum++;
+    }
+    
+    /// <summary>
+    /// 根据地火中心位置找到对应地火本体方位的idx
+    /// 因为地火位置会根据Boss面向改变，所以要减去boss旋转的偏置量
+    /// </summary>
+    /// <param name="exaflarePosV3">地火中心位置</param>
+    /// <param name="bossRotation">Boss面向</param>
+    /// <returns></returns>
+    private int FindExaflareIdx(Vector3 exaflarePosV3, float bossRotation)
+    {
+        var exaflareBaseDir = exaflarePosV3.FindRadian(BossPos);
+        var exaflareRelativeDir = exaflareBaseDir - bossRotation.Game2Logic();
+        var idx = exaflareRelativeDir.Rad2Dirs(3, false);
+        return idx;
+    }
+
+    /// <summary>
+    /// 返回该枚地火是否为正角，当八方方位为偶数时是正角
+    /// </summary>
+    /// <param name="idx">某枚地火</param>
+    /// <returns></returns>
+    private bool IsExaflareRightDir(int idx)
+    {
+        return ExaflareDirList[idx] % 2 == 0;
+    }
+
+    /// <summary>
+    /// 返回背后地火是否为正角
+    /// </summary>
+    /// <returns></returns>
+    private bool IsBackExaflareRightDir()
+    {
+        return IsExaflareRightDir(1);
+    }
+
+    /// <summary>
+    /// 前方两地火全正角
+    /// </summary>
+    /// <returns></returns>
+    private bool IsBothFrontExaflareRightDir()
+    {
+        return IsExaflareRightDir(0) && IsExaflareRightDir(2);
+    }
+
+    /// <summary>
+    /// 前方两地火全斜角
+    /// </summary>
+    /// <returns></returns>
+    private bool IsBothFrontExaflareOpliqueDir()
+    {
+        return !(IsExaflareRightDir(0) || IsExaflareRightDir(2));
+    }
+    
+    /// <summary>
+    /// 前方两地火正斜类型一致
+    /// </summary>
+    /// <returns></returns>
+    private bool IsBothFrontExaflareSameDir()
+    {
+        return IsExaflareRightDir(0) == IsExaflareRightDir(2);
+    }
+    
+    /// <summary>
+    /// 找到前方正角地火
+    /// </summary>
+    /// <returns>正角地火序号</returns>
+    private int FindFrontRightDirExaflare()
+    {
+        if (IsBothFrontExaflareOpliqueDir()) return -1;
+        return IsExaflareRightDir(0) ? 0 : 2;
+    }
+    
+    /// <summary>
+    /// 找到前方斜角地火
+    /// </summary>
+    /// <returns>斜角地火序号</returns>
+    private int FindFrontObliqueDirExaflare()
+    {
+        if (IsBothFrontExaflareRightDir()) return -1;
+        return IsExaflareRightDir(0) ? 2 : 0;
+    }
+
+    /// <summary>
+    /// 找到背后是否被序号为idx的地火指
+    /// </summary>
+    /// <param name="idx">地火序号</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    private bool IsBackPointedByExaflare(int idx, ScriptAccessory accessory)
+    {
+        // 找背后是否被前方地火指
+        accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}地火指向为{GetDirStr(ExaflareDirList[idx])}", DebugMode);
+        var result = true;
+        switch (idx)
+        {
+            case 0:
+            {
+                if (ExaflareDirList[idx] == 1)
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是斜火，但不会指向背后", DebugMode);
+                    result = false;
+                }
+                if (IsExaflareRightDir(idx))
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是正火，不会指向背后", DebugMode);
+                    result = false;
+                }
+                break;
+            }
+            case 2:
+            {
+                if (ExaflareDirList[idx] == 7)
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是斜火，但不会指向背后", DebugMode);
+                    result = false;
+                }
+                if (IsExaflareRightDir(idx))
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是正火，不会指向背后", DebugMode);
+                    result = false;
+                }
+                break;
+            }
+        }
+
+        if (result)
+        {
+            accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}地火会指向背后", DebugMode);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 找到前方序号为idx的地火是否被指
+    /// </summary>
+    /// <param name="idx">地火序号</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    private bool IsFrontPointedByExaflare(int idx, ScriptAccessory accessory)
+    {
+        // 找背后是否被前方地火指
+        accessory.DebugMsg($"正在检测前方{GetExaflareIdxStr(idx)}地火是否会被指", DebugMode);
+        var result = false;
+        switch (idx)
+        {
+            case 0:
+            {
+                // 如果2号火不是斜火且面向不为6，会指
+                if (IsExaflareRightDir(2) && ExaflareDirList[2] != 6)
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(2)}地火是正火，且有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
+                    result = true;
+                }
+                // 如果1号火面向不为3，会指
+                if (ExaflareDirList[1] != 5)
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(1)}地火是有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
+                    result = true;
+                }
+                break;
+            }
+            case 2:
+            {
+                // 如果0号火不是斜火且面向不为2，会指
+                if (IsExaflareRightDir(0) && ExaflareDirList[0] != 2)
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(0)}地火是有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
+                    result = true;
+                }
+                // 如果1号火面向不为3，会指
+                if (ExaflareDirList[1] != 3)
+                {
+                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(1)}地火是有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
+                    result = true;
+                }
+                break;
+            }
+        }
+
+        if (result)
+        {
+            accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}不会被指", DebugMode);
+        }
+        return result;
+    }
+    
+    public void SetBladeType(uint type)
+    {
+        BladeType = type;
+    }
+
+    private bool IsChariot()
+    {
+        const uint chariotFireBlade = 42;
+        return BladeType == chariotFireBlade;
+    }
+
+    private void AddExaflareSolution(ExaflareSolution solution)
+    {
+        ExaflareSolutionList.Add(solution);
+    }
+
+    public List<Vector3> ExportExaflareSolution(ScriptAccessory accessory)
+    {
+        AddExaflareSolution(BuildOneStepSolution(accessory));
+        AddExaflareSolution(BuildTwoStepSolution(accessory));
+        
+        ExaflareSolutionList = ExaflareSolutionList.OrderBy(solution => solution.Score).ToList();
+        accessory.DebugMsg($"两解法对比，优先级高的是{ExaflareSolutionList[0].Description}，为{ExaflareSolutionList[0].Score}分", DebugMode);
+        return ExaflareSolutionList[0].ExaflareSolutionPosList;
+    }
+    
+    /*
+     * 下述为构建地火的方法，今后可以单独做成一个class调用
+     */
+    
+    /// <summary>
+    /// 构建地火坐标
+    /// </summary>
+    /// <param name="center">中心</param>
+    /// <param name="rotation">旋转角度</param>
+    /// <param name="extendDistance">延伸距离</param>
+    /// <returns></returns>
+    private Vector3 GetExaflarePos(Vector3 center, float rotation, float extendDistance)
+    {
+        return center.ExtendPoint(rotation, extendDistance);
+    }
+
+    private Vector3[] BuildExaflareVector(Vector3 center, float rotation, int extendNum, float extendDistance)
+    {
+        var exaflarePos = new Vector3[extendNum];
+        for (var i = 0; i < extendNum; i++)
+            exaflarePos[i] = GetExaflarePos(center, rotation, (i + 1) * extendDistance);
+        return exaflarePos;
+    }
+
+    public bool ExaflareRecordComplete()
+    {
+        return _recordedExaflareNum == 3;
+    }
+
+    private string GetExaflareIdxStr(int idx)
+    {
+        return idx switch
+        {
+            0 => "右上",
+            1 => "背后",
+            2 => "左上",
+            _ => "未知"
+        };
+    }
+    
+    private string GetDirStr(int idx)
+    {
+        return idx switch
+        {
+            0 => "正上",
+            1 => "右上",
+            2 => "正右",
+            3 => "右下",
+            4 => "正下",
+            5 => "左下",
+            6 => "正左",
+            7 => "左上",
+            _ => "未知"
+        };
+    }
+
+    public class ExaflareSolution
+    {
+        /*
+         * 地火优选策略
+         * 地火共有四种解法选项：
+         * 1、绝不去前方 NeverFront
+         *      背后两步火>无脑火>>>前方一步火>前方两步火
+         * 2、绝不跑无脑火 NeverUniverse
+         *      背后两步火>前方一步火>前方两步火>>>无脑火
+         * 3、绝不多跑 LeastMovement
+         *      前方一步火>背后两步火>前方两步火>>>无脑火
+         * 4、绝对前方 AlwaysFront
+         *      前方一步火>前方两步火>背后两步火>无脑火
+         * 四种解法被求解后，分数低者取胜。
+         *
+         * 解法情况与影响分值的对应关系
+         *                  basic   moveStep    isFront     isUniverse
+         * NeverFront        100        2         100           50
+         * NeverUniverse     100        2          10          100
+         * LeastMovement     100       20          10           50
+         * AlwaysFront       100        2         -10           50
+         */
+        public List<Vector3> ExaflareSolutionPosList { get; set; }
+        public int MoveStep { get; set; }
+        public bool IsFront { get; set; }
+        public bool IsUniverse { get; set; }
+        public int Score { get; set; }
+        public string Description { get; set; }
+        public bool DebugMode { get; set; }
+
+        public ExaflareSolution(List<Vector3> exaflareSolutionPosList, int moveStep, bool isFront, bool isUniverse,
+            string description, List<int> scoreList, bool debugMode, ScriptAccessory accessory)
+        {
+            ExaflareSolutionPosList = exaflareSolutionPosList;
+            MoveStep = moveStep;
+            IsFront = isFront;
+            IsUniverse = isUniverse;
+            Score = CalcScore(scoreList, accessory, debugMode, description);
+            Description = description;
+            DebugMode = debugMode;
+        }
+        private int CalcScore(List<int> scoreList, ScriptAccessory accessory, bool debugMode, string description)
+        {
+            const int moveStepIdx = 0;
+            const int isFrontIdx = 1;
+            const int isUniverseIdx = 2;
+            const int baseScore = 100;
+            var moveStepScore = scoreList[moveStepIdx] * MoveStep;
+            var isFrontScore = IsFront ? scoreList[isFrontIdx] : 0;
+            var isUniverseScore = IsUniverse ? scoreList[isUniverseIdx] : 0;
+            var totalScore = baseScore + moveStepScore + isFrontScore + isUniverseScore;
+            accessory.DebugMsg(
+                $"{description}的得分为：基础{baseScore} + 步数{moveStepScore} + 前方{isFrontScore} + 无脑{isUniverseScore} = {totalScore}",
+                debugMode);
+            return totalScore;
+        }
+    }
+}
+
+#endregion
+
 
 #region 函数集
 public static class EventExtensions
@@ -1623,7 +2354,7 @@ public static class DirectionCalc
         // if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
 
         var r = float.Pi - radian;
-        r %= float.Pi * 2;
+        r = (r + float.Pi * 2) % (float.Pi * 2);
         return r;
     }
 
@@ -1651,11 +2382,10 @@ public static class DirectionCalc
     /// <returns>逻辑基角度对应的逻辑方位</returns>
     public static int Rad2Dirs(this float radian, int dirs, bool diagDivision = true)
     {
-        double dirsDouble = dirs;
         var r = diagDivision
-            ? Math.Round(radian / (2f / dirsDouble * float.Pi))
-            : Math.Floor(radian / (2f / dirsDouble * float.Pi));
-        r %= dirs;
+            ? Math.Round(radian / (2f * float.Pi / dirs))
+            : Math.Floor(radian / (2f * float.Pi / dirs));
+        r = (r + dirs) % dirs;
         return (int)r;
     }
 
@@ -2264,11 +2994,11 @@ public static class AssignDp
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f, float innerscale = 0)
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
+        var dp = accessory.DrawStatic(center, float.Pi * 2, 0, scale, scale, delay, destroy, name);
         dp.Color = color;
-        dp.InnerScale = new Vector2(innerscale == 0 ? scale - 0.05f : innerscale);
+        dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
     
@@ -2325,6 +3055,19 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
+    }
+    
+    /// <summary>
+    /// 外部用调试模式
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="debugMode"></param>
+    /// <param name="accessory"></param>
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode)
+    {
+        if (!debugMode)
+            return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
 }
 

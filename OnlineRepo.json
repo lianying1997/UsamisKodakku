@@ -34,10 +34,10 @@
     {
         "Name": "UCOB [巴哈姆特绝境战]",
         "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-        "Version": "0.0.1.6",
+        "Version": "0.0.1.7",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-        "UpdateInfo": "【重要】1. 修复P3连击逻辑Bug。"
+        "UpdateInfo": "1. 修复奈尔钢铁范围。"
     },
     {
         "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",
@@ -74,10 +74,10 @@
     {
         "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
         "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-        "Version": "0.0.0.4",
+        "Version": "0.0.0.5",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
-        "UpdateInfo": "1. 调整了P3放塔面向颜色避免误解。\n2. 修复P7地火步进距离错误问题。"
+        "UpdateInfo": "1. 增加P7地火特殊跑法指引"
     },
     {
         "Name": "ASS [异闻希拉狄哈水道]",

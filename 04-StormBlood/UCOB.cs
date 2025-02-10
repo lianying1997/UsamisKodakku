@@ -32,7 +32,7 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.6", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.7", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     // TODO
@@ -44,6 +44,9 @@ public class Ucob
 
     Original code by Joshua, adjustments by Usami.
     Great Thanks to Contributor @KnightRider. 
+    v0.0.1.7:
+    1. 修复奈尔钢铁范围。
+    
     v0.0.1.6:
     【重要】1. 修复P3连击BUG。
 
@@ -730,7 +733,7 @@ public class Ucob
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "钢铁";
-        dp.Scale = new(9);
+        dp.Scale = new(8.55f);
         dp.ScaleMode = ScaleMode.ByTime;
         dp.Owner = sid;
         dp.Delay = delay;
