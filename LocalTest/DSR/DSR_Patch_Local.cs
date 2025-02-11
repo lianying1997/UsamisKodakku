@@ -867,6 +867,7 @@ public class DsrPatch
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
+    private ManualResetEvent _IceAndFireEvent = new(false);
     [ScriptMethod(name: "P6：冰火吐息记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2795[4567])$"], userControl: false)]
     public void P6_IceAndFireGlowRecord(Event @event, ScriptAccessory accessory)
     {
@@ -893,6 +894,8 @@ public class DsrPatch
         {
             _recorded[1] = _recorded[0];
             _recorded[0] = true;
+            if (_recorded[0] && _recorded[1])
+                _IceAndFireEvent.Set();
         }
     }
 
@@ -901,10 +904,7 @@ public class DsrPatch
     {
         if (_dsrPhase is not (DsrPhase.Phase6IceAndFire1 or DsrPhase.Phase6IceAndFire2))
             return;
-        lock (_recorded)
-        {
-            while (!(_recorded[0] && _recorded[1]));
-        }
+        _IceAndFireEvent.WaitOne();
         // await Task.Delay(100);
         var myIndex = accessory.GetMyIndex();
         var tankBusterPosition = new Vector3[4];
@@ -948,6 +948,7 @@ public class DsrPatch
                 PosColorPlayer.V4.WithW(1.5f), 0, 6000, $"冰火死刑点区域", 1f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
         }
+        _IceAndFireEvent.Reset();
     }
 
     #endregion
@@ -967,13 +968,6 @@ public class DsrPatch
             _ => DsrPhase.Phase6NearOrFar1,
         };
         _p6DragonsWingAction = [false, false, false];   // P6 双龙远近记录
-        
-        lock (_recorded)
-        {
-            _recorded[0] = false;
-            _recorded[1] = false;
-        }
-        
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
     
@@ -996,6 +990,7 @@ public class DsrPatch
         DebugMsg($"检测到{(_p6DragonsWingAction[0] ? "T远离" : "T靠近")}, {(_p6DragonsWingAction[1] ? "左" : "右")}安全", accessory);
     }
 
+    private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
     [ScriptMethod(name: "P6：远近，俯冲记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12612"], userControl: false)]
     public void P6_NearOrFar_CauterizeRecord(Event @event, ScriptAccessory accessory)
     {
@@ -1004,12 +999,10 @@ public class DsrPatch
         // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
         _p6DragonsWingAction[2] = spos.X < Center.X;
         DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "前安全" : "后安全")}", accessory);
-        lock (_recorded)
-        {
-            _recorded[2] = true;
-        }
+        _NearOrFarCauterizeEvent.Set();
     }
 
+    private ManualResetEvent _NearOrFarInOutEvent = new(false);
     [ScriptMethod(name: "P6：远近，内外记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"], userControl: false)]
     public void P6_NearOrFar_BlackWingsRecord(Event @event, ScriptAccessory accessory)
     {
@@ -1020,21 +1013,14 @@ public class DsrPatch
         // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
         _p6DragonsWingAction[2] = aid == insideSafe;
         DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "内安全" : "外安全")}", accessory);
-        lock (_recorded)
-        {
-            _recorded[3] = true;
-        }
+        _NearOrFarInOutEvent.Set();
     }
 
     [ScriptMethod(name: "P6：一远近，指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"])]
     public void P6_NearOrFar1_Dir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
-        lock (_recorded)
-        {
-            while (!_recorded[2]) ;
-        }
-        // await Task.Delay(100);
+        _NearOrFarCauterizeEvent.WaitOne();
         Vector3[] nearOrFarSafePos = GetQuarterSafePos(_p6DragonsWingAction);
         var nearOrFarDirPosIdx = GetQuarterSafePosIdx(_p6DragonsWingAction);
         DebugMsg($"MT去{nearOrFarDirPosIdx[0]}, ST去{nearOrFarDirPosIdx[1]}, 人群去{nearOrFarDirPosIdx[2]}", accessory);
@@ -1053,6 +1039,7 @@ public class DsrPatch
 
         var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"一远近指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        _NearOrFarCauterizeEvent.Reset();
     }
 
     private Vector3[] GetQuarterSafePos(List<bool> wings)
@@ -1090,12 +1077,7 @@ public class DsrPatch
     public void P6_NearOrFar2_Dir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
-        lock (_recorded)
-        {
-            while (!_recorded[3]) ;
-        }
-        // 黑龙读条慢
-        // await Task.Delay(100);
+        _NearOrFarInOutEvent.WaitOne();
 
         Vector3[] nearOrFarSafePos = GetLineSafePos(_p6DragonsWingAction);
         int[] nearOrFarDirPosIdx = GetLineSafePosIdx(_p6DragonsWingAction);
@@ -1114,6 +1096,7 @@ public class DsrPatch
 
         var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"二远近指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        _NearOrFarInOutEvent.Reset();
     }
 
     private static Vector3[] GetLineSafePos(List<bool> wings)
@@ -1210,15 +1193,14 @@ public class DsrPatch
         _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
     }
     
+    private ManualResetEvent _BladeEvent = new(false);
     [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"], userControl: false)]
     public void P7_BossBladeRecord(Event @event, ScriptAccessory accessory)
     {
         var stc = @event.StackCount();
         _p7Exaflare?.SetBladeType(stc);
-        lock (_recorded)
-        {
-            _recorded[5] = true;
-        }
+        if (!IsExaflarePhase()) return;
+        _BladeEvent.Set();
     }
     
     [ScriptMethod(name: "P7：地火范围绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:28060"])]
@@ -1257,20 +1239,18 @@ public class DsrPatch
         if (!IsExaflarePhase()) return;
         if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
         if (!_p7Exaflare.ExaflareRecordComplete()) return;
-        lock (_recorded)
-        {
-            while (!_recorded[5]) ;
-        }
+        _BladeEvent.WaitOne();
         var guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
         accessory.DebugMsg($"你选择的策略是{ExaflareStrategy}", DebugMode);
         DrawExaflareGuidePos(guidePosList, accessory);
+        _BladeEvent.Reset();
     }
     
     private void DrawExaflareGuidePos(List<Vector3> guidePosList, ScriptAccessory accessory)
     {
         const int intervalTime = 1900;
         const int castTime = 6900;
-        const int baseTime = castTime;
+        const int baseTime = castTime - 900;    // 900ms为冰火剑附加到托尔丹身上的时间
 
         for (var i = 0; i < guidePosList.Count; i++)
         {
@@ -1453,10 +1433,9 @@ public class DsrPatch
         
         // 记录完钢铁月环后可计算
         if (_p7Exaflare == null) return;
-        if (!IsExaflarePhase()) return;
+        // if (!IsExaflarePhase()) return;
         if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
         if (!_p7Exaflare.ExaflareRecordComplete()) return;
-
         var guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
         DrawExaflareGuidePos(guidePosList, accessory);
     }
@@ -1465,6 +1444,7 @@ public class DsrPatch
     
     #region P7 接刀
 
+    private ManualResetEvent _TrinityEvent = new(false);
     [ScriptMethod(name: "P7：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179]|28206)$"], userControl: false)]
     public void P7_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
@@ -1497,7 +1477,8 @@ public class DsrPatch
             _p7FirstEntityOrder[1] = !_p7FirstEntityOrder[1];
             DebugMsg($"MT为{(_p7FirstEntityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEntityOrder[1] ? "一仇" : "二仇")}", accessory);
         }
-
+        _TrinityEvent.Set();
+        
         if (!IsStackPhase()) return;
         List<int> scoreList = ExaflareStrategy switch
         {
@@ -1509,10 +1490,7 @@ public class DsrPatch
             _ => [-10, 100, 0],
         };
         _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
-        lock (_recorded)
-        {
-            _recorded[4] = true;
-        }
+        
     }
     
     private bool IsExaflarePhase()
@@ -1528,11 +1506,7 @@ public class DsrPatch
     [ScriptMethod(name: "P7：三剑一体接刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179])$"])]
     public void P7_TrinityAttack(Event @event, ScriptAccessory accessory)
     {
-        lock (_recorded)
-        {
-            while (!_recorded[4]) ;
-        }
-        
+        _TrinityEvent.WaitOne();
         var aid = @event.ActionId();
         var sid = @event.SourceId();
         const uint exaflare = 28059;
@@ -1555,12 +1529,13 @@ public class DsrPatch
             _ => delay
         };
 
-        DrawTrinityAggro(sid, delay - 6000, 6000, 1, accessory);
-        DrawTrinityAggro(sid, delay - 6000, 6000, 2, accessory);
+        DrawTrinityAggro(sid, delay - 4000, 4000, 1, accessory);
+        DrawTrinityAggro(sid, delay - 4000, 4000, 2, accessory);
         DrawTrinityAggro(sid, delay, 4000, 1, accessory);
         DrawTrinityAggro(sid, delay, 4000, 2, accessory);
-        DrawTrinityNear(sid, delay - 6000, 6000, accessory);
+        DrawTrinityNear(sid, delay - 4000, 4000, accessory);
         DrawTrinityNear(sid, delay, 4000, accessory);
+        _TrinityEvent.Reset();
     }
 
     private void DrawTrinityAggro(uint sid, int delay, int destroy, uint aggroIdx, ScriptAccessory accessory)
@@ -1663,18 +1638,6 @@ public class DsrPatch
         _p7TrinityTankDisordered = true;
     }
 
-    [ScriptMethod(name: "P7：三剑一体阶段初始化记录标志", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2806[34])$"], userControl: false)]
-    public void P7_RecorderInitAtTrinity(Event @event, ScriptAccessory accessory)
-    {
-        lock (_recorded)
-        {
-            // 初始化接刀绘制
-            _recorded[4] = false;
-            // 初始化钢铁月环剑
-            _recorded[5] = false;
-        }
-    }
-    
     #endregion
 
 }
@@ -2033,12 +1996,12 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     /// <returns></returns>
     private bool IsBackPointedByExaflare(int idx, ScriptAccessory accessory)
     {
-        // 右上地火不指向背后地火，当右上地火是正火时不指，当右上地火是斜火且方向为1时不指。
-        // 左上地火不指向背后地火，当左上地火是正火时不指，当左上地火是斜火且方向为7时不指。
+        // 右上地火指向背后地火的条件：右上地火不是正火且方向不等于1
+        // 左上地火指向背后地火的条件：左上地火不是正火且方向不等于7
         var result = idx switch
         {
-            0 => IsExaflareRightDir(idx) || ExaflareDirList[idx] == 1,
-            2 => IsExaflareRightDir(idx) || ExaflareDirList[idx] == 7,
+            0 => !IsExaflareRightDir(idx) && ExaflareDirList[idx] != 1,
+            2 => !IsExaflareRightDir(idx) && ExaflareDirList[idx] != 7,
             _ => false
         };
         return result;

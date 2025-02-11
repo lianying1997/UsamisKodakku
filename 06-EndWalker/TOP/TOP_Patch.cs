@@ -260,7 +260,7 @@ public class TopPatch
         if (!CaptainMode) return;
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
-        _sw.CalcMarker();
+        // _sw.CalcMarker();
         // TODO 二传算头标
     }
     

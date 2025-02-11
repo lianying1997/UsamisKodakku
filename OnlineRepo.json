@@ -74,10 +74,10 @@
     {
         "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
         "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-        "Version": "0.0.0.6",
+        "Version": "0.0.0.7",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
-        "UpdateInfo": "1. 暂时关闭非Debug模式下的地火特殊策略启用"
+        "UpdateInfo": "1. 再次调整P7各机制时间间隔。\n2. 修复P7地火特殊跑法电椅。\n3. 重构了代码，尽可能移除了async/await。"
     },
     {
         "Name": "ASS [异闻希拉狄哈水道]",
