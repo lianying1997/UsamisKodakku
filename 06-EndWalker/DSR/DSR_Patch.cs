@@ -78,7 +78,7 @@ public class DsrPatch
         绝对前方_AlwaysFront,
         关闭_PleaseDontDoThat,
     }
-    [UserSetting("地火指路特殊策略")]
+    [UserSetting("地火指路特殊策略（有电待修复，非Debug不启用）")]
     public static ExaflareSpecStrategyEnum ExaflareStrategy { get; set; } = ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat;
     
     [UserSetting("地火（百京核爆）使用程序预设颜色")]
@@ -1651,14 +1651,14 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             {
                 accessory.DebugMsg($"[一步火] 检测到前方地火都是正地火", DebugMode);
                 // 观察左右地火是否被指向
-                if (IsFrontPointedByExaflare(0, accessory))
+                if (!IsFrontPointedByExaflare(0, accessory))
                 {
                     targetExaflareIdx = 0;
                     accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
                     pos2 = ExaflarePosList[targetExaflareIdx];
                     pos3 = pos2;
                 }
-                else if (IsFrontPointedByExaflare(2, accessory))
+                else if (!IsFrontPointedByExaflare(2, accessory))
                 {
                     targetExaflareIdx = 2;
                     accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
@@ -2017,10 +2017,11 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             }
         }
 
-        if (result)
+        if (!result)
         {
             accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}不会被指", DebugMode);
         }
+        
         return result;
     }
     

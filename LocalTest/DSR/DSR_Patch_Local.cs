@@ -35,7 +35,7 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
-    v0.0.0.6
+    v0.0.0.7
     1. 再次调整P7各机制时间间隔。
     2. 重构了代码，尽可能移除了async/await
     
@@ -60,7 +60,7 @@ public class DsrPatch
     """;
 
     private const string Name = "Local_DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.6";
+    private const string Version = "0.0.0.7";
     private const string DebugVersion = "a";
     private const string Note = "测试时间间隔";
     
@@ -1687,6 +1687,47 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     private uint BladeType { get; set; } = 0;
     private List<ExaflareSolution> ExaflareSolutionList { get; set; } = [];
     public int _recordedExaflareNum = 0;
+
+    private ExaflareSolution BuildOneStepSolutionNew(ScriptAccessory accessory)
+    {
+        // 一步火
+        var backExaflarePos = ExaflarePosList[1];
+        const bool isUniverse = false;
+        var moveStep = 0;
+        Vector3 pos2;
+        Vector3 pos3;
+        int targetExaflareIdx;
+        if (!IsFrontPointedByExaflare(0, accessory))
+            targetExaflareIdx = 0;
+        else if (!IsFrontPointedByExaflare(2, accessory))
+            targetExaflareIdx = 2;
+        else
+        {
+            targetExaflareIdx = 0;
+            moveStep++;
+        }
+
+        pos2 = ExaflarePosList[targetExaflareIdx];
+        
+        if (moveStep == 0)
+        {
+            accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
+            pos3 = pos2;
+        }
+        else
+        {
+            accessory.DebugMsg($"[一步火] 检测到前方地火均被指向，随便取左上作安全点", DebugMode);
+            pos3 = ExaflarePosList[1].PointInOutside(BossPos, 12f);
+        }
+        
+        // pos1 根据职能定义起跑点
+        var myIndex = accessory.GetMyIndex();
+        var pos1 = FindFirstSafePosAtFront(targetExaflareIdx, myIndex < 1);
+        moveStep++;
+        
+        return new ExaflareSolution([pos1, pos2, pos3], moveStep, true, isUniverse, "一步火", scoreList, DebugMode,
+            accessory);
+    }
     
     private ExaflareSolution BuildOneStepSolution(ScriptAccessory accessory)
     {
@@ -1707,14 +1748,14 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             {
                 accessory.DebugMsg($"[一步火] 检测到前方地火都是正地火", DebugMode);
                 // 观察左右地火是否被指向
-                if (IsFrontPointedByExaflare(0, accessory))
+                if (!IsFrontPointedByExaflare(0, accessory))
                 {
                     targetExaflareIdx = 0;
                     accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
                     pos2 = ExaflarePosList[targetExaflareIdx];
                     pos3 = pos2;
                 }
-                else if (IsFrontPointedByExaflare(2, accessory))
+                else if (!IsFrontPointedByExaflare(2, accessory))
                 {
                     targetExaflareIdx = 2;
                     accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
@@ -2073,7 +2114,7 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             }
         }
 
-        if (result)
+        if (!result)
         {
             accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}不会被指", DebugMode);
         }
@@ -2098,7 +2139,7 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
 
     public List<Vector3> ExportExaflareSolution(ScriptAccessory accessory)
     {
-        AddExaflareSolution(BuildOneStepSolution(accessory));
+        AddExaflareSolution(BuildOneStepSolutionNew(accessory));
         AddExaflareSolution(BuildTwoStepSolution(accessory));
         
         ExaflareSolutionList = ExaflareSolutionList.OrderBy(solution => solution.Score).ToList();
