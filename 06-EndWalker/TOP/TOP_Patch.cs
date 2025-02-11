@@ -69,12 +69,13 @@ public class TopPatch
     private static SigmaWorld _sw = new(DebugMode);
     private static DynamicsPass _dyn = new(DebugMode);
     
-    // private List<ManualResetEvent> _events = new(false);
+    private List<ManualResetEvent> _events = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
     
     public void Init(ScriptAccessory accessory)
     {
         accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
         _phase = TopPhase.Init;
+        _events = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }
@@ -218,22 +219,16 @@ public class TopPatch
         }
         _sv.FindSpreadTarget();
         _sv.CalcSpreadPos(Center, accessory);
-
-        lock (_recorded)
-        {
-            _recorded[(int)RecordedIdx.SigmaSonyMarker] = true;
-        }
+        _events[(int)RecordedIdx.SigmaSonyMarker].Set();
     }
     
     [ScriptMethod(name: "P5 二运八方分散指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"])]
     public void P5_SigmaVersionSpreadDir(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
-        lock (_recorded)
-        {
-            while (!_recorded[(int)RecordedIdx.SigmaSonyMarker]) ;
-        }
+        _events[(int)RecordedIdx.SigmaSonyMarker].WaitOne();
         DrawSigmaSpreadSolution(accessory);
+        _events[(int)RecordedIdx.SigmaSonyMarker].Reset();
     }
     
     [ScriptMethod(name: "P5 二运塔生成记录", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:regex:^(201324[56])$", "Operate:Add"], userControl: false)]
@@ -262,7 +257,7 @@ public class TopPatch
         if (!CaptainMode) return;
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
-        // _sw.CalcMarker();
+        _sw.CalcMarker();
         // TODO 二传算头标
     }
     
@@ -687,7 +682,12 @@ public class SigmaWorld(bool debugMode)
     private bool OmegaFemaleInsideSafe { get; set; } = false;
     private List<int>? _dynamicBuffLevel;
 
-    public void GetDynamicBuffLevel(DynamicsPass dyn)
+    public void CalcMarker()
+    {
+        // GetDynamicBuffLevel(_dyn);
+    }
+
+    private void GetDynamicBuffLevel(DynamicsPass dyn)
     {
         _dynamicBuffLevel = dyn.GetBuffLevelList();
     }
