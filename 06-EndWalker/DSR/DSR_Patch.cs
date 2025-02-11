@@ -134,6 +134,12 @@ public class DsrPatch
     private DsrExaflare? _p7Exaflare = null;                            // P7 地火Class
     private uint _p7BossId = 0;                                         // P7 boss Id
     
+    private ManualResetEvent _IceAndFireEvent = new(false);
+    private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
+    private ManualResetEvent _NearOrFarInOutEvent = new(false);
+    private ManualResetEvent _BladeEvent = new(false);
+    private ManualResetEvent _TrinityEvent = new(false);
+    
     public void Init(ScriptAccessory accessory)
     {
         DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
@@ -144,6 +150,12 @@ public class DsrPatch
         _drawn = new bool[20].ToList();
         _recorded = new bool[20].ToList();
         _p7BossId = 0;
+        
+        _IceAndFireEvent = new ManualResetEvent(false);
+        _NearOrFarCauterizeEvent = new ManualResetEvent(false);
+        _NearOrFarInOutEvent = new ManualResetEvent(false);
+        _BladeEvent = new ManualResetEvent(false);
+        _TrinityEvent = new ManualResetEvent(false);
     }
 
     public static void DebugMsg(string str, ScriptAccessory accessory)
@@ -861,7 +873,7 @@ public class DsrPatch
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
-    private ManualResetEvent _IceAndFireEvent = new(false);
+    
     [ScriptMethod(name: "P6：冰火吐息记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2795[4567])$"], userControl: false)]
     public void P6_IceAndFireGlowRecord(Event @event, ScriptAccessory accessory)
     {
@@ -984,7 +996,7 @@ public class DsrPatch
         DebugMsg($"检测到{(_p6DragonsWingAction[0] ? "T远离" : "T靠近")}, {(_p6DragonsWingAction[1] ? "左" : "右")}安全", accessory);
     }
 
-    private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
+    
     [ScriptMethod(name: "P6：远近，俯冲记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12612"], userControl: false)]
     public void P6_NearOrFar_CauterizeRecord(Event @event, ScriptAccessory accessory)
     {
@@ -996,7 +1008,6 @@ public class DsrPatch
         _NearOrFarCauterizeEvent.Set();
     }
 
-    private ManualResetEvent _NearOrFarInOutEvent = new(false);
     [ScriptMethod(name: "P6：远近，内外记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"], userControl: false)]
     public void P6_NearOrFar_BlackWingsRecord(Event @event, ScriptAccessory accessory)
     {
@@ -1187,7 +1198,7 @@ public class DsrPatch
         _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
     }
     
-    private ManualResetEvent _BladeEvent = new(false);
+
     [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"], userControl: false)]
     public void P7_BossBladeRecord(Event @event, ScriptAccessory accessory)
     {
@@ -1438,7 +1449,7 @@ public class DsrPatch
     
     #region P7 接刀
 
-    private ManualResetEvent _TrinityEvent = new(false);
+
     [ScriptMethod(name: "P7：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179]|28206)$"], userControl: false)]
     public void P7_PhaseRecord(Event @event, ScriptAccessory accessory)
     {

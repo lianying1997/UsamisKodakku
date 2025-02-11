@@ -18,6 +18,7 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
+using Lumina.Excel.GeneratedSheets;
 
 namespace UsamisKodakku.Scripts.FolderName.SubFolderName;
 
@@ -64,11 +65,20 @@ public class Hello
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
 
+
         // -- DEBUG CODE END --
     }
+    
+
 }
 
 #region 函数集
+
+// private ManualResetEvent _event = new(false);
+// _event.Set();
+// _event.Reset();
+// _event.WaitOne();
+
 public static class EventExtensions
 {
     private static bool ParseHexId(string? idStr, out uint id)
