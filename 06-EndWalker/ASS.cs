@@ -82,16 +82,19 @@ public class ASS
     static Vector3 CENTER_BOSS3 = new Vector3(289f, 533f, -105f);      // BOSS3 场地中心
     const int FIELDX_BOSS3 = 30;                                // BOSS3 场地X总长
     const int FIELDZ_BOSS3 = 40;                                // BOSS3 场地Z总长
+    
     uint Boss1_BubbleProperty = 0;                              // BOSS1 鼠鼠的泡泡属性
     List<uint> Boss1_P2_FieldBubbleProperty = [0, 0, 0];        // BOSS1 P2一染，场地泡泡属性记录
     List<uint> Boss1_P2_FieldBubbleSid = [0, 0, 0];             // BOSS1 P2一染，场地泡泡ID记录
     List<uint> Boss1_P3_FieldBubbleProperty = [0, 0, 0, 0];     // BOSS1 P3一拉，场地泡泡属性记录
     List<uint> Boss1_P3_FieldBubbleSid = [];                    // BOSS1 P3一拉，场地泡泡ID记录
     List<bool> Boss1_P4_WaterLine = new bool[4].ToList();       // BOSS1 P4二染，场地水壶记录
+    
     List<uint> Boss2_CurseBuff = [0, 0, 0, 0];                  // BOSS2 记录分摊/天光轮回buff
     List<bool> Boss2_isLongBuff = [false, false, false, false]; // BOSS2 记录长/短Buff
     List<int> Boss2_GoldenSilverBuff = [0, 0, 0, 0];            // BOSS2 记录金银Buff
     List<List<int>> Boss2_GoldenSilverField = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]; // BOSS2 金银Buff场地计算
+    
     List<int> Boss3_StrikeTarget = [0, 0];                      // BOSS3 石火豪冲（被挡枪目标）记录
     List<int> Boss3_P2_PlayerBuff = [0, 0, 0, 0];               // BOSS3 P2麻将记录
     List<float> Boss3_P4_BrandRot = [0, 0, 0];                  // BOSS3 咒具面向逻辑角度记录

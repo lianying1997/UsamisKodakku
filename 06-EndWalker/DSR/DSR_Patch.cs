@@ -35,6 +35,9 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
+    v0.0.0.6
+    1. 暂时关闭非Debug模式下的地火特殊策略启用
+    
     v0.0.0.5
     感谢贾老板的帮助，孩子抄代码抄的很开心！
     1. 增加P7地火特殊跑法指引
@@ -134,8 +137,7 @@ public class DsrPatch
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         
-        // _dsrPhase = DsrPhase.Init;
-        _dsrPhase = DsrPhase.Phase7Exaflare2;
+        _dsrPhase = DsrPhase.Init;
         _drawn = new bool[20].ToList();
         _p7BossId = 0;
     }
@@ -1210,6 +1212,8 @@ public class DsrPatch
         if (!IsExaflarePhase()) return;
         if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
         if (!_p7Exaflare.ExaflareRecordComplete()) return;
+
+        if (!DebugMode) return;
 
         List<Vector3> guidePosList;
         await Task.Delay(500);

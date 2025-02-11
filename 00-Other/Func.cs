@@ -314,10 +314,9 @@ public static class DirectionCalc
     /// <returns>逻辑基角度对应的逻辑方位</returns>
     public static int Rad2Dirs(this float radian, int dirs, bool diagDivision = true)
     {
-        double dirsDouble = dirs;
         var r = diagDivision
-            ? Math.Round(radian / (2f / dirsDouble * float.Pi))
-            : Math.Floor(radian / (2f / dirsDouble * float.Pi));
+            ? Math.Round(radian / (2f * float.Pi / dirs))
+            : Math.Floor(radian / (2f * float.Pi / dirs));
         r = (r + dirs) % dirs;
         return (int)r;
     }
