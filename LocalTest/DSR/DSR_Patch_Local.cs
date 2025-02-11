@@ -22,6 +22,11 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using KodakkuAssist.Module.Script.Type;
 
+// namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
+//
+// [ScriptType(name: Name, territorys: [968, 1112], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", 
+//     version: Version, author: "Usami", note: NoteStr)]
+
 namespace UsamisKodakku.Scripts.LocalTest.DSR;
 
 [ScriptType(name: Name, territorys: [968, 1112], guid: "abcdefg", 
@@ -38,6 +43,7 @@ public class DsrPatch
     v0.0.0.7
     1. 再次调整P7各机制时间间隔。
     2. 重构了代码，尽可能移除了async/await
+    3. 修复P7地火特殊跑法电椅。
     
     v0.0.0.5
     感谢贾老板的帮助，孩子抄代码抄的很开心！
@@ -59,6 +65,7 @@ public class DsrPatch
     鸭门。
     """;
 
+    // private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Name = "Local_DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.7";
     private const string DebugVersion = "a";
@@ -1254,8 +1261,7 @@ public class DsrPatch
         {
             while (!_recorded[5]) ;
         }
-        List<Vector3> guidePosList;
-        guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
+        var guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
         accessory.DebugMsg($"你选择的策略是{ExaflareStrategy}", DebugMode);
         DrawExaflareGuidePos(guidePosList, accessory);
     }
@@ -1403,7 +1409,7 @@ public class DsrPatch
         var bossRot = bossChara?.Rotation ?? bossRotRad;
         var bossPos = bossChara?.Position ?? Center;
         const int intervalTime = 1900;
-        const int castTime = 7000;
+        const int castTime = 6900;
         const int extendDistance = 7;
         const int dirNum = 3;
         const int extNum = 6;
@@ -1449,11 +1455,9 @@ public class DsrPatch
         if (_p7Exaflare == null) return;
         if (!IsExaflarePhase()) return;
         if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
-        accessory.DebugMsg($"{_p7Exaflare._recordedExaflareNum}", DebugMode);
         if (!_p7Exaflare.ExaflareRecordComplete()) return;
 
-        List<Vector3> guidePosList;
-        guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
+        var guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
         DrawExaflareGuidePos(guidePosList, accessory);
     }
 
@@ -1691,12 +1695,13 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     private ExaflareSolution BuildOneStepSolutionNew(ScriptAccessory accessory)
     {
         // 一步火
-        var backExaflarePos = ExaflarePosList[1];
         const bool isUniverse = false;
         var moveStep = 0;
         Vector3 pos2;
         Vector3 pos3;
         int targetExaflareIdx;
+        var debugText = $"[a][一步火]: \n";
+        
         if (!IsFrontPointedByExaflare(0, accessory))
             targetExaflareIdx = 0;
         else if (!IsFrontPointedByExaflare(2, accessory))
@@ -1711,19 +1716,22 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         
         if (moveStep == 0)
         {
-            accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
+            debugText += $"[a]检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点\n";
             pos3 = pos2;
         }
         else
         {
-            accessory.DebugMsg($"[一步火] 检测到前方地火均被指向，随便取左上作安全点", DebugMode);
+            debugText += $"[a]检测到前方地火均被指向，走前方两步火，随便取左上作安全点\n";
             pos3 = ExaflarePosList[1].PointInOutside(BossPos, 12f);
         }
         
         // pos1 根据职能定义起跑点
         var myIndex = accessory.GetMyIndex();
         var pos1 = FindFirstSafePosAtFront(targetExaflareIdx, myIndex < 1);
+        debugText += $"[a]玩家序号为{myIndex}, 为{(myIndex < 1?"坦克":"人群")}视角，\n倾向于{(myIndex < 1?"前方":"后方")}就位\n";
         moveStep++;
+        
+        accessory.DebugMsg(debugText, DebugMode);
         
         return new ExaflareSolution([pos1, pos2, pos3], moveStep, true, isUniverse, "一步火", scoreList, DebugMode,
             accessory);
@@ -1833,6 +1841,7 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         var pos2 = backExaflarePos;
         // pos3 二炸后，观察前面两枚
         Vector3 pos3;
+        var debugText = $"[b][两步火]: \n";
         
         // 前方两地火是否指向背后
         var idx0Point = IsBackPointedByExaflare(0, accessory);
@@ -1842,21 +1851,21 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         {
             // 都未指向背后，原地
             pos3 = backExaflarePos;
-            accessory.DebugMsg($"[两步火]前方地火都未指向背后，原地", DebugMode);
+            debugText += $"[b]检测到前方地火前方地火都未指向背后，转为背后一步火\n";
         }
         else if (!idx0Point && idx2Point)
         {
             // 右上未指向背后，去左侧
             pos3 = backExaflarePos.RotatePoint(BossPos, 45f.DegToRad());
             moveStep++;
-            accessory.DebugMsg($"[两步火]右上地火未指向背后，去左侧", DebugMode);
+            debugText += $"[b]检测到右上地火未指向背后，去左后\n";
         }
         else if (idx0Point && !idx2Point)
         {
             // 左上未指向背后，去右侧
             pos3 = backExaflarePos.RotatePoint(BossPos, -45f.DegToRad());
             moveStep++;
-            accessory.DebugMsg($"[两步火]左上地火未指向背后，去右侧", DebugMode);
+            debugText += $"[b]检测到左上地火未指向背后，去右侧\n";
         }
         else
         {
@@ -1864,9 +1873,9 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             pos3 = FindUniversalSafePos();
             isUniverse = true;
             moveStep++;
-            accessory.DebugMsg($"[两步火]地火全指向背后，无脑火", DebugMode);
+            debugText += $"[b]检测到地火全指向背后，转为无脑火\n";
         }
-
+        accessory.DebugMsg(debugText, DebugMode);
         return new ExaflareSolution([pos1, pos2, pos3], moveStep, false, isUniverse, "两步火", scoreList, DebugMode,
             accessory);
     }
@@ -2024,46 +2033,14 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     /// <returns></returns>
     private bool IsBackPointedByExaflare(int idx, ScriptAccessory accessory)
     {
-        // 找背后是否被前方地火指
-        accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}地火指向为{GetDirStr(ExaflareDirList[idx])}", DebugMode);
-        var result = true;
-        switch (idx)
+        // 右上地火不指向背后地火，当右上地火是正火时不指，当右上地火是斜火且方向为1时不指。
+        // 左上地火不指向背后地火，当左上地火是正火时不指，当左上地火是斜火且方向为7时不指。
+        var result = idx switch
         {
-            case 0:
-            {
-                if (ExaflareDirList[idx] == 1)
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是斜火，但不会指向背后", DebugMode);
-                    result = false;
-                }
-                if (IsExaflareRightDir(idx))
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是正火，不会指向背后", DebugMode);
-                    result = false;
-                }
-                break;
-            }
-            case 2:
-            {
-                if (ExaflareDirList[idx] == 7)
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是斜火，但不会指向背后", DebugMode);
-                    result = false;
-                }
-                if (IsExaflareRightDir(idx))
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(idx)}地火是正火，不会指向背后", DebugMode);
-                    result = false;
-                }
-                break;
-            }
-        }
-
-        if (result)
-        {
-            accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}地火会指向背后", DebugMode);
-        }
-
+            0 => IsExaflareRightDir(idx) || ExaflareDirList[idx] == 1,
+            2 => IsExaflareRightDir(idx) || ExaflareDirList[idx] == 7,
+            _ => false
+        };
         return result;
     }
 
@@ -2075,49 +2052,16 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     /// <returns></returns>
     private bool IsFrontPointedByExaflare(int idx, ScriptAccessory accessory)
     {
-        // 找背后是否被前方地火指
-        accessory.DebugMsg($"正在检测前方{GetExaflareIdxStr(idx)}地火是否会被指", DebugMode);
-        var result = false;
-        switch (idx)
+        // 右上地火被指：左上地火为正火，且方向不为6（朝左） 或 背后地火是斜火，且方向不为5（朝左下）
+        // 左上地火被指：右上地火为正火，且方向不为2（朝右） 或 背后地火是斜火，且方向不为3（朝右下）
+        var result = idx switch
         {
-            case 0:
-            {
-                // 如果2号火不是斜火且面向不为6，会指
-                if (IsExaflareRightDir(2) && ExaflareDirList[2] != 6)
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(2)}地火是正火，且有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
-                    result = true;
-                }
-                // 如果1号火面向不为3，会指
-                if (ExaflareDirList[1] != 5)
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(1)}地火是有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
-                    result = true;
-                }
-                break;
-            }
-            case 2:
-            {
-                // 如果0号火不是斜火且面向不为2，会指
-                if (IsExaflareRightDir(0) && ExaflareDirList[0] != 2)
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(0)}地火是有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
-                    result = true;
-                }
-                // 如果1号火面向不为3，会指
-                if (ExaflareDirList[1] != 3)
-                {
-                    accessory.DebugMsg($"检测到{GetExaflareIdxStr(1)}地火是有箭头指向{GetExaflareIdxStr(idx)}", DebugMode);
-                    result = true;
-                }
-                break;
-            }
-        }
-
-        if (!result)
-        {
-            accessory.DebugMsg($"检测到前方{GetExaflareIdxStr(idx)}不会被指", DebugMode);
-        }
+            0 => (IsExaflareRightDir(2) && ExaflareDirList[2] != 6) ||
+                 (!IsExaflareRightDir(1) && ExaflareDirList[1] != 5),
+            2 => (IsExaflareRightDir(0) && ExaflareDirList[0] != 2) ||
+                 (!IsExaflareRightDir(1) && ExaflareDirList[1] != 3),
+            _ => false
+        };
         return result;
     }
     

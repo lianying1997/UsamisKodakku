@@ -56,15 +56,18 @@ public class TopPatch
     [UserSetting("是否开启柯基模式")]
     public static bool CaptainMode { get; set; } = true;
     [UserSetting("站位提示圈绘图-普通颜色")]
-    public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
+    public static ScriptColor PosColorNormal { get; set; } = new() { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
-    public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
+    public static ScriptColor PosColorPlayer { get; set; } = new() { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
     
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
     private TopPhase _phase = TopPhase.Init;
-    private static DeltaVersion _dv = new DeltaVersion();
-    private static SigmaVersion _sv = new SigmaVersion();
-    private static DynamicsPass _dyn = new DynamicsPass();
+    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
+    private static DeltaVersion _dv = new(DebugMode);
+    private static SigmaVersion _sv = new(DebugMode);
+    private static SigmaWorld _sw = new(DebugMode);
+    private static DynamicsPass _dyn = new(DebugMode);
     
     public void Init(ScriptAccessory accessory)
     {
@@ -86,10 +89,23 @@ public class TopPatch
     
     #region P5 一运
     
+    [ScriptMethod(name: "P5 潜能量层数记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3444"], userControl: false)]
+    public void P5_DynamicRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (!IsInPhase5(_phase)) return;
+        var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        _dyn.AddDynamicBuffLevel(tidx);
+        accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(tidx)}的潜能量增加了，目前为{_dyn.GetDynamicBuffLevelCount(tidx)}",
+            DebugMode);
+    }
+    
     [ScriptMethod(name: "P5 一运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
     public void P5_RunMi_Delta_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         _phase = TopPhase.P5_Delta;
+        _dyn = new DynamicsPass(DebugMode);
+        _dv = new DeltaVersion(DebugMode);
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
@@ -121,7 +137,6 @@ public class TopPatch
         if (_phase == TopPhase.P5_Omega) return;
         var stid = (StatusId)@event.StatusId();
         var targetId = @event.TargetId();
-
         switch (stid)
         {
             case StatusId.FarWorld:
@@ -142,6 +157,9 @@ public class TopPatch
     {
         _phase = TopPhase.P5_Sigma;
         _sv = new SigmaVersion(DebugMode);
+        _sw = new SigmaWorld(DebugMode);
+        _dyn.DynamicIdxAdd();
+        _dyn.Reset();
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
@@ -183,10 +201,13 @@ public class TopPatch
     }
     
     [ScriptMethod(name: "P5 二运索尼头标计算", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"], userControl: false)]
-    public async void P5_SigmaVersionMarker(Event @event, ScriptAccessory accessory)
+    public void P5_SigmaVersionMarker(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
-        await Task.Delay(200);
+        lock (_sv)
+        {
+            while (!_sv.SonyRecordedDone() && !_sv.TargetRecordedDone()) ;
+        }
         _sv.BuildUntargetedGroup(accessory);
         if (CaptainMode)
         {
@@ -195,14 +216,21 @@ public class TopPatch
         }
         _sv.FindSpreadTarget();
         _sv.CalcSpreadPos(Center, accessory);
-        DrawSigmaSpreadSolution(accessory);
+
+        lock (_recorded)
+        {
+            _recorded[(int)RecordedIdx.SigmaSonyMarker] = true;
+        }
     }
     
     [ScriptMethod(name: "P5 二运八方分散指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"])]
-    public async void P5_SigmaVersionSpreadDir(Event @event, ScriptAccessory accessory)
+    public void P5_SigmaVersionSpreadDir(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
-        await Task.Delay(400);
+        lock (_recorded)
+        {
+            while (!_recorded[(int)RecordedIdx.SigmaSonyMarker]) ;
+        }
         DrawSigmaSpreadSolution(accessory);
     }
     
@@ -231,8 +259,8 @@ public class TopPatch
         if (_phase != TopPhase.P5_Sigma) return;
         if (!CaptainMode) return;
         accessory.Method.MarkClear();
-        accessory.DebugMsg($"二运前半段头标已消除", DebugMode);
         accessory.Method.RemoveDraw(".*");
+        _sw.CalcMarker();
         // TODO 二传算头标
     }
     
@@ -315,9 +343,9 @@ public class TopPatch
     }
 }
 
-public class DeltaVersion
+public class DeltaVersion(bool debugMode)
 {
-    private readonly bool _debugMode = true;    // 测试完成后置为False
+    private readonly bool _debugMode = debugMode;    // 测试完成后置为False
     // 数大在外，锁2近世界
     private List<uint> RemoteTetherInside { get; set; } = [];
     private List<uint> RemoteTetherOutside { get; set; } = [];
@@ -352,8 +380,9 @@ public class DeltaVersion
     }
 }
     
-public class SigmaVersion(bool debugMode = false)
+public class SigmaVersion(bool debugMode)
 {
+    private readonly bool _debugMode = debugMode;
     private List<uint> CircleGroup { get; set; } = [];
     private List<uint> CrossGroup { get; set; } = [];
     private List<uint> TriangleGroup { get; set; } = [];
@@ -368,6 +397,7 @@ public class SigmaVersion(bool debugMode = false)
     private List<int> TargetTowerPos { get; set; } = Enumerable.Repeat(0, 8).ToList();
     private List<Vector3> TargetTowerPosV3 { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
     private int SpreadTrueNorth { get; set; }
+    public int SonyGroupCount { get; set; } = 0;
 
     public void AddPlayerToGroup(uint id, IconId group, ScriptAccessory accessory)
     {
@@ -386,7 +416,8 @@ public class SigmaVersion(bool debugMode = false)
                 SquareGroup.Add(id);
                 break;
         }
-        accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", debugMode);
+        SonyGroupCount++;
+        // accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", _debugMode);
     }
 
     public void BuildTargetTowerPos(ScriptAccessory accessory)
@@ -397,12 +428,12 @@ public class SigmaVersion(bool debugMode = false)
             if (towerIdx == -1)
             {
                 TargetTowerPos[i] = 0;
-                accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", debugMode);
+                accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", _debugMode);
             }
             else
             {
                 TargetTowerPos[i] = towerIdx;
-                accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", debugMode);
+                accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", _debugMode);
             }
         }
     }
@@ -441,14 +472,14 @@ public class SigmaVersion(bool debugMode = false)
     public void SetSpreadTrueNorth(int pos, ScriptAccessory accessory)
     {
         SpreadTrueNorth = pos;
-        accessory.DebugMsg($"设置分散真北方向为{pos}", debugMode);
+        accessory.DebugMsg($"设置分散真北方向为{pos}", _debugMode);
     }
 
     public void SetTargetedPlayer(uint id, ScriptAccessory accessory)
     {
         var idx = accessory.GetPlayerIdIndex(id);
         IsTargeted[idx] = true;
-        accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", debugMode);
+        accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", _debugMode);
     }
 
     public void BuildUntargetedGroup(ScriptAccessory accessory)
@@ -460,7 +491,7 @@ public class SigmaVersion(bool debugMode = false)
             .ToList();
         
         foreach (var player in UntargetedGroup)
-            accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", debugMode);
+            accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", _debugMode);
     }
 
     public IconId FindIconGroup(uint id)
@@ -542,7 +573,7 @@ public class SigmaVersion(bool debugMode = false)
 
     public void CalcSpreadPos(Vector3 center, ScriptAccessory accessory)
     {
-        // TODO 该值待测试
+        // TODO 该“中远线距离”值待测试
         var basicDistance = IsRemoteGlitch() ? 19.5f : 11.25f;
         var basicPoint = new Vector3(100, 0, 100 - basicDistance);
         for (var i = 0; i < 8; i++)
@@ -555,13 +586,12 @@ public class SigmaVersion(bool debugMode = false)
                 posV3 = posV3.PointInOutside(center, 0.5f, true);
             SpreadPosV3[i] = posV3;
             accessory.DebugMsg($"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的分散位置{SpreadPosV3[i]}",
-                debugMode);
+                _debugMode);
         }
     }
 
     public void CalcTargetTowerPos(Vector3 center, ScriptAccessory accessory)
     {
-        // TODO 该值待测试
         var knockBackDistance = 13f;
         var basicPoint = new Vector3(100, 0, 82.5f + knockBackDistance);
         for (var i = 0; i < 8; i++)
@@ -569,7 +599,7 @@ public class SigmaVersion(bool debugMode = false)
             var posV3 = basicPoint.RotatePoint(center, TargetTowerPos[i] * float.Pi / 8);
             TargetTowerPosV3[i] = posV3;
             accessory.DebugMsg($"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的击退塔位置{TargetTowerPosV3[i]}",
-                debugMode);
+                _debugMode);
         }
     }
    
@@ -577,14 +607,14 @@ public class SigmaVersion(bool debugMode = false)
     {
         var idx = accessory.GetPlayerIdIndex(id);
         Marker[idx] = marker;
-        accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", debugMode);
+        accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", _debugMode);
     }
     
     public void SetMarkerBySelf(uint id, MarkType marker, ScriptAccessory accessory)
     {
         var idx = accessory.GetPlayerIdIndex(id);
         Marker[idx] = marker;
-        accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", debugMode);
+        accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", _debugMode);
     }
 
     public void SetTowerType(DataId towerId, Vector3 towerPos, Vector3 center, ScriptAccessory accessory)
@@ -597,7 +627,7 @@ public class SigmaVersion(bool debugMode = false)
             _ => 0
         };
         TowerType[pos] = towerType;
-        accessory.DebugMsg($"检测到方位{pos}的{towerType}人塔", debugMode);
+        accessory.DebugMsg($"检测到方位{pos}的{towerType}人塔", _debugMode);
     }
     
     public bool IsMarkered(int idx)
@@ -638,45 +668,69 @@ public class SigmaVersion(bool debugMode = false)
     {
         return TargetTowerPosV3;
     }
+    public bool SonyRecordedDone()
+    {
+        return SonyGroupCount == 8;
+    }
+    public bool TargetRecordedDone()
+    {
+        return IsTargeted.Count(x => x) == 6;
+    }
 }
 
-public class SigmaWorld
+public class SigmaWorld(bool debugMode)
 {
-    private readonly bool _debugMode = true;    // 测试完成后置为False
+    private readonly bool _debugMode = debugMode;
     private int OmegaFemalePos { get; set; } = 0;
     private bool OmegaFemaleInsideSafe { get; set; } = false;
-    // 到时候在这个class中，从DynamicsPass中获得数据，做标点算法。
+    private List<int>? _dynamicBuffLevel;
+
+    public void GetDynamicBuffLevel(DynamicsPass dyn)
+    {
+        _dynamicBuffLevel = dyn.GetBuffLevelList();
+    }
 }
 
-public class DynamicsPass
+public class DynamicsPass(bool debugMode)
 {
-    private readonly bool _debugMode = true;    // 测试完成后置为False
+    private readonly bool _debugMode = debugMode;
     private int DynamicIdx { get; set; } = 0;
     private List<int> BuffLevel { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0];
-    public uint FarSource { get; set; } = 0;
-    public uint NearSource { get; set; } = 0;
-    public List<uint> FarTarget { get; set; } = [];
-    public List<uint> NearTarget { get; set; } = [];
-    public List<uint> FreeTarget { get; set; } = [];
-
-    /// <summary>
-    /// “传”流程增加
-    /// </summary>
+    private uint FarSource { get; set; } = 0;
+    private uint NearSource { get; set; } = 0;
+    private List<uint> FarTarget { get; set; } = [];
+    private List<uint> NearTarget { get; set; } = [];
+    private List<uint> FreeTarget { get; set; } = [];
+    
     public void DynamicIdxAdd()
     {
         DynamicIdx++;
     }
 
+    public void Reset()
+    {
+        FarSource = 0;
+        NearSource = 0;
+        FreeTarget.Clear();
+        FarTarget.Clear();
+        NearTarget.Clear();
+    }
     public List<int> GetBuffLevelList()
     {
         return BuffLevel;
     }
-
+    public void AddDynamicBuffLevel(int idx)
+    {
+        BuffLevel[idx]++;
+    }
+    public int GetDynamicBuffLevelCount(int idx)
+    {
+        return BuffLevel[idx];
+    }
     public void SetFarSource(uint id)
     {
         FarSource = id;
     }
-        
     public void SetNearSource(uint id)
     {
         NearSource = id;
@@ -747,6 +801,11 @@ public enum DataId : uint
 {
     SingleTower = 2013245,
     PartnerTower = 2013246,
+}
+
+public enum RecordedIdx : int
+{
+    SigmaSonyMarker = 0,
 }
 
 #region 函数集
