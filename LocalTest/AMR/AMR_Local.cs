@@ -12,6 +12,7 @@ using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
@@ -21,7 +22,7 @@ using FFXIVClientStructs;
 
 namespace UsamisKodakku.Scripts.LocalTest.AMR;
 
-[ScriptType(name: Name, territorys: [], guid: "amr", 
+[ScriptType(name: Name, territorys: [1155, 1156], guid: "amr", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
@@ -47,15 +48,9 @@ public class Amr
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
     public void Init(ScriptAccessory accessory)
     {
-        DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
-    }
-
-    public static void DebugMsg(string str, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-        accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
 
     [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
@@ -66,6 +61,219 @@ public class Amr
 
         // -- DEBUG CODE END --
     }
+    
+    #region Boss1 舞狮
+
+    [ScriptMethod(name: "---- Boss1 狮子王 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
+    public static void SplitLine_Boss1(Event @event, ScriptAccessory accessory) {}
+
+    [ScriptMethod(name: "死刑与甩尾", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(19|20|5[89]))$"],
+        userControl: true)]
+    public static void SplittingCry(Event @event, ScriptAccessory accessory)
+    {
+        var aid = @event.ActionId();
+        var tid = @event.TargetId();
+        var sid = @event.SourceId();
+
+        HashSet<uint> tankBuster = [33819, 33858];
+        HashSet<uint> backSwipe = [33820, 33859];
+        
+        if (tankBuster.Contains(aid))
+        {
+            var dp = accessory.DrawOwnersTarget(sid, 14f, 60f, 0, 5000, $"直线死刑");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Rect, dp);
+        }
+        
+        if (backSwipe.Contains(aid))
+        {
+            var dp0 = accessory.DrawFrontBackCleave(sid, false, 0, 2000, $"扇形后刀", 60f.DegToRad(), 25f);
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+        }
+    }
+
+    [ScriptMethod(name: "六条奔雷矩形范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(33(790|829))$"],
+        userControl: true)]
+    public static void RokujoRevelRectAoe(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var dp = accessory.DrawRect(sid, 14f, 60f, 0, 8000, $"六条奔雷矩形{sid}");
+        accessory.Method.SendDraw(0, DrawTypeEnum.Straight, dp);
+    }
+    
+    #endregion
+
+    #region Boss2 捕鼠
+
+    [ScriptMethod(name: "---- Boss2 铁鼠豪雷 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
+    public static void SplitLine_Boss2(Event @event, ScriptAccessory accessory) {}
+
+    #endregion
+
+    #region Boss3 捉鬼
+
+    [ScriptMethod(name: "---- Boss3 怨灵猛虎 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
+    public static void SplitLine_Boss3(Event @event, ScriptAccessory accessory) {}
+
+    #endregion
+    
+    #region Mob1
+
+    [ScriptMethod(name: "---- Trash 小怪 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
+    public static void SplitLine_Trash(Event @event, ScriptAccessory accessory) {}
+    
+    [ScriptMethod(name: "紫州雷犼", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^((343(87|89|90))|3440[567])$"])]
+    public void Mob1_Raiko(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+        var tid = @event.TargetId();
+
+        HashSet<uint> chariot = [34390, 34408];
+        HashSet<uint> donut = [34389, 34407];
+        HashSet<uint> charge = [34387, 34405];
+
+        if (chariot.Contains(aid))
+        {
+            var dp = accessory.DrawCircle(sid, 10, 0, 4000, $"雷犼钢铁");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Circle, dp);
+        }
+
+        if (donut.Contains(aid))
+        {
+            var dp = accessory.DrawDonut(sid, 30, 5, 0, 4000, $"雷犼月环");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Donut, dp);
+        }
+
+        if (charge.Contains(aid))
+        {
+            var dp = accessory.DrawTarget2Target(sid, tid, 7, 5, 0, 4000, $"雷光冲锋", true);
+            accessory.Method.SendDraw(0, DrawTypeEnum.Donut, dp);
+        }
+    }
+
+    [ScriptMethod(name: "紫州风犼", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34(39[234]|41[012]))$"])]
+    public void Mob1_Fuko(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+        var tid = @event.TargetId();
+
+        HashSet<uint> stack = [34392, 34410];
+        HashSet<uint> knockBack = [34393, 34411];
+        HashSet<uint> chariot = [34394, 34412];
+
+        if (stack.Contains(aid))
+        {
+            var dp = accessory.DrawCircle(tid, 8, 0, 5000, $"风犼分摊");
+            dp.Color = accessory.Data.DefaultSafeColor;
+            accessory.Method.SendDraw(0, DrawTypeEnum.Circle, dp);
+        }
+
+        if (knockBack.Contains(aid))
+        {
+            var dp = accessory.DrawKnockBack(sid, 25, 0, 4000, $"风犼击退");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Displacement, dp);
+        }
+
+        if (chariot.Contains(aid))
+        {
+            var dp = accessory.DrawCircle(sid, 10, 0, 4000, $"风犼钢铁");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Donut, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "紫州幽鬼", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(344(3[78]|4[01]))$"])]
+    public void Mob1_Yuki(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+
+        HashSet<uint> rightSwipe = [34437, 34440];
+        HashSet<uint> leftSwipe = [34438, 34441];
+
+        if (rightSwipe.Contains(aid))
+        {
+            var dp = accessory.DrawLeftRightCleave(sid, false, 0, 4000, $"幽鬼右刀");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+        }
+
+        if (leftSwipe.Contains(aid))
+        {
+            var dp = accessory.DrawLeftRightCleave(sid, true, 0, 4000, $"幽鬼右刀");
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+        }
+    }
+    #endregion
+    
+    #region Mob2
+    
+    [ScriptMethod(name: "紫州小天狗", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34(39[678]|401|41[4569]))$"])]
+    public void Mob2_Kotengu(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+        
+        HashSet<uint> backCleave = [34396, 34414];
+        HashSet<uint> leftCleave = [34397, 34415];
+        HashSet<uint> rightCleave = [34398, 34416];
+        HashSet<uint> gaze = [34401, 34419];
+        
+        // TODO 绘图摧毁时间待测试
+        if (rightCleave.Contains(aid))
+        {
+            var dp0 = accessory.DrawFrontBackCleave(sid, true, 0, 4000, $"天狗前刀", 90f.DegToRad(), 50f);
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            var dp = accessory.DrawLeftRightCleave(sid, false, 0, 5000, $"天狗左刀", 90f.DegToRad());
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+        }
+
+        if (leftCleave.Contains(aid))
+        {
+            var dp0 = accessory.DrawFrontBackCleave(sid, true, 0, 4000, $"天狗前刀", 90f.DegToRad(), 50f);
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            var dp = accessory.DrawLeftRightCleave(sid, true, 0, 5000, $"天狗右刀", 90f.DegToRad());
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+        }
+        
+        if (backCleave.Contains(aid))
+        {
+            var dp0 = accessory.DrawFrontBackCleave(sid, true, 0, 4000, $"天狗前刀", 90f.DegToRad(), 50f);
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            var dp = accessory.DrawFrontBackCleave(sid, false, 0, 5000, $"天狗后刀", 90f.DegToRad(), 50f);
+            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+        }
+
+        if (gaze.Contains(aid))
+        {
+            var dp = accessory.DrawSightAvoid(sid, 0, 4000, $"天狗背对");
+            accessory.Method.SendDraw(0, DrawTypeEnum.SightAvoid, dp);
+        }
+    }
+
+    [ScriptMethod(name: "风元精直线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(344(39|42))$"])]
+    public void Mob2_WindElement(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var dp = accessory.DrawRect(sid, 8, 40, 0, 6000, $"风元精直线", true);
+        accessory.Method.SendDraw(0, DrawTypeEnum.Rect, dp);
+    }
+    
+    [ScriptMethod(name: "紫州隐密头领", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(344(04|2[29]|30))$"])]
+    public void Mob2_Onmitsugashira(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+        
+        HashSet<uint> shuriken = [34404, 34422];
+        HashSet<uint> shurikenFast = [34429, 34430];
+        
+        var destroy = shuriken.Contains(aid) ? 3000 : 1500;
+        var dp = accessory.DrawRect(sid, 3, 40, 0, destroy, $"忍者手里剑");
+        accessory.Method.SendDraw(0, DrawTypeEnum.Rect, dp);
+    }
+    
+    #endregion
+    
 }
 
 #region 函数集
@@ -496,75 +704,52 @@ public static class ColorHelper
 public static class AssignDp
 {
     /// <summary>
-    /// 返回自己指向某目标地点的dp，可修改dp.TargetPosition, dp.Scale
+    /// 返回箭头指引相关dp
     /// </summary>
-    /// <param name="targetPos">指向地点</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
+    /// <param name="ownerObj">箭头起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">箭头指向目标，可输入uint或Vector3，为0则无目标</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="rotation">箭头旋转角度</param>
+    /// <param name="scale">箭头宽度</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirPos(this ScriptAccessory accessory, Vector3 targetPos, int delay, int destroy, string name, float scale = 1f)
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
+        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(scale);
-        dp.Owner = accessory.Data.Me;
-        dp.TargetPosition = targetPos;
+        dp.Rotation = rotation;
         dp.ScaleMode |= ScaleMode.YByDistance;
         dp.Color = accessory.Data.DefaultSafeColor;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
-        return dp;
-    }
+        
+        switch (ownerObj)
+        {
+            case uint sid:
+                dp.Owner = sid;
+                break;
+            case Vector3 spos:
+                dp.Position = spos;
+                break;
+            default:
+                throw new ArgumentException("ownerObj的目标类型输入错误");
+        }
 
-    /// <summary>
-    /// 返回起始地点指向某目标地点的dp，可修改dp.Position, dp.TargetPosition, dp.Scale
-    /// </summary>
-    /// <param name="startPos">起始地点</param>
-    /// <param name="targetPos">指向地点</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirPos2Pos(this ScriptAccessory accessory, Vector3 startPos, Vector3 targetPos, int delay, int destroy, string name, float scale = 1f)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Position = startPos;
-        dp.TargetPosition = targetPos;
-        dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        return dp;
-    }
+        switch (targetObj)
+        {
+            case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos;
+                break;
+        }
 
-    /// <summary>
-    /// 返回自己指向某目标对象的dp，可修改dp.TargetObject, dp.Scale
-    /// </summary>
-    /// <param name="targetId">指向目标对象</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirTarget(this ScriptAccessory accessory, uint targetId, int delay, int destroy, string name, float scale = 1f)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Owner = accessory.Data.Me;
-        dp.TargetObject = targetId;
-        dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
         return dp;
     }
 
@@ -965,6 +1150,93 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
+
+    /// <summary>
+    /// 返回击退
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="target">击退源，可输入uint或Vector3</param>
+    /// <param name="width">击退绘图宽度</param>
+    /// <param name="length">击退绘图长度/距离</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, uint ownerId = 0, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        switch (target)
+        {
+            // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
+            case uint tid:
+                dp.TargetObject = tid; // 如果 tid 是 uint 类型
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos; // 如果 tid 是 Vector3 类型
+                break;
+            default:
+                throw new ArgumentException("DrawKnockBack的目标类型输入错误");
+        }
+        dp.Rotation = float.Pi;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回背对
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="target">背对源，可输入uint或Vector3</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name, uint ownerId = 0)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        switch (target)
+        {
+            // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
+            case uint tid:
+                dp.TargetObject = tid; // 如果 tid 是 uint 类型
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos; // 如果 tid 是 Vector3 类型
+                break;
+            default:
+                throw new ArgumentException("DrawSightAvoid的目标类型输入错误");
+        }
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+    
+    /// <summary>
+    /// 外部用调试模式
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="debugMode"></param>
+    /// <param name="accessory"></param>
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode)
+    {
+        if (!debugMode)
+            return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
+    }
 }
 
 #endregion
@@ -976,14 +1248,7 @@ public enum ActionId : uint
     //------Boss1------
     NTeleport = 33821, // NBoss->location, no cast, single-target, teleport
     STeleport = 33860, // SBoss->location, no cast, single-target, teleport
-
-    NEnkyo = 33818, // NBoss->self, 5.0s cast, range 60 circle, raidwide
-    NSplittingCry = 33819, // NBoss->self/players, 5.0s cast, range 60 width 14 rect tankbuster
-    NSlither = 33820, // NBoss->self, 2.0s cast, range 25 90-degree cone
-    SEnkyo = 33857, // SBoss->self, 5.0s cast, range 60 circle, raidwide
-    SSplittingCry = 33858, // SBoss->self/players, 5.0s cast, range 60 width 14 rect tankbuster
-    SSlither = 33859, // SBoss->self, 2.0s cast, range 25 90-degree cone
-
+    
     NStormcloudSummons = 33784, // NBoss->self, 3.0s cast, single-target, visual (summon clouds)
     NSmokeaterFirst = 33785, // NBoss->self, 2.5s cast, single-target, visual (first breath in)
     NSmokeaterRest = 33786, // NBoss->self, no cast, single-target, visual (optional second/third breath in)
@@ -999,6 +1264,7 @@ public enum ActionId : uint
     NCloudToCloud1 = 33796, // NRaiun->self, 2.5s cast, range 100 width 2 rect
     NCloudToCloud2 = 33797, // NRaiun->self, 4.0s cast, range 100 width 6 rect
     NCloudToCloud3 = 33798, // NRaiun->self, 4.0s cast, range 100 width 12 rect
+    
     SStormcloudSummons = 33823, // SBoss->self, 3.0s cast, single-target, visual
     SSmokeaterFirst = 33824, // SBoss->self, 2.5s cast, single-target, visual (first breath in)
     SSmokeaterRest = 33825, // SBoss->self, no cast, single-target, visual (optional second/third breath in)

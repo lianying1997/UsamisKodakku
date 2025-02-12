@@ -506,75 +506,52 @@ public static class ColorHelper
 public static class AssignDp
 {
     /// <summary>
-    /// 返回自己指向某目标地点的dp，可修改dp.TargetPosition, dp.Scale
+    /// 返回箭头指引相关dp
     /// </summary>
-    /// <param name="targetPos">指向地点</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
+    /// <param name="ownerObj">箭头起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">箭头指向目标，可输入uint或Vector3，为0则无目标</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="rotation">箭头旋转角度</param>
+    /// <param name="scale">箭头宽度</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirPos(this ScriptAccessory accessory, Vector3 targetPos, int delay, int destroy, string name, float scale = 1f)
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
+        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(scale);
-        dp.Owner = accessory.Data.Me;
-        dp.TargetPosition = targetPos;
+        dp.Rotation = rotation;
         dp.ScaleMode |= ScaleMode.YByDistance;
         dp.Color = accessory.Data.DefaultSafeColor;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
-        return dp;
-    }
+        
+        switch (ownerObj)
+        {
+            case uint sid:
+                dp.Owner = sid;
+                break;
+            case Vector3 spos:
+                dp.Position = spos;
+                break;
+            default:
+                throw new ArgumentException("ownerObj的目标类型输入错误");
+        }
 
-    /// <summary>
-    /// 返回起始地点指向某目标地点的dp，可修改dp.Position, dp.TargetPosition, dp.Scale
-    /// </summary>
-    /// <param name="startPos">起始地点</param>
-    /// <param name="targetPos">指向地点</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirPos2Pos(this ScriptAccessory accessory, Vector3 startPos, Vector3 targetPos, int delay, int destroy, string name, float scale = 1f)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Position = startPos;
-        dp.TargetPosition = targetPos;
-        dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        return dp;
-    }
+        switch (targetObj)
+        {
+            case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos;
+                break;
+        }
 
-    /// <summary>
-    /// 返回自己指向某目标对象的dp，可修改dp.TargetObject, dp.Scale
-    /// </summary>
-    /// <param name="targetId">指向目标对象</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirTarget(this ScriptAccessory accessory, uint targetId, int delay, int destroy, string name, float scale = 1f)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Owner = accessory.Data.Me;
-        dp.TargetObject = targetId;
-        dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
         return dp;
     }
 
@@ -974,6 +951,93 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
+    }
+    
+    /// <summary>
+    /// 返回击退
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="target">击退源，可输入uint或Vector3</param>
+    /// <param name="width">击退绘图宽度</param>
+    /// <param name="length">击退绘图长度/距离</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float width, float length, int delay, int destroy, string name, uint ownerId = 0, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new(width, length);
+        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        switch (target)
+        {
+            // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
+            case uint tid:
+                dp.TargetObject = tid; // 如果 tid 是 uint 类型
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos; // 如果 tid 是 Vector3 类型
+                break;
+            default:
+                throw new ArgumentException("DrawKnockBack的目标类型输入错误");
+        }
+        dp.Rotation = float.Pi;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+    
+    /// <summary>
+    /// 返回背对
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="target">背对源，可输入uint或Vector3</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name, uint ownerId = 0)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        switch (target)
+        {
+            // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
+            case uint tid:
+                dp.TargetObject = tid; // 如果 tid 是 uint 类型
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos; // 如果 tid 是 Vector3 类型
+                break;
+            default:
+                throw new ArgumentException("DrawSightAvoid的目标类型输入错误");
+        }
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+    
+    /// <summary>
+    /// 外部用调试模式
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="debugMode"></param>
+    /// <param name="accessory"></param>
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode)
+    {
+        if (!debugMode)
+            return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
 }
 
