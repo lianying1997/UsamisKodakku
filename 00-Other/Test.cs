@@ -19,6 +19,7 @@ using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using ECommons.MathHelpers;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 
 namespace UsamisScript.test;
 
@@ -56,7 +57,6 @@ public class HelloTest
     public void EchoDebug(Event @event, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
-
         // DEBUG CODE
         DebugMsg($"{float.Pi.RadToDeg()}, {180f.DegToRad()}", accessory);
 

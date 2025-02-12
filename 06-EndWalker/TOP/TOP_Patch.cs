@@ -19,6 +19,7 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using KodakkuAssist.Module.GameOperate;
 

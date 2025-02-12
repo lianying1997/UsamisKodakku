@@ -21,14 +21,14 @@ using FFXIVClientStructs;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.AMR;
 
-[ScriptType(name: Name, territorys: [], guid: "amr", 
+[ScriptType(name: Name, territorys: [], guid: "5166df44-bfc3-4675-b678-763f3e42fba4", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
 
 public class Amr
 {
-    const string NoteStr =
+    private const string NoteStr =
     """
     v0.0.0.0
     测试中。
@@ -45,9 +45,25 @@ public class Amr
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
+    
+    private enum AmrPhase
+    {
+        Init,                   // 初始
+    }
+
+    private AmrPhase _phase = AmrPhase.Init;
+    private static Vector3 _centerBoss1 = new Vector3(0, 0, -100);
+    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
+    
     public void Init(ScriptAccessory accessory)
     {
         DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", accessory);
+        
+        _phase = AmrPhase.Init;
+        _drawn = new bool[20].ToList();
+        _recorded = new bool[20].ToList();
+        
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }

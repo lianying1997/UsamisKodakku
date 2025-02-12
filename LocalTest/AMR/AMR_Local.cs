@@ -22,7 +22,7 @@ using FFXIVClientStructs;
 
 namespace UsamisKodakku.Scripts.LocalTest.AMR;
 
-[ScriptType(name: Name, territorys: [1155, 1156], guid: "amr", 
+[ScriptType(name: Name, territorys: [1155, 1156], guid: "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
@@ -46,13 +46,31 @@ public class Amr
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
+    
+    private enum AmrPhase
+    {
+        Init
+    }
+
+    private AmrPhase _phase = AmrPhase.Init;
+    private static Vector3 _centerBoss1 = new Vector3(0, 0, -100);
+    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
+    private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
+
+    private List<bool> _wailIsStackAndFirst = new bool[5].ToList();     // 不寻常咒声，分摊，先分摊记录
+    
     public void Init(ScriptAccessory accessory)
     {
         accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
+        
+        _phase = AmrPhase.Init;
+        _drawn = new bool[20].ToList();
+        _recorded = new bool[20].ToList();
+        
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }
-
+    
     [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
     public void EchoDebug(Event @event, ScriptAccessory accessory)
     {
@@ -65,11 +83,11 @@ public class Amr
     #region Boss1 舞狮
 
     [ScriptMethod(name: "---- Boss1 狮子王 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
-    public static void SplitLine_Boss1(Event @event, ScriptAccessory accessory) {}
+    public void SplitLine_Boss1(Event @event, ScriptAccessory accessory) {}
 
     [ScriptMethod(name: "死刑与甩尾", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(19|20|5[89]))$"],
         userControl: true)]
-    public static void SplittingCry(Event @event, ScriptAccessory accessory)
+    public void SplittingCry(Event @event, ScriptAccessory accessory)
     {
         var aid = @event.ActionId();
         var tid = @event.TargetId();
@@ -80,24 +98,124 @@ public class Amr
         
         if (tankBuster.Contains(aid))
         {
-            var dp = accessory.DrawOwnersTarget(sid, 14f, 60f, 0, 5000, $"直线死刑");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Rect, dp);
+            var dp = accessory.DrawTarget2Target(sid, tid, 14f, 60f, 0, 5000, $"灵鸣炮");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
         }
         
         if (backSwipe.Contains(aid))
         {
-            var dp0 = accessory.DrawFrontBackCleave(sid, false, 0, 2000, $"扇形后刀", 60f.DegToRad(), 25f);
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            var dp0 = accessory.DrawFrontBackCleave(sid, false, 0, 2000, $"扇形后刀", 90f.DegToRad(), 25f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp0);
         }
     }
 
     [ScriptMethod(name: "六条奔雷矩形范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(33(790|829))$"],
         userControl: true)]
-    public static void RokujoRevelRectAoe(Event @event, ScriptAccessory accessory)
+    public void RokujoRevelRectAoe(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
         var dp = accessory.DrawRect(sid, 14f, 60f, 0, 8000, $"六条奔雷矩形{sid}");
-        accessory.Method.SendDraw(0, DrawTypeEnum.Straight, dp);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
+    }
+    
+    [ScriptMethod(name: "狮子王牙矩形范围", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(16202)$"],
+        userControl: true)]
+    public void NoblePursuitRectAoe(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var dp = accessory.DrawRect(sid, 12f, 60f, 0, 12000, $"狮子王牙本体{sid}");
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
+        var dp0 = accessory.DrawRect(sid, 10f, 60f, 0, 12000, $"狮子王牙扩散{sid}");
+        dp0.Rotation = float.Pi / 2;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp0);
+    }
+    
+    [ScriptMethod(name: "狮子王牙范围删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(338(01|40))$"],
+        userControl: true)]
+    public void NoblePursuitRectAoeRemove(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        accessory.Method.RemoveDraw($"狮子王牙本体{sid}");
+        accessory.Method.RemoveDraw($"狮子王牙扩散{sid}");
+    }
+    
+    [ScriptMethod(name: "诡异咒声Buff记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["StatusID:regex:^(356[34])$"],
+        userControl: false)]
+    public void UnnaturalWailBuffRecord(Event @event, ScriptAccessory accessory)
+    {
+        const uint spread = 3565;
+        const uint stack = 3566;
+        const uint buffLongTime = 20000;
+        
+        var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        var stid = @event.StatusId();
+        var dur = @event.DurationMilliseconds();
+        
+        if (stid == stack)
+            _wailIsStackAndFirst[tidx] = true;
+        if (dur > buffLongTime && stid == stack)
+            _wailIsStackAndFirst[4] = true;
+    }
+    
+    [ScriptMethod(name: "诡异咒声分摊分散", eventType: EventTypeEnum.ActionEffect, eventCondition: ["StatusID:regex:^(356[34])$"],
+        userControl: true)]
+    public void UnnaturalWailBuff(Event @event, ScriptAccessory accessory)
+    {
+        // =====================================================================
+        // NUnnaturalWail = 33815, // NBoss->self, 3.0s cast, single-target, visual (spread/stack debuffs)
+        // NUnnaturalAilment = 33816, // Helper->players, no cast, range 6 circle spread
+        // NUnnaturalForce = 33817, // Helper->players, no cast, range 6 circle 2-man stack
+        // NHauntingCry = 33802, // NBoss->self, 3.0s cast, single-target, visual (spawn adds)
+        // NRightSwipe = 33803, // NDevilishThrall->self, 10.0s cast, range 40 180-degree cone
+        // NLeftSwipe = 33804, // NDevilishThrall->self, 10.0s cast, range 40 180-degree cone
+        // NEyeOfTheThunderVortexFirst = 33811, // NBoss->self, 5.2s cast, range 15 circle
+        // NEyeOfTheThunderVortexSecond = 33812, // NBoss->self, no cast, range 8-30 donut
+        // NVortexOfTheThunderEyeFirst = 33813, // NBoss->self, 5.2s cast, range 8-30 donut
+        // NVortexOfTheThunderEyeSecond = 33814, // NBoss->self, no cast, range 15 circle
+        // SUnnaturalWail = 33854, // SBoss->self, 3.0s cast, single-target, visual (spread/stack debuffs)
+        // SUnnaturalAilment = 33855, // Helper->players, no cast, range 6 circle spread
+        // SUnnaturalForce = 33856, // Helper->players, no cast, range 6 circle 2-man stack
+        // SHauntingCry = 33841, // SBoss->self, 3.0s cast, single-target, visual (spawn adds)
+        // SRightSwipe = 33842, // SDevilishThrall->self, 10.0s cast, range 40 180-degree cone
+        // SLeftSwipe = 33843, // SDevilishThrall->self, 10.0s cast, range 40 180-degree cone
+        // SEyeOfTheThunderVortexFirst = 33850, // SBoss->self, 5.2s cast, range 15 circle
+        // SEyeOfTheThunderVortexSecond = 33851, // SBoss->self, no cast, range 8-30 donut
+        // SVortexOfTheThunderEyeFirst = 33852, // SBoss->self, 5.2s cast, range 8-30 donut
+        // SVortexOfTheThunderEyeSecond = 33853, // SBoss->self, no cast, range 15 circle
+        //
+        // ScatteredWailing = 3563, // *Boss->player, extra=0x0
+        // IntensifiedWailing = 3564, // *Boss->player, extra=0x0
+        // =====================================================================
+        
+        // const uint spread = 3565;
+        const uint stack = 3566;
+        
+        var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        var myIndex = accessory.GetMyIndex();
+        var stid = @event.StatusId();
+        var dur = @event.DurationMilliseconds();
+
+        if (stid == stack)
+        {
+            var dp = accessory.DrawCircle(tid, 6, (int)dur - 4000, 4000, $"分摊");
+            if (IsTnPartner(tidx, myIndex))
+                dp.Color = accessory.Data.DefaultSafeColor;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+        else
+        {
+            var dp = accessory.DrawCircle(tid, 6, (int)dur - 4000, 4000, $"分散");
+            if (tidx == myIndex) return;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+    }
+
+    private bool IsTnPartner(int idx1, int idx2)
+    {
+        return (idx1 < 2 && idx2 < 2) || (idx1 >= 2 && idx2 >= 2);
     }
     
     #endregion
@@ -105,22 +223,21 @@ public class Amr
     #region Boss2 捕鼠
 
     [ScriptMethod(name: "---- Boss2 铁鼠豪雷 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
-    public static void SplitLine_Boss2(Event @event, ScriptAccessory accessory) {}
+    public void SplitLine_Boss2(Event @event, ScriptAccessory accessory) {}
 
     #endregion
 
     #region Boss3 捉鬼
 
     [ScriptMethod(name: "---- Boss3 怨灵猛虎 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
-    public static void SplitLine_Boss3(Event @event, ScriptAccessory accessory) {}
+    public void SplitLine_Boss3(Event @event, ScriptAccessory accessory) {}
 
     #endregion
-    
+   
     #region Mob1
-
     [ScriptMethod(name: "---- Trash 小怪 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
-    public static void SplitLine_Trash(Event @event, ScriptAccessory accessory) {}
-    
+    public void SplitLine_Trash(Event @event, ScriptAccessory accessory) {}
+
     [ScriptMethod(name: "紫州雷犼", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^((343(87|89|90))|3440[567])$"])]
     public void Mob1_Raiko(Event @event, ScriptAccessory accessory)
     {
@@ -135,19 +252,19 @@ public class Amr
         if (chariot.Contains(aid))
         {
             var dp = accessory.DrawCircle(sid, 10, 0, 4000, $"雷犼钢铁");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Circle, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
 
         if (donut.Contains(aid))
         {
             var dp = accessory.DrawDonut(sid, 30, 5, 0, 4000, $"雷犼月环");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Donut, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
         }
 
         if (charge.Contains(aid))
         {
             var dp = accessory.DrawTarget2Target(sid, tid, 7, 5, 0, 4000, $"雷光冲锋", true);
-            accessory.Method.SendDraw(0, DrawTypeEnum.Donut, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
         }
     }
 
@@ -166,19 +283,19 @@ public class Amr
         {
             var dp = accessory.DrawCircle(tid, 8, 0, 5000, $"风犼分摊");
             dp.Color = accessory.Data.DefaultSafeColor;
-            accessory.Method.SendDraw(0, DrawTypeEnum.Circle, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
 
         if (knockBack.Contains(aid))
         {
             var dp = accessory.DrawKnockBack(sid, 25, 0, 4000, $"风犼击退");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Displacement, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
         }
 
         if (chariot.Contains(aid))
         {
             var dp = accessory.DrawCircle(sid, 10, 0, 4000, $"风犼钢铁");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Donut, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
         }
     }
     
@@ -194,13 +311,13 @@ public class Amr
         if (rightSwipe.Contains(aid))
         {
             var dp = accessory.DrawLeftRightCleave(sid, false, 0, 4000, $"幽鬼右刀");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
 
         if (leftSwipe.Contains(aid))
         {
             var dp = accessory.DrawLeftRightCleave(sid, true, 0, 4000, $"幽鬼右刀");
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
     }
     #endregion
@@ -222,31 +339,31 @@ public class Amr
         if (rightCleave.Contains(aid))
         {
             var dp0 = accessory.DrawFrontBackCleave(sid, true, 0, 4000, $"天狗前刀", 90f.DegToRad(), 50f);
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp0);
             var dp = accessory.DrawLeftRightCleave(sid, false, 0, 5000, $"天狗左刀", 90f.DegToRad());
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
 
         if (leftCleave.Contains(aid))
         {
             var dp0 = accessory.DrawFrontBackCleave(sid, true, 0, 4000, $"天狗前刀", 90f.DegToRad(), 50f);
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp0);
             var dp = accessory.DrawLeftRightCleave(sid, true, 0, 5000, $"天狗右刀", 90f.DegToRad());
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
         
         if (backCleave.Contains(aid))
         {
             var dp0 = accessory.DrawFrontBackCleave(sid, true, 0, 4000, $"天狗前刀", 90f.DegToRad(), 50f);
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp0);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp0);
             var dp = accessory.DrawFrontBackCleave(sid, false, 0, 5000, $"天狗后刀", 90f.DegToRad(), 50f);
-            accessory.Method.SendDraw(0, DrawTypeEnum.Fan, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
 
         if (gaze.Contains(aid))
         {
             var dp = accessory.DrawSightAvoid(sid, 0, 4000, $"天狗背对");
-            accessory.Method.SendDraw(0, DrawTypeEnum.SightAvoid, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.SightAvoid, dp);
         }
     }
 
@@ -255,7 +372,7 @@ public class Amr
     {
         var sid = @event.SourceId();
         var dp = accessory.DrawRect(sid, 8, 40, 0, 6000, $"风元精直线", true);
-        accessory.Method.SendDraw(0, DrawTypeEnum.Rect, dp);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
     
     [ScriptMethod(name: "紫州隐密头领", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(344(04|2[29]|30))$"])]
@@ -269,11 +386,11 @@ public class Amr
         
         var destroy = shuriken.Contains(aid) ? 3000 : 1500;
         var dp = accessory.DrawRect(sid, 3, 40, 0, destroy, $"忍者手里剑");
-        accessory.Method.SendDraw(0, DrawTypeEnum.Rect, dp);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
     
     #endregion
-    
+
 }
 
 #region 函数集
@@ -897,7 +1014,7 @@ public static class AssignDp
         dp.Owner = ownerId;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
-        dp.CentreResolvePattern = PositionResolvePatternEnum.OwnerTarget;
+        dp.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;

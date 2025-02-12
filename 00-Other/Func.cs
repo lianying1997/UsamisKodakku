@@ -699,7 +699,7 @@ public static class AssignDp
         dp.Owner = ownerId;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
-        dp.CentreResolvePattern = PositionResolvePatternEnum.OwnerTarget;
+        dp.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
