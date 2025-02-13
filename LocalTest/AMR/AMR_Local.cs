@@ -20,6 +20,7 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
+using Lumina.Data.Structs.Excel;
 
 namespace UsamisKodakku.Scripts.LocalTest.AMR;
 
@@ -59,6 +60,9 @@ public class Amr
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private List<AutoResetEvent> _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();   // 自动线程
     private List<ManualResetEvent> _manualEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();   // 手动线程
+
+    private VengefulSouls _vs = new VengefulSouls();
+    private StormClouds _sc = new StormClouds();
     
     private List<bool> _wailIsStackAndFirst = new bool[5].ToList();     // Boss1 不寻常咒声，分摊，先分摊记录
     private List<int> _liveFireStackIdx = [];                           // Boss2 火印分摊点名记录
@@ -111,7 +115,7 @@ public class Amr
         
         if (backSwipe.Contains(aid))
         {
-            var dp0 = accessory.DrawFrontBackCleave(sid, false, 0, 2000, $"扇形后刀", 90f.DegToRad(), 25f);
+            var dp0 = accessory.DrawFrontBackCleave(sid, false, 0, 2000, $"扇形后刀", 90f.DegToRad(), 40f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp0);
         }
     }
@@ -125,14 +129,14 @@ public class Amr
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
     }
     
-    [ScriptMethod(name: "狮子王牙矩形范围", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(16202)$"],
+    [ScriptMethod(name: "狮子王牙矩形范围", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1620[27])$"],
         userControl: true)]
     public void NoblePursuitRectAoe(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
-        var dp = accessory.DrawRect(sid, 12f, 60f, 0, 12000, $"狮子王牙本体{sid}");
+        var dp = accessory.DrawRect(sid, 12f, 120f, 0, 12000, $"狮子王牙本体{sid}");
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
-        var dp0 = accessory.DrawRect(sid, 10f, 60f, 0, 12000, $"狮子王牙扩散{sid}");
+        var dp0 = accessory.DrawRect(sid, 10f, 120f, 0, 12000, $"狮子王牙扩散{sid}");
         dp0.Rotation = float.Pi / 2;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp0);
@@ -188,14 +192,14 @@ public class Amr
 
         if (stid == stack)
         {
-            var dp = accessory.DrawCircle(tid, 6, (int)dur - 4000, 4000, $"分摊");
+            var dp = accessory.DrawCircle(tid, 6, (int)dur - 5000, 5000, $"分摊");
             if (IsJobPartner(tidx, myIndex))
                 dp.Color = accessory.Data.DefaultSafeColor;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
         else
         {
-            var dp = accessory.DrawCircle(tid, 6, (int)dur - 4000, 4000, $"分散");
+            var dp = accessory.DrawCircle(tid, 6, (int)dur - 5000, 5000, $"分散");
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
@@ -246,15 +250,55 @@ public class Amr
 
         if (rightSwipe.Contains(aid))
         {
-            var dp = accessory.DrawLeftRightCleave(sid, false, 6000, 4000, $"幽鬼右刀");
+            var dp = accessory.DrawLeftRightCleave(sid, false, 5000, 5000, $"幽鬼右刀");
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
 
         if (leftSwipe.Contains(aid))
         {
-            var dp = accessory.DrawLeftRightCleave(sid, true, 6000, 4000, $"幽鬼右刀");
+            var dp = accessory.DrawLeftRightCleave(sid, true, 5000, 5000, $"幽鬼右刀");
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
+    }
+    
+    [ScriptMethod(name: "黑赤招魂初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(02|41))$"],
+        userControl: false)]
+    public void VengefulSoulsReset(Event @event, ScriptAccessory accessory)
+    {
+        _vs.Init(accessory);
+    }
+    
+    [ScriptMethod(name: "黑赤招魂塔记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(07|46))$"],
+        userControl: false)]
+    public void VengefulSoulsTowerRecord(Event @event, ScriptAccessory accessory)
+    {
+        var tpos = @event.TargetPosition();
+        lock (_vs)
+        {
+            _vs.AddTowerPos(tpos);
+            if (_vs.GetTowerNum() == 2)
+                _manualEvents[0].Set();
+        }
+    }
+    
+    [ScriptMethod(name: "黑赤招魂塔指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(06|45))$"],
+        userControl: true)]
+    public void VengefulSoulsTowerGuide(Event @event, ScriptAccessory accessory)
+    {
+        _manualEvents[0].WaitOne();
+        var towerSolution = _vs.ExportTowerSolution();
+        var myIndex = accessory.GetMyIndex();
+        for (var i = 0; i < towerSolution.Count; i++)
+        {
+            var playerIdx = towerSolution[i].Item1;
+            if (myIndex != playerIdx) continue;
+            var towerPos = towerSolution[i].Item2;
+            var dpTower = accessory.DrawStaticCircle(towerPos, accessory.Data.DefaultSafeColor, 0, 15000, $"塔范围", 4);
+            var dpGuide = accessory.DrawGuidance(towerPos, 0, 15000, $"塔指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dpTower);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuide);
+        }
+        _manualEvents[0].Reset();
     }
     
     [ScriptMethod(name: "黑赤招魂大圈", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(08|47))$"],
@@ -262,30 +306,41 @@ public class Amr
     public void VengefulSoulsDefamation(Event @event, ScriptAccessory accessory)
     {
         var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        _vs.AddDefamationTargetIdx(tidx);
         var dp = accessory.DrawCircle(tid, 15, 11000, 4000, $"黑赤招魂大圈");
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
     
-    private class VengefulSouls(ScriptAccessory accessory)
+    private class VengefulSouls
     {
-        private List<int> _defamationTargetIdx = [];
+        public ScriptAccessory accessory {get; set;} = null!;
+        private readonly List<int> _defamationTargetIdx = [];
         private static readonly List<int> PriorityList = [0, 1, 2, 3];
         private List<Vector3> _towerPos = [];
 
-        public void Init()
+        public void Init(ScriptAccessory _accessory)
         {
             _defamationTargetIdx.Clear();
             _towerPos.Clear();
+            accessory = _accessory;
         }
         
         public void AddDefamationTargetIdx(int idx)
         {
             _defamationTargetIdx.Add(idx);
+            accessory.DebugMsg($"检测到{accessory.GetPlayerJobByIndex(idx, true)}的大圈", DebugMode);
         }
 
         public void AddTowerPos(Vector3 pos)
         {
             _towerPos.Add(pos);
+            accessory.DebugMsg($"检测到{pos}的塔", DebugMode);
+        }
+
+        public int GetTowerNum()
+        {
+            return _towerPos.Count;
         }
 
         public List<(int, Vector3)> ExportTowerSolution()
@@ -298,7 +353,7 @@ public class Amr
             var str = "";
             for (var i = 0; i < combinedList.Count; i++)
             {
-                str += $"{accessory.GetPlayerJobByIndex(combinedList[i].Item1)}踩塔{combinedList[i].Item2}\n";
+                str += $"{accessory.GetPlayerJobByIndex(combinedList[i].Item1, true)}踩塔{combinedList[i].Item2}\n";
             }
             accessory.DebugMsg(str, DebugMode);
             return combinedList;
@@ -327,7 +382,231 @@ public class Amr
         }
     }
     
+    [ScriptMethod(name: "雷暴云初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(33(784|823))$"],
+        userControl: false)]
+    public void StormCloudReset(Event @event, ScriptAccessory accessory)
+    {
+        // NStormcloudSummons = 33784, // NBoss->self, 3.0s cast, single-target, visual (summon clouds)
+        // NSmokeaterFirst = 33785, // NBoss->self, 2.5s cast, single-target, visual (first breath in)
+        // NSmokeaterRest = 33786, // NBoss->self, no cast, single-target, visual (optional second/third breath in)
+        // NSmokeaterAbsorb = 33787, // NRaiun->NBoss, no cast, single-target, visual (absorb cloud)
+        // NRokujoRevelFirst = 33788, // NBoss->self, 7.5s cast, single-target, visual (first line aoe)
+        // NRokujoRevelRest = 33789, // NBoss->self, no cast, single-target, visual (second/third line aoe)
+        // NRokujoRevelAOE = 33790, // Helper->self, 8.0s cast, range 60 width 14 rect
+        // NLeapingLevin1 = 33791, // NRaiun->self, 1.0s cast, range 8 circle
+        // NLeapingLevin2 = 33792, // NRaiun->self, 1.0s cast, range 12 circle
+        // NLeapingLevin3 = 33793, // NRaiun->self, 1.0s cast, range 23 circle
+        // NLightningBolt = 33794, // NBoss->self, 3.0s cast, single-target, visual (start multiple lines)
+        // NLightningBoltAOE = 33795, // Helper->location, 4.0s cast, range 6 circle
+        //
+        // SStormcloudSummons = 33823, // SBoss->self, 3.0s cast, single-target, visual
+        // SSmokeaterFirst = 33824, // SBoss->self, 2.5s cast, single-target, visual (first breath in)
+        // SSmokeaterRest = 33825, // SBoss->self, no cast, single-target, visual (optional second/third breath in)
+        // SSmokeaterAbsorb = 33826, // SRaiun->SBoss, no cast, single-target, visual (absorb cloud)
+        // SRokujoRevelFirst = 33827, // SBoss->self, 7.5s cast, single-target, visual (first line aoe)
+        // SRokujoRevelRest = 33828, // SBoss->self, no cast, single-target, visual (second/third line aoe)
+        // SRokujoRevelAOE = 33829, // Helper->self, 8.0s cast, range 60 width 14 rect
+        // SLeapingLevin1 = 33830, // SRaiun->self, 1.0s cast, range 8 circle
+        // SLeapingLevin2 = 33831, // SRaiun->self, 1.0s cast, range 12 circle
+        // SLeapingLevin3 = 33832, // SRaiun->self, 1.0s cast, range 23 circle
+        // SLightningBolt = 33833, // SBoss->self, 3.0s cast, single-target, visual (start multiple lines)
+        // SLightningBoltAOE = 33834, // Helper->location, 4.0s cast, range 6 circle
+            
+        _sc.Init(accessory);
+    }
+
+    [ScriptMethod(name: "雷暴云添加", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1620[16])$"],
+        userControl: false)]
+    public void StormCloudAdd(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
+        _sc.AddCloud(sid, spos);
+    }
+
+    [ScriptMethod(name: "雷暴云移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:regex:^(33(787|826))$"],
+        userControl: false)]
+    public void StormCloudRemove(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        _sc.DisableCloud(sid);
+    }
     
+    [ScriptMethod(name: "吞霞次数添加", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:regex:^(33(78[56]|82[45]))$"],
+        userControl: false)]
+    public void SmokeatTimeAdd(Event @event, ScriptAccessory accessory)
+    {
+        _sc.AddSmokeatTime();
+    }
+    
+    [ScriptMethod(name: "六条奔雷角度记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(33(790|829))$"],
+        userControl: false)]
+    public void RokujoRevelRotationRecord(Event @event, ScriptAccessory accessory)
+    {
+        var srot = @event.SourceRotation();
+        _sc.AddBossRotation(srot);
+        if (_sc.GetSetCondition())
+            _manualEvents[1].Set();
+    }
+    
+    [ScriptMethod(name: "雷暴云吞霞范围与指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(33(788|827))$"],
+        userControl: true)]
+    public void StormCloudGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // 读条“六条奔雷”时开始等待
+        _manualEvents[1].WaitOne();
+        var dpList = _sc.ExportCloudSolution();
+
+        for (var i = 0; i < dpList[0].Count(); i++)
+        {
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dpList[0][i]);
+        }
+        // TODO 没写完
+    }
+    
+    private class StormClouds
+    {
+        public ScriptAccessory accessory {get; set;} = null!;
+        private List<(uint, Vector3, bool)> _cloud = [];
+        private List<float> _bossRotation = [];
+        private int _smokeatTime = 0;
+        
+        public void Init(ScriptAccessory _accessory)
+        {
+            _cloud.Clear();
+            _bossRotation.Clear();
+            _smokeatTime = 0;
+            accessory = _accessory;
+        }
+
+        public void AddCloud(uint id, Vector3 pos)
+        {
+            _cloud.Add((id, pos, true));
+        }
+
+        public void DisableCloud(uint id)
+        {
+            for (var i = 0; i < _cloud.Count; i++)
+            {
+                if (_cloud[i].Item1 == id)
+                    _cloud[i] = (_cloud[i].Item1, _cloud[i].Item2, false);
+            }
+        }
+
+        public void AddSmokeatTime()
+        {
+            _smokeatTime++;
+        }
+        
+        public void AddBossRotation(float rot)
+        {
+            _bossRotation.Add(rot);
+        }
+        
+        public bool GetSetCondition()
+        {
+            return _bossRotation.Count == _smokeatTime;
+        }
+
+        private bool IsInRange(Vector3 pos, float bossRotation)
+        {
+            var relativePos = pos.RotatePoint(_centerBoss1, -1 * bossRotation.Game2Logic());
+            // 检查x轴是否在范围内即可，六条奔雷宽度14
+            return Math.Abs(relativePos.X) <= 7;
+        }
+
+        private bool IsNearEdge(Vector3 pos)
+        {
+            var v2 = new Vector2(pos.X - _centerBoss1.X, pos.Z - _centerBoss1.Z);
+            return v2.Length() > 17f;
+        }
+
+        private Vector3 FindRelativeSafePos(Vector3 pos)
+        {
+            Vector3 safePos;
+            if (_smokeatTime != 3)
+            {
+                // 计算偏外侧
+                if (IsNearEdge(pos))
+                {
+                    var isCw = pos.Position2Dirs(_centerBoss1, 4, false) % 2 == 0;
+                    safePos = pos.RotatePoint(_centerBoss1, isCw ? 40f.DegToRad() : -40f.DegToRad());
+                }
+                else
+                {
+                    var isRight = pos.X > _centerBoss1.X;
+                    safePos = new Vector3(pos.X + (isRight ? 8f : -8f), pos.Y, pos.Z);
+                }
+            }
+            else
+            {
+                var isRight = pos.X > _centerBoss1.X;
+                safePos = new Vector3(isRight ? -19f:19f, pos.Y, _centerBoss1.Z);
+            }
+            return safePos;
+        }
+        
+        public List<DrawPropertiesEdit[]> ExportCloudSolution()
+        {
+            List<DrawPropertiesEdit[]> dpList = [[], [], []];   // 危险区、安全区、指路
+            var cloudScale = _smokeatTime switch
+            {
+                1 => 8,
+                2 => 12,
+                3 => 23,
+                _ => 8
+            };
+            // 吞霞一次，场中六选一；吞霞两次，场中四选一；吞霞三次，场中一对一
+            // 机制核心解法是找到场中的六个雷暴云进行判断
+            foreach (var cloud in _cloud.Where(cloud => IsInRange(cloud.Item2, _bossRotation[0])))
+            {
+                if (cloud.Item3)
+                {
+                    var dangerCloudPos = cloud.Item2;
+                    // 需画出对应危险区域
+                    var dp = accessory.DrawCircle(cloud.Item1, cloudScale, 0, 20000, $"雷云{cloud.Item1}");
+                    dpList[0].Add(dp);
+                    
+                    // 三次吞霞需借助危险区反推安全区，三次吞霞只有一个cloud满足该条件，所以无需加额外条件
+                    if (_smokeatTime != 3) continue;
+                    var safePos = FindRelativeSafePos(dangerCloudPos);
+                    var dpSafeField1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区1");
+                    var dpSafeField2 = accessory.DrawStaticCircle(dangerCloudPos, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区2");
+                    dpList[1].Add(dpSafeField1);
+                    dpList[1].Add(dpSafeField2);
+                    
+                    var dpSafeGuide1 = accessory.DrawGuidance(safePos, 0, 20000, $"雷云指路1");
+                    var dpSafeGuide12 = accessory.DrawGuidance(safePos, dangerCloudPos, 0, 20000, $"雷云指路12");
+                    dpSafeGuide12.Color = accessory.Data.DefaultDangerColor;
+                    var dpSafeGuide2 = accessory.DrawGuidance(dangerCloudPos, 0, 20000, $"雷云指路2");
+                    dpList[2].Add(dpSafeGuide1);
+                    dpList[2].Add(dpSafeGuide12);
+                    dpList[2].Add(dpSafeGuide2);
+                }
+                else
+                {
+                    if (_smokeatTime == 3) continue;
+                    
+                    var safeCloudPos = cloud.Item2;
+                    var safePos = FindRelativeSafePos(safeCloudPos);
+                    var dp1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区1");
+                    var dp2 = accessory.DrawStaticCircle(_centerBoss1, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区2");
+                    dpList[1].Add(dp1);
+                    dpList[1].Add(dp2);
+                    
+                    var dpSafeGuide1 = accessory.DrawGuidance(safePos, 0, 20000, $"雷云指路1");
+                    var dpSafeGuide12 = accessory.DrawGuidance(safePos, _centerBoss1, 0, 20000, $"雷云指路12");
+                    dpSafeGuide12.Color = accessory.Data.DefaultDangerColor;
+                    var dpSafeGuide2 = accessory.DrawGuidance(_centerBoss1, 0, 20000, $"雷云指路2");
+                    dpList[2].Add(dpSafeGuide1);
+                    dpList[2].Add(dpSafeGuide12);
+                    dpList[2].Add(dpSafeGuide2);
+                }
+            }
+            return dpList;
+        }
+    }
+
     #endregion
 
     #region Boss2 捕鼠
@@ -503,7 +782,7 @@ public class Amr
         if (chariot.Contains(aid))
         {
             var dp = accessory.DrawCircle(sid, 10, 0, 4000, $"风犼钢铁");
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
     
@@ -1019,16 +1298,17 @@ public static class IndexHelper
     /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
     /// </summary>
     /// <param name="idx">位置index</param>
+    /// <param name="fourPeople">是否为四人迷宫</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx)
+    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx, bool fourPeople = false)
     {
         var str = idx switch
         {
             0 => "MT",
-            1 => "ST",
-            2 => "H1",
-            3 => "H2",
+            1 => fourPeople ? "H1" : "ST",
+            2 => fourPeople ? "D1" : "H1",
+            3 => fourPeople ? "D2" : "H2",
             4 => "D1",
             5 => "D2",
             6 => "D3",

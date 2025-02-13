@@ -471,16 +471,17 @@ public static class IndexHelper
     /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
     /// </summary>
     /// <param name="idx">位置index</param>
+    /// <param name="fourPeople">是否为四人迷宫</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx)
+    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx, bool fourPeople = false)
     {
         var str = idx switch
         {
             0 => "MT",
-            1 => "ST",
-            2 => "H1",
-            3 => "H2",
+            1 => fourPeople ? "H1" : "ST",
+            2 => fourPeople ? "D1" : "H1",
+            3 => fourPeople ? "D2" : "H2",
             4 => "D1",
             5 => "D2",
             6 => "D3",
