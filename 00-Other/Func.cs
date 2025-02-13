@@ -554,7 +554,13 @@ public static class AssignDp
 
         return dp;
     }
-
+    
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
+        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+    {
+        return accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+    }
+    
     /// <summary>
     /// 返回扇形左右刀
     /// </summary>
@@ -967,12 +973,12 @@ public static class AssignDp
     /// <param name="byTime">动画效果随时间填充</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
-    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float width, float length, int delay, int destroy, string name, uint ownerId = 0, bool byTime = false)
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, uint ownerId, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
-        dp.Scale = new(width, length);
-        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
         switch (target)
         {
             // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
@@ -993,6 +999,12 @@ public static class AssignDp
         return dp;
     }
     
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
+    {
+        return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+    }
+
+    
     /// <summary>
     /// 返回背对
     /// </summary>
@@ -1004,12 +1016,12 @@ public static class AssignDp
     /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
-    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name, uint ownerId = 0)
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, uint ownerId, object target, int delay, int destroy, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        dp.Owner = ownerId;
         switch (target)
         {
             // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
@@ -1025,6 +1037,11 @@ public static class AssignDp
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         return dp;
+    }
+    
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
+    {
+        return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
     }
     
     /// <summary>

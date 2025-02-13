@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures.InfoProxy;
+using Dalamud.Utility;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
 using ECommons;
@@ -56,8 +57,12 @@ public class Amr
     private static Vector3 _centerBoss1 = new Vector3(0, 0, -100);
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
-
-    private List<bool> _wailIsStackAndFirst = new bool[5].ToList();     // 不寻常咒声，分摊，先分摊记录
+    private List<AutoResetEvent> _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();   // 自动线程
+    private List<ManualResetEvent> _manualEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();   // 手动线程
+    
+    private List<bool> _wailIsStackAndFirst = new bool[5].ToList();     // Boss1 不寻常咒声，分摊，先分摊记录
+    private List<int> _liveFireStackIdx = [];                           // Boss2 火印分摊点名记录
+    private int _buffCount = 0;                                         // Boss2 分摊buff计数
     
     public void Init(ScriptAccessory accessory)
     {
@@ -66,6 +71,8 @@ public class Amr
         _phase = AmrPhase.Init;
         _drawn = new bool[20].ToList();
         _recorded = new bool[20].ToList();
+        _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
+        _manualEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();   // 手动线程
         
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
@@ -140,13 +147,20 @@ public class Amr
         accessory.Method.RemoveDraw($"狮子王牙扩散{sid}");
     }
     
-    [ScriptMethod(name: "诡异咒声Buff记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["StatusID:regex:^(356[34])$"],
+    [ScriptMethod(name: "诡异咒声Buff记录重置", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(338(15|54))$"], userControl: false)]
+    public void UnnaturalWailBuffReset(Event @event, ScriptAccessory accessory)
+    {
+        _wailIsStackAndFirst = new bool[5].ToList();
+    }
+    
+    [ScriptMethod(name: "诡异咒声Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(356[34])$"],
         userControl: false)]
     public void UnnaturalWailBuffRecord(Event @event, ScriptAccessory accessory)
     {
         const uint spread = 3565;
         const uint stack = 3566;
-        const uint buffLongTime = 20000;
+        const uint buffLongThreshold = 20000;
         
         var tid = @event.TargetId();
         var tidx = accessory.GetPlayerIdIndex(tid);
@@ -155,40 +169,14 @@ public class Amr
         
         if (stid == stack)
             _wailIsStackAndFirst[tidx] = true;
-        if (dur > buffLongTime && stid == stack)
+        if (dur > buffLongThreshold && stid == stack)
             _wailIsStackAndFirst[4] = true;
     }
     
-    [ScriptMethod(name: "诡异咒声分摊分散", eventType: EventTypeEnum.ActionEffect, eventCondition: ["StatusID:regex:^(356[34])$"],
+    [ScriptMethod(name: "诡异咒声分摊分散", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(356[34])$"],
         userControl: true)]
     public void UnnaturalWailBuff(Event @event, ScriptAccessory accessory)
     {
-        // =====================================================================
-        // NUnnaturalWail = 33815, // NBoss->self, 3.0s cast, single-target, visual (spread/stack debuffs)
-        // NUnnaturalAilment = 33816, // Helper->players, no cast, range 6 circle spread
-        // NUnnaturalForce = 33817, // Helper->players, no cast, range 6 circle 2-man stack
-        // NHauntingCry = 33802, // NBoss->self, 3.0s cast, single-target, visual (spawn adds)
-        // NRightSwipe = 33803, // NDevilishThrall->self, 10.0s cast, range 40 180-degree cone
-        // NLeftSwipe = 33804, // NDevilishThrall->self, 10.0s cast, range 40 180-degree cone
-        // NEyeOfTheThunderVortexFirst = 33811, // NBoss->self, 5.2s cast, range 15 circle
-        // NEyeOfTheThunderVortexSecond = 33812, // NBoss->self, no cast, range 8-30 donut
-        // NVortexOfTheThunderEyeFirst = 33813, // NBoss->self, 5.2s cast, range 8-30 donut
-        // NVortexOfTheThunderEyeSecond = 33814, // NBoss->self, no cast, range 15 circle
-        // SUnnaturalWail = 33854, // SBoss->self, 3.0s cast, single-target, visual (spread/stack debuffs)
-        // SUnnaturalAilment = 33855, // Helper->players, no cast, range 6 circle spread
-        // SUnnaturalForce = 33856, // Helper->players, no cast, range 6 circle 2-man stack
-        // SHauntingCry = 33841, // SBoss->self, 3.0s cast, single-target, visual (spawn adds)
-        // SRightSwipe = 33842, // SDevilishThrall->self, 10.0s cast, range 40 180-degree cone
-        // SLeftSwipe = 33843, // SDevilishThrall->self, 10.0s cast, range 40 180-degree cone
-        // SEyeOfTheThunderVortexFirst = 33850, // SBoss->self, 5.2s cast, range 15 circle
-        // SEyeOfTheThunderVortexSecond = 33851, // SBoss->self, no cast, range 8-30 donut
-        // SVortexOfTheThunderEyeFirst = 33852, // SBoss->self, 5.2s cast, range 8-30 donut
-        // SVortexOfTheThunderEyeSecond = 33853, // SBoss->self, no cast, range 15 circle
-        //
-        // ScatteredWailing = 3563, // *Boss->player, extra=0x0
-        // IntensifiedWailing = 3564, // *Boss->player, extra=0x0
-        // =====================================================================
-        
         // const uint spread = 3565;
         const uint stack = 3566;
         
@@ -201,22 +189,144 @@ public class Amr
         if (stid == stack)
         {
             var dp = accessory.DrawCircle(tid, 6, (int)dur - 4000, 4000, $"分摊");
-            if (IsTnPartner(tidx, myIndex))
+            if (IsJobPartner(tidx, myIndex))
                 dp.Color = accessory.Data.DefaultSafeColor;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
         else
         {
             var dp = accessory.DrawCircle(tid, 6, (int)dur - 4000, 4000, $"分散");
-            if (tidx == myIndex) return;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
         }
     }
 
-    private bool IsTnPartner(int idx1, int idx2)
+    [ScriptMethod(name: "钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(1[013]|5[02]|49))$"],
+        userControl: true)]
+    public void UnnaturalWailChariotDonut(Event @event, ScriptAccessory accessory)
     {
-        return (idx1 < 2 && idx2 < 2) || (idx1 >= 2 && idx2 >= 2);
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+        
+        HashSet<uint> chariot = [33811, 33850];
+        HashSet<uint> donut = [33813, 33852];
+        HashSet<uint> singleDonut = [33810, 33849];
+
+        if (chariot.Contains(aid))
+        {
+            var dp = accessory.DrawCircle(sid, 15, 0, 5200, $"咒声钢铁");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            var dp0 = accessory.DrawDonut(sid, 30, 8, 5200, 4000, $"咒声月环");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp0);
+        }
+
+        if (donut.Contains(aid))
+        {
+            var dp = accessory.DrawDonut(sid, 30, 8, 0, 5200, $"咒声月环");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+            var dp0 = accessory.DrawCircle(sid, 15, 5200, 4000, $"咒声钢铁");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp0);
+        }
+        
+        if (singleDonut.Contains(aid))
+        {
+            var dp = accessory.DrawDonut(sid, 30, 8, 0, 5000, $"月环");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+        }
     }
+    
+    [ScriptMethod(name: "诡异咒声左右刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(0[34]|4[23]))$"],
+        userControl: true)]
+    public void UnnaturalWailSwipe(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var aid = @event.ActionId();
+
+        HashSet<uint> rightSwipe = [33803, 33842];
+        HashSet<uint> leftSwipe = [33804, 33843];
+
+        if (rightSwipe.Contains(aid))
+        {
+            var dp = accessory.DrawLeftRightCleave(sid, false, 6000, 4000, $"幽鬼右刀");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        }
+
+        if (leftSwipe.Contains(aid))
+        {
+            var dp = accessory.DrawLeftRightCleave(sid, true, 6000, 4000, $"幽鬼右刀");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "黑赤招魂大圈", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(338(08|47))$"],
+        userControl: true)]
+    public void VengefulSoulsDefamation(Event @event, ScriptAccessory accessory)
+    {
+        var tid = @event.TargetId();
+        var dp = accessory.DrawCircle(tid, 15, 11000, 4000, $"黑赤招魂大圈");
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+    
+    private class VengefulSouls(ScriptAccessory accessory)
+    {
+        private List<int> _defamationTargetIdx = [];
+        private static readonly List<int> PriorityList = [0, 1, 2, 3];
+        private List<Vector3> _towerPos = [];
+
+        public void Init()
+        {
+            _defamationTargetIdx.Clear();
+            _towerPos.Clear();
+        }
+        
+        public void AddDefamationTargetIdx(int idx)
+        {
+            _defamationTargetIdx.Add(idx);
+        }
+
+        public void AddTowerPos(Vector3 pos)
+        {
+            _towerPos.Add(pos);
+        }
+
+        public List<(int, Vector3)> ExportTowerSolution()
+        {
+            SortTowerPosition();
+            var towerTargets = FindTowerTargets();
+            var combinedList = towerTargets.Zip(_towerPos, (dir, pos) => (dir, pos)).ToList();
+            if (!DebugMode) return combinedList;
+            
+            var str = "";
+            for (var i = 0; i < combinedList.Count; i++)
+            {
+                str += $"{accessory.GetPlayerJobByIndex(combinedList[i].Item1)}踩塔{combinedList[i].Item2}\n";
+            }
+            accessory.DebugMsg(str, DebugMode);
+            return combinedList;
+        }
+
+        /// <summary>
+        /// 从小到大排列，正好符合北起顺时针
+        /// </summary>
+        private void SortTowerPosition()
+        {
+            var towerDir = _towerPos.Select(pos => pos.Position2Dirs(_centerBoss1, 8)).ToList();
+            var combinedList = towerDir.Zip(_towerPos, (dir, pos) => (dir, pos));
+            var sortedCombined = combinedList.OrderBy(x => x.dir).ToList();
+            _towerPos = sortedCombined.Select(x => x.pos).ToList();
+        }
+
+        /// <summary>
+        /// 找到存在于priorityList，但不存在于defamationTarget中的元素，并排序
+        /// </summary>
+        /// <returns></returns>
+        private List<int> FindTowerTargets()
+        {
+            var ls = PriorityList.Except(_defamationTargetIdx)
+                .OrderBy(x => PriorityList.IndexOf(x)).ToList();
+            return ls;
+        }
+    }
+    
     
     #endregion
 
@@ -224,7 +334,105 @@ public class Amr
 
     [ScriptMethod(name: "---- Boss2 铁鼠豪雷 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["Hello World"], userControl: true)]
     public void SplitLine_Boss2(Event @event, ScriptAccessory accessory) {}
+    
+    [ScriptMethod(name: "火印分摊分散Buff重置", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:34051"], userControl: false)]
+    public void LiveFireBuffReset(Event @event, ScriptAccessory accessory)
+    {
+        _liveFireStackIdx.Clear();
+    }
+    
+    [ScriptMethod(name: "火印分摊分散Buff", eventType: EventTypeEnum.StatusAdd,
+        eventCondition: ["StatusID:regex:^(360[78])$"], userControl: true)]
+    public void LiveFireBuff(Event @event, ScriptAccessory accessory)
+    {
+        // const uint spread = 3608;
+        const uint stack = 3607;
+        
+        var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        var dur = @event.DurationMilliseconds();
 
+        if (tidx == stack)
+        {
+            lock (_liveFireStackIdx)
+            {
+                _liveFireStackIdx.Add(tidx);
+                if (_liveFireStackIdx.Count != 2) return;
+            }
+            
+            var myIndex = accessory.GetMyIndex();
+            for (var i = 0; i < 2; i++)
+            {
+                var owner = accessory.Data.PartyList[_liveFireStackIdx[i]];
+                var dp = accessory.DrawCircle(owner, 6, (int)dur - 4000, 4000,
+                    $"分摊{_liveFireStackIdx[0]}");
+                if (IsRangePartner(_liveFireStackIdx[0], _liveFireStackIdx[1]))
+                {
+                    if (IsJobPartner(myIndex, _liveFireStackIdx[0]))
+                        dp.Color = accessory.Data.DefaultSafeColor;
+                }
+                else
+                {
+                    if (IsRangePartner(myIndex, _liveFireStackIdx[0]))
+                        dp.Color = accessory.Data.DefaultSafeColor;
+                }
+                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            }
+        }
+        else
+        {
+            var dp = accessory.DrawCircle(tid, 10, (int)dur - 4000, 4000,
+                $"分散{tidx}");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+    }
+    
+    // NGreaterBallOfFire = 34053, // Helper->players, no cast, range 6 circle, 2-man stack
+    // NGreatBallOfFire = 34054, // Helper->players, no cast, range 10 circle spread
+    // SGreaterBallOfFire = 34105, // Helper->players, no cast, range 6 circle, 2-man stack
+    // SGreatBallOfFire = 34106, // Helper->players, no cast, range 10 circle spread
+    // FlameAndSulphur = 34056, // *Boss->self, 3.0s cast, single-target, visual (create rocks)
+    // BrazenBalladExpanding = 34057, // *Boss->self, 5.0s cast, single-target, visual (expanding aoes)
+    // BrazenBalladSplitting = 34058, // *Boss->self, 5.0s cast, single-target, visual (splitting aoes)
+    // NFireSpreadExpand = 34059, // Helper->self, no cast, range 46 width 10 rect
+    // NFireSpreadSplit = 34060, // Helper->self, no cast, range 46 width 5 rect
+    // NFallingRockExpand = 34062, // Helper->self, no cast, range 11 circle
+    // NFallingRockSplit = 34063, // Helper->self, no cast, range 6-16 donut
+    // SFireSpreadExpand = 34108, // Helper->self, no cast, range 46 width 10 rect
+    // SFireSpreadSplit = 34109, // Helper->self, no cast, range 46 width 5 rect
+    // SFallingRockExpand = 34111, // Helper->self, no cast, range 11 circle
+    // SFallingRockSplit = 34112, // Helper->self, no cast, range 6-16 donut
+    //
+    // var dpSpreadChariot = accessory.DrawCircle(sid, 11, 0, 5000, $"扩散钢铁");
+    // var dpSpreadDonut = accessory.DrawDonut(sid, 16, 6, 0, 5000, $"扩散月环");
+    // var dpSpreadStraight = accessory.DrawRect(sid, 10, 46, 0, 5000, $"扩散辣尾");
+    // var dpSpreadWing = accessory.DrawDonut(sid, 5, 10, 0, 5000, $"扩散辣翅");
+
+    public class FlameAndSulphur(ScriptAccessory accessory)
+    {
+        private List<(uint, Vector3)> _sulphurs = [];
+        private List<(uint, Vector3)> _fire = [];
+
+        public void AddSulphur(uint id, Vector3 pos)
+        {
+            _sulphurs.Add((id, pos));
+        }
+
+        public void AddFire(uint id, Vector3 pos)
+        {
+            _fire.Add((id, pos));
+        }
+
+        private void SortElements()
+        {
+            // var towerDir = _towerPos.Select(pos => pos.Position2Dirs(_centerBoss1, 8)).ToList();
+            // var combinedList = towerDir.Zip(_towerPos, (dir, pos) => (dir, pos));
+            // var sortedCombined = combinedList.OrderBy(x => x.dir).ToList();
+            // _towerPos = sortedCombined.Select(x => x.pos).ToList();
+        }
+    }
+    
     #endregion
 
     #region Boss3 捉鬼
@@ -391,6 +599,31 @@ public class Amr
     
     #endregion
 
+    #region General Functions
+
+    /// <summary>
+    /// 是否为职能搭档（T-H，D1-D2）
+    /// </summary>
+    /// <param name="idx1"></param>
+    /// <param name="idx2"></param>
+    /// <returns></returns>
+    private bool IsJobPartner(int idx1, int idx2)
+    {
+        return (idx1 < 2 && idx2 < 2) || (idx1 >= 2 && idx2 >= 2);
+    }
+    
+    /// <summary>
+    /// 是否为同攻击范围搭档（T-D1，H-D2）
+    /// </summary>
+    /// <param name="idx1"></param>
+    /// <param name="idx2"></param>
+    /// <returns></returns>
+    private bool IsRangePartner(int idx1, int idx2)
+    {
+        return idx1 + idx2 == 2 || idx1 + idx2 == 4;
+    }
+
+    #endregion
 }
 
 #region 函数集
@@ -869,7 +1102,13 @@ public static class AssignDp
 
         return dp;
     }
-
+    
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
+        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+    {
+        return accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+    }
+    
     /// <summary>
     /// 返回扇形左右刀
     /// </summary>
@@ -1267,7 +1506,7 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
-
+    
     /// <summary>
     /// 返回击退
     /// </summary>
@@ -1282,12 +1521,12 @@ public static class AssignDp
     /// <param name="byTime">动画效果随时间填充</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
-    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, uint ownerId = 0, bool byTime = false)
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, uint ownerId, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
-        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        dp.Owner = ownerId;
         switch (target)
         {
             // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
@@ -1307,7 +1546,13 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
+    
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
+    {
+        return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+    }
 
+    
     /// <summary>
     /// 返回背对
     /// </summary>
@@ -1319,12 +1564,12 @@ public static class AssignDp
     /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
-    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name, uint ownerId = 0)
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, uint ownerId, object target, int delay, int destroy, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Owner = ownerId == 0 ? accessory.Data.Me : ownerId;
+        dp.Owner = ownerId;
         switch (target)
         {
             // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
@@ -1340,6 +1585,11 @@ public static class AssignDp
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         return dp;
+    }
+    
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
+    {
+        return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
     }
     
     /// <summary>
