@@ -421,7 +421,7 @@ public static class DirectionCalc
         var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
         return targetPos;
     }
-    
+
     /// <summary>
     /// 获得两点之间距离
     /// </summary>
@@ -565,7 +565,12 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
         object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
     {
-        return accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+        return targetObj switch
+        {
+            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
+            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
+            _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
+        };
     }
     
     /// <summary>
@@ -914,7 +919,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, 0, scale, scale, color, delay, destroy, name);
+        var dp = accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
         return dp;
     }
 
@@ -932,7 +937,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, 0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
+        var dp = accessory.DrawStatic(center, (uint)0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
         dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
@@ -1034,7 +1039,12 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
     {
-        return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+        return target switch
+        {
+            uint uintTarget => accessory.DrawKnockBack(accessory.Data.Me, uintTarget, length, delay, destroy, name, width, byTime),
+            Vector3 vectorTarget => accessory.DrawKnockBack(accessory.Data.Me, vectorTarget, length, delay, destroy, name, width, byTime),
+            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+        };
     }
     
     /// <summary>
@@ -1073,7 +1083,12 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
     {
-        return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+        return target switch
+        {
+            uint uintTarget => accessory.DrawSightAvoid(accessory.Data.Me, uintTarget, delay, destroy, name),
+            Vector3 vectorTarget => accessory.DrawSightAvoid(accessory.Data.Me, vectorTarget, delay, destroy, name),
+            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+        };
     }
 
     /// <summary>

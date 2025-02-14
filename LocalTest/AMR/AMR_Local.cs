@@ -21,8 +21,6 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
-using Lumina.Data.Structs.Excel;
-using UsamisKodakku.Scripts.LocalTest.DSR;
 
 namespace UsamisKodakku.Scripts.LocalTest.AMR;
 
@@ -58,7 +56,7 @@ public class Amr
 
     private AmrPhase _phase = AmrPhase.Init;
     private static Vector3 _centerBoss1 = new Vector3(0, 0, -100);
-    private static Vector3 _centerBoss2 = new Vector3(0, 0, -100);      // TODO 待记录
+    private static Vector3 _centerBoss2 = new Vector3(300, 7, -120);
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private List<AutoResetEvent> _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();   // 自动线程
@@ -79,6 +77,7 @@ public class Amr
     private StormClouds _sc = new StormClouds();
     private FlameAndSulphur _fas = new FlameAndSulphur();
     private HumbleHammer _hh = new HumbleHammer();
+    private RousingReincarnation _rr = new RousingReincarnation();
     
     private List<bool> _wailIsStackAndFirst = new bool[5].ToList();     // Boss1 不寻常咒声，分摊，先分摊记录
     private List<int> _liveFireStackIdx = [];                           // Boss2 火印分摊点名记录
@@ -104,7 +103,10 @@ public class Amr
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-
+        uint boss = 0x40007020;
+        var dpGuideToOrb = accessory.DrawGuidance(boss, 0, 5000, $"万宝槌球指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuideToOrb);
+        
         // -- DEBUG CODE END --
     }
     
@@ -179,8 +181,8 @@ public class Amr
         userControl: false)]
     public void UnnaturalWailBuffRecord(Event @event, ScriptAccessory accessory)
     {
-        // const uint spread = 3565;
-        const uint stack = 3566;
+        // const uint spread = 3563;
+        const uint stack = 3564;
         const uint buffLongThreshold = 20000;
         
         var tid = @event.TargetId();
@@ -198,8 +200,8 @@ public class Amr
         userControl: true)]
     public void UnnaturalWailBuff(Event @event, ScriptAccessory accessory)
     {
-        // const uint spread = 3565;
-        const uint stack = 3566;
+        // const uint spread = 3563;
+        const uint stack = 3564;
         
         var tid = @event.TargetId();
         var tidx = accessory.GetPlayerIdIndex(tid);
@@ -403,32 +405,6 @@ public class Amr
         userControl: false)]
     public void StormCloudReset(Event @event, ScriptAccessory accessory)
     {
-        // NStormcloudSummons = 33784, // NBoss->self, 3.0s cast, single-target, visual (summon clouds)
-        // NSmokeaterFirst = 33785, // NBoss->self, 2.5s cast, single-target, visual (first breath in)
-        // NSmokeaterRest = 33786, // NBoss->self, no cast, single-target, visual (optional second/third breath in)
-        // NSmokeaterAbsorb = 33787, // NRaiun->NBoss, no cast, single-target, visual (absorb cloud)
-        // NRokujoRevelFirst = 33788, // NBoss->self, 7.5s cast, single-target, visual (first line aoe)
-        // NRokujoRevelRest = 33789, // NBoss->self, no cast, single-target, visual (second/third line aoe)
-        // NRokujoRevelAOE = 33790, // Helper->self, 8.0s cast, range 60 width 14 rect
-        // NLeapingLevin1 = 33791, // NRaiun->self, 1.0s cast, range 8 circle
-        // NLeapingLevin2 = 33792, // NRaiun->self, 1.0s cast, range 12 circle
-        // NLeapingLevin3 = 33793, // NRaiun->self, 1.0s cast, range 23 circle
-        // NLightningBolt = 33794, // NBoss->self, 3.0s cast, single-target, visual (start multiple lines)
-        // NLightningBoltAOE = 33795, // Helper->location, 4.0s cast, range 6 circle
-        //
-        // SStormcloudSummons = 33823, // SBoss->self, 3.0s cast, single-target, visual
-        // SSmokeaterFirst = 33824, // SBoss->self, 2.5s cast, single-target, visual (first breath in)
-        // SSmokeaterRest = 33825, // SBoss->self, no cast, single-target, visual (optional second/third breath in)
-        // SSmokeaterAbsorb = 33826, // SRaiun->SBoss, no cast, single-target, visual (absorb cloud)
-        // SRokujoRevelFirst = 33827, // SBoss->self, 7.5s cast, single-target, visual (first line aoe)
-        // SRokujoRevelRest = 33828, // SBoss->self, no cast, single-target, visual (second/third line aoe)
-        // SRokujoRevelAOE = 33829, // Helper->self, 8.0s cast, range 60 width 14 rect
-        // SLeapingLevin1 = 33830, // SRaiun->self, 1.0s cast, range 8 circle
-        // SLeapingLevin2 = 33831, // SRaiun->self, 1.0s cast, range 12 circle
-        // SLeapingLevin3 = 33832, // SRaiun->self, 1.0s cast, range 23 circle
-        // SLightningBolt = 33833, // SBoss->self, 3.0s cast, single-target, visual (start multiple lines)
-        // SLightningBoltAOE = 33834, // Helper->location, 4.0s cast, range 6 circle
-            
         _sc.Init(accessory);
     }
 
@@ -441,7 +417,7 @@ public class Amr
         _sc.AddCloud(sid, spos);
     }
 
-    [ScriptMethod(name: "雷暴云移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:regex:^(33(787|826))$"],
+    [ScriptMethod(name: "雷暴云移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(33(787|826))$"],
         userControl: false)]
     public void StormCloudRemove(Event @event, ScriptAccessory accessory)
     {
@@ -449,7 +425,7 @@ public class Amr
         _sc.DisableCloud(sid);
     }
     
-    [ScriptMethod(name: "吞霞次数添加", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:regex:^(33(78[56]|82[45]))$"],
+    [ScriptMethod(name: "吞霞次数添加", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(33(78[56]|82[45]))$"],
         userControl: false)]
     public void SmokeatTimeAdd(Event @event, ScriptAccessory accessory)
     {
@@ -474,27 +450,32 @@ public class Amr
         _manualEvents[1].WaitOne();
         var dpList = _sc.ExportCloudSolution();
 
-        for (var i = 0; i < dpList[0].Length; i++)
+        for (var i = 0; i < dpList[0].Count; i++)
         {
             // 雷暴云危险区
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dpList[0][i]);
         }
-        for (var i = 0; i < dpList[1].Length; i++)
-        {
-            // 雷暴云就位区与目的地
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dpList[1][i]);
-        }
-        for (var i = 0; i < 2; i++)
-        {
-            // 雷暴云指路
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[2][i]);
-        }
+        // TODO 好难写，老调不对
+        
+        // for (var i = 0; i < dpList[1].Count; i++)
+        // {
+        //     // 雷暴云就位区与目的地
+        //     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dpList[1][i]);
+        // }
+        
+        // for (var i = 0; i < dpList[2].Count; i++)
+        // {
+        //     // 雷暴云指路
+        //     if (i % 2 != 0) continue;
+        //     accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[2][i]);
+        // }
+        
         _manualEvents[1].Reset();
         _manualEvents[2].WaitOne();
         accessory.Method.RemoveDraw($"雷云就位区1");
         accessory.Method.RemoveDraw($"雷云指路1");
         accessory.Method.RemoveDraw($"雷云指路12");
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[2][2]);
+        // accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[2][2]);
         _manualEvents[2].Reset();
     }
     
@@ -515,11 +496,10 @@ public class Amr
         }
     }
     
-    [ScriptMethod(name: "雷暴云指路移除", eventType: EventTypeEnum.EnvControl, eventCondition: ["ActionId:regex:^(33(79[123]|83[012]))$"],
+    [ScriptMethod(name: "雷暴云指路移除", eventType: EventTypeEnum.EnvControl, eventCondition: ["State:00080004", "Index:00000034"],
         userControl: false)]
     public void StormCloudGuidanceRemove(Event @event, ScriptAccessory accessory)
     {
-        // TODO 通过圆形场地变回方形场地事件移除所有绘图
         accessory.Method.RemoveDraw($".*");
     }
     
@@ -569,15 +549,16 @@ public class Amr
 
         private bool IsInRange(Vector3 pos, float bossRotation)
         {
+            // 记录了逆时针旋转的游戏基，将云顺时针旋转正好抵消
             var relativePos = pos.RotatePoint(_centerBoss1, -1 * bossRotation.Game2Logic());
             // 检查x轴是否在范围内即可，六条奔雷宽度14
-            return Math.Abs(relativePos.X) <= 7;
+            return Math.Abs(relativePos.X) <= 7f;
         }
 
         private bool IsNearEdge(Vector3 pos)
         {
             var v2 = new Vector2(pos.X - _centerBoss1.X, pos.Z - _centerBoss1.Z);
-            return v2.Length() > 17f;
+            return v2.Length() > 15f;
         }
 
         private Vector3 FindRelativeSafePos(Vector3 pos)
@@ -589,12 +570,16 @@ public class Amr
                 if (IsNearEdge(pos))
                 {
                     var isCw = pos.Position2Dirs(_centerBoss1, 4, false) % 2 == 0;
-                    safePos = pos.RotatePoint(_centerBoss1, isCw ? 40f.DegToRad() : -40f.DegToRad());
+                    safePos = pos.RotatePoint(_centerBoss1, isCw ? 15f.DegToRad() : -15f.DegToRad());
+                    // accessory.DebugMsg($"安全云点{pos}在外侧，{(isCw ? "顺" : "逆")}时针旋转", DebugMode);
                 }
                 else
                 {
+                    var relativePos = pos.RotatePoint(_centerBoss1, -1 * _bossRotation[0].Game2Logic());
                     var isRight = pos.X > _centerBoss1.X;
-                    safePos = new Vector3(pos.X + (isRight ? 8f : -8f), pos.Y, pos.Z);
+                    var relativeSafePos = relativePos with { X = relativePos.X + (isRight ? 4f : -4f) };
+                    safePos = relativeSafePos.RotatePoint(_centerBoss1, _bossRotation[0].Game2Logic());
+                    // accessory.DebugMsg($"安全云点{pos}在内，直接对X坐标处理", DebugMode);
                 }
             }
             else
@@ -605,9 +590,9 @@ public class Amr
             return safePos;
         }
         
-        public List<DrawPropertiesEdit[]> ExportCloudSolution()
+        public List<List<DrawPropertiesEdit>> ExportCloudSolution()
         {
-            List<DrawPropertiesEdit[]> dpList = [[], [], []];   // 危险区、安全区、指路
+            List<List<DrawPropertiesEdit>> dpList = [[], [], []];   // 危险区、安全区、指路
             var cloudScale = _smokeatTime switch
             {
                 1 => 8,
@@ -622,22 +607,23 @@ public class Amr
                 if (cloud.Item3)
                 {
                     var dangerCloudPos = cloud.Item2;
+                    // accessory.DebugMsg($"危险云点为{dangerCloudPos}", DebugMode);
                     // 需画出对应危险区域
-                    var dp = accessory.DrawCircle(cloud.Item1, cloudScale, 0, 20000, $"雷云{cloud.Item1}");
+                    var dp = accessory.DrawCircle(cloud.Item1, cloudScale, 0, 10000, $"雷云{cloud.Item1}");
                     dpList[0].Add(dp);
                     
                     // 三次吞霞需借助危险区反推安全区，三次吞霞只有一个cloud满足该条件，所以无需加额外条件
                     if (_smokeatTime != 3) continue;
                     var safePos = FindRelativeSafePos(dangerCloudPos);
-                    var dpSafeField1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区1");
-                    var dpSafeField2 = accessory.DrawStaticCircle(dangerCloudPos, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区2");
+                    var dpSafeField1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 10000, $"雷云就位区1");
+                    var dpSafeField2 = accessory.DrawStaticCircle(dangerCloudPos, accessory.Data.DefaultSafeColor, 0, 10000, $"雷云就位区2");
                     dpList[1].Add(dpSafeField1);
                     dpList[1].Add(dpSafeField2);
                     
-                    var dpSafeGuide1 = accessory.DrawGuidance(safePos, 0, 20000, $"雷云指路1");
-                    var dpSafeGuide12 = accessory.DrawGuidance(safePos, dangerCloudPos, 0, 20000, $"雷云指路12");
+                    var dpSafeGuide1 = accessory.DrawGuidance(safePos, 0, 10000, $"雷云指路1");
+                    var dpSafeGuide12 = accessory.DrawGuidance(safePos, dangerCloudPos, 0, 10000, $"雷云指路12");
                     dpSafeGuide12.Color = accessory.Data.DefaultDangerColor;
-                    var dpSafeGuide2 = accessory.DrawGuidance(dangerCloudPos, 0, 20000, $"雷云指路2");
+                    var dpSafeGuide2 = accessory.DrawGuidance(dangerCloudPos, 0, 10000, $"雷云指路2");
                     dpList[2].Add(dpSafeGuide1);
                     dpList[2].Add(dpSafeGuide12);
                     dpList[2].Add(dpSafeGuide2);
@@ -648,15 +634,16 @@ public class Amr
                     
                     var safeCloudPos = cloud.Item2;
                     var safePos = FindRelativeSafePos(safeCloudPos);
-                    var dp1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区1");
-                    var dp2 = accessory.DrawStaticCircle(_centerBoss1, accessory.Data.DefaultSafeColor, 0, 20000, $"雷云就位区2");
+                    // accessory.DebugMsg($"安全云点为{safeCloudPos}，对应安全区{safePos}", DebugMode);
+                    var dp1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 10000, $"雷云就位区1");
+                    var dp2 = accessory.DrawStaticCircle(_centerBoss1, accessory.Data.DefaultSafeColor, 0, 10000, $"雷云就位区2");
                     dpList[1].Add(dp1);
                     dpList[1].Add(dp2);
                     
-                    var dpSafeGuide1 = accessory.DrawGuidance(safePos, 0, 20000, $"雷云指路1");
-                    var dpSafeGuide12 = accessory.DrawGuidance(safePos, _centerBoss1, 0, 20000, $"雷云指路12");
+                    var dpSafeGuide1 = accessory.DrawGuidance(safePos, 0, 10000, $"雷云指路1");
+                    var dpSafeGuide12 = accessory.DrawGuidance(safePos, _centerBoss1, 0, 10000, $"雷云指路12");
                     dpSafeGuide12.Color = accessory.Data.DefaultDangerColor;
-                    var dpSafeGuide2 = accessory.DrawGuidance(_centerBoss1, 0, 20000, $"雷云指路2");
+                    var dpSafeGuide2 = accessory.DrawGuidance(_centerBoss1, 0, 10000, $"雷云指路2");
                     dpList[2].Add(dpSafeGuide1);
                     dpList[2].Add(dpSafeGuide12);
                     dpList[2].Add(dpSafeGuide2);
@@ -740,8 +727,8 @@ public class Amr
         var did = @event.DataId();
         var sid = @event.SourceId();
         var spos = @event.SourcePosition();
-        // const uint flame = 2013332;
-        const uint sulphur = 2013331;
+        // const uint flame = 2013331;
+        const uint sulphur = 2013332;
         
         if (did == sulphur)
             _fas.AddSulphur(sid, spos);
@@ -754,12 +741,13 @@ public class Amr
     {
         var aid = @event.ActionId();
         var targetSulphur = _fas.ExportBalladSolution(aid);
-        var dp = accessory.DrawGuidance(targetSulphur.Item1, 0, 3500, $"琵琶旋律指路石头");
+        var dp = accessory.DrawGuidance(targetSulphur.Item1, 0, 5000, $"琵琶旋律指路石头");
+        // 这个绘图范围不对，要修改
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         accessory.Method.TextInfo($"寻找指向石头的安全区", 3500);
     }
 
-    private class FlameAndSulphur()
+    private class FlameAndSulphur
     {
         private List<(uint, Vector3)> _sulphurs = [];
         private List<(uint, Vector3)> _fire = [];
@@ -791,14 +779,15 @@ public class Amr
                 if (isExpand)
                 {
                     // Rect
-                    var dp = accessory.DrawRect(fire.Item1, 10, 46, 0, 5000, $"扩散辣尾");
+                    var dp = accessory.DrawRect(fire.Item1, 10, 46, 0, 7000, $"扩散辣尾");
                     dp.Color = ColorHelper.ColorCyan.V4.WithW(2f);
                     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
                 }
                 else
                 {
                     // Hot wing
-                    var dp = accessory.DrawDonut(fire.Item1, 5, 10, 0, 5000, $"扩散辣翅");
+                    var dp = accessory.DrawDonut(fire.Item1, 20, 10, 0, 7000, $"扩散辣翅");
+                    dp.Scale = new Vector2(20f, 100f);
                     dp.Color = ColorHelper.ColorCyan.V4.WithW(2f);
                     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.HotWing, dp);
                 }
@@ -843,28 +832,6 @@ public class Amr
                 _ => _safeSulphurs[0],
             };
             return targetSulphur;
-
-            // TODO
-            // NGreaterBallOfFire = 34053, // Helper->players, no cast, range 6 circle, 2-man stack
-            // NGreatBallOfFire = 34054, // Helper->players, no cast, range 10 circle spread
-            // SGreaterBallOfFire = 34105, // Helper->players, no cast, range 6 circle, 2-man stack
-            // SGreatBallOfFire = 34106, // Helper->players, no cast, range 10 circle spread
-            // FlameAndSulphur = 34056, // *Boss->self, 3.0s cast, single-target, visual (create rocks)
-            // BrazenBalladExpanding = 34057, // *Boss->self, 5.0s cast, single-target, visual (expanding aoes)
-            // BrazenBalladSplitting = 34058, // *Boss->self, 5.0s cast, single-target, visual (splitting aoes)
-            // NFireSpreadExpand = 34059, // Helper->self, no cast, range 46 width 10 rect
-            // NFireSpreadSplit = 34060, // Helper->self, no cast, range 46 width 5 rect
-            // NFallingRockExpand = 34062, // Helper->self, no cast, range 11 circle
-            // NFallingRockSplit = 34063, // Helper->self, no cast, range 6-16 donut
-            // SFireSpreadExpand = 34108, // Helper->self, no cast, range 46 width 10 rect
-            // SFireSpreadSplit = 34109, // Helper->self, no cast, range 46 width 5 rect
-            // SFallingRockExpand = 34111, // Helper->self, no cast, range 11 circle
-            // SFallingRockSplit = 34112, // Helper->self, no cast, range 6-16 donut
-            //
-            // var dpSpreadChariot = accessory.DrawCircle(sid, 11, 0, 5000, $"扩散钢铁");
-            // var dpSpreadDonut = accessory.DrawDonut(sid, 16, 6, 0, 5000, $"扩散月环");
-            // var dpSpreadStraight = accessory.DrawRect(sid, 10, 46, 0, 5000, $"扩散辣尾");
-            // var dpSpreadWing = accessory.DrawDonut(sid, 5, 10, 0, 5000, $"扩散辣翅");
         }
 
         private void FindSafeSulphurs()
@@ -904,7 +871,7 @@ public class Amr
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
         List<float> extendDirs = [0, -90f.DegToRad().Logic2Game(), 180f.DegToRad().Logic2Game(), 90f.DegToRad().Logic2Game()];
-        var dpList = accessory.DrawExtendDirection(sid, extendDirs, myIndex, 4f, 10f, 0, 3600, $"炎流方向",
+        var dpList = accessory.DrawExtendDirection(sid, extendDirs, myIndex, 2f, 20f, 0, 3600, $"炎流方向",
             PosColorPlayer.V4.WithW(2f), PosColorNormal.V4);
         foreach (var dp in dpList)
         {
@@ -912,28 +879,27 @@ public class Amr
         }
     }
     
-    [ScriptMethod(name: "炎流引导范围", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: true)]
+    [ScriptMethod(name: "炎流引导范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: true)]
     public void ImpurePurgationBaitField(Event @event, ScriptAccessory accessory)
     {
-        var spos = @event.SourcePosition();
-        var tpos = @event.TargetPosition();
+        var sid = @event.SourceId();
+        var tid = @event.TargetId();
         for (var i = 0; i < accessory.Data.PartyList.Count; i++)
         {
-            var dp = accessory.DrawStatic(spos, tpos, 45f.DegToRad(), 0, 60f, 60f, 0, 0, 2000, $"炎流引导{i}");
+            var dp = accessory.DrawStatic(sid, tid, 45f.DegToRad(), 0, 60f, 60f, 0, 0, 2000, $"炎流引导{i}");
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
     }
     
-    [ScriptMethod(name: "万宝槌初始化", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: false)]
+    [ScriptMethod(name: "万宝槌初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34080)$"], userControl: false)]
     public void HumbleHammerReset(Event @event, ScriptAccessory accessory)
     {
         _hh.Init(accessory);
     }
 
-    [ScriptMethod(name: "万宝槌添加球", eventType: EventTypeEnum.AddCombatant, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: false)]
+    [ScriptMethod(name: "万宝槌添加球", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1622[68])$"], userControl: false)]
     public void HumbleHammerAddOrb(Event @event, ScriptAccessory accessory)
     {
-        // TODO eventCondition
         var sid = @event.SourceId();
         var spos = @event.SourcePosition();
         _hh.AddOrbs(sid, spos);
@@ -952,7 +918,7 @@ public class Amr
         // 目标球指路
         if (IbcHelper.IsHealer(accessory.Data.Me))
         {
-            var dpGuideToOrb = accessory.DrawGuidance(targetOrb, 0, 5000, $"万宝槌球指路");
+            var dpGuideToOrb = accessory.DrawGuidance((uint)targetOrb, 0, 5000, $"万宝槌球指路");
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuideToOrb);
         }
 
@@ -1011,10 +977,120 @@ public class Amr
         }
     }
     
-    // OrangeTower1 = 0x1EB895, // R0.500, EventObj type, spawn during fight
-    // OrangeTower2 = 0x1EB906, // R0.500, EventObj type, spawn during fight
-    // BlueTower1 = 0x1EB896, // R0.500, EventObj type, spawn during fight
-    // BlueTower2 = 0x1EB897, // R0.500, EventObj type, spawn during fight
+    [ScriptMethod(name: "线塔初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34066)$"], userControl: false)]
+    public void RousingReincarnationReset(Event @event, ScriptAccessory accessory)
+    {
+        _rr.Init(accessory);
+    }
+    
+    [ScriptMethod(name: "橙蓝Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(359[789]|360[01234])$"], userControl: false)]
+    public void RousingReincarnationBuffRecord(Event @event, ScriptAccessory accessory)
+    {
+        var stid = @event.StatusId();
+        var tid = @event.TargetId();
+        _rr.AddBuff(tid, stid);
+    }
+
+    [ScriptMethod(name: "橙蓝塔标记", eventType: EventTypeEnum.EnvControl, eventCondition: ["State:00020001", "Index:regex:^(0000000[3456789A])$"], userControl: true)]
+    public void RousingReincarnationTowerRecord(Event @event, ScriptAccessory accessory)
+    {
+        var index = @event.Index();
+        _rr.AddTower(index);
+        var isOrange = index < 7;
+
+        lock (_rr)
+        {
+            if (_rr.GetTowerPlayerId(isOrange) != accessory.Data.Me) return;
+            var towerPos = _centerBoss2 - new Vector3(0, 0, 11);
+            towerPos.RotatePoint(_centerBoss2, _rr.GetNewTowerDirection(isOrange) * float.Pi / 4);
+            var dp = accessory.DrawStaticCircle(towerPos, accessory.Data.DefaultSafeColor, 0, 6000, $"塔{index}", 4f);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
+        }
+    }
+    
+    private class RousingReincarnation
+    {
+        private List<uint> _orange = [0, 0, 0, 0];
+        private List<uint> _blue = [0, 0, 0, 0];
+        public List<int> _orangeTowerPos = [];
+        public List<int> _blueTowerPos = [];
+        private int _towerNum = 0;
+        
+        private ScriptAccessory accessory {get; set;} = null!;
+
+        public void Init(ScriptAccessory _accessory)
+        {
+            _orange = [0, 0, 0, 0];
+            _blue = [0, 0, 0, 0];
+            _towerNum = 0;
+            _orangeTowerPos.Clear();
+            _blueTowerPos.Clear();
+            accessory = _accessory;
+        }
+
+        public int GetNewTowerDirection(bool isOrange)
+        {
+            return isOrange ? _orangeTowerPos[_towerNum / 2] : _blueTowerPos[_towerNum / 2];
+        }
+        
+        public uint GetTowerPlayerId(bool isOrange)
+        {
+            return isOrange ? _orange[_towerNum / 2] : _blue[_towerNum / 2];
+        }
+
+        public void AddTower(uint idx)
+        {
+            // 3 4 5 6 => 7 1 5 3
+            // 7 8 9 10 => 0 6 2 4
+            _towerNum++;
+            var towerPos = idx switch
+            {
+                3 => 7,
+                4 => 1,
+                5 => 5,
+                6 => 3,
+                7 => 0,
+                8 => 6,
+                9 => 2,
+                10 => 4,
+                _ => 0
+            };
+            
+            if (idx < 7)
+                _orangeTowerPos.Add(towerPos);
+            else
+                _blueTowerPos.Add(towerPos);
+        }
+        
+        public void AddBuff(uint id, uint buffId)
+        {
+            // const uint orange1 = 3597;
+            // const uint orange2 = 3598;
+            // const uint orange3 = 3599;
+            // const uint orange4 = 3600;
+            // const uint blue1 = 3601;
+            // const uint blue2 = 3602;
+            // const uint blue3 = 3603;
+            // const uint blue4 = 3604;
+
+            if (buffId <= 3600)
+            {
+                var idx = (int)buffId - 3597;
+                _orange[idx] = id;
+            }
+            else
+            {
+                var idx = (int)buffId - 3601;
+                _blue[idx] = id;
+            }
+        }
+
+        public int GetTowerNum()
+        {
+            return _towerNum;
+        }
+        
+    }
     
     #endregion
 
@@ -1702,7 +1778,12 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
         object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
     {
-        return accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+        return targetObj switch
+        {
+            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
+            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
+            _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
+        };
     }
     
     /// <summary>
@@ -2051,7 +2132,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, 0, scale, scale, color, delay, destroy, name);
+        var dp = accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
         return dp;
     }
 
@@ -2069,7 +2150,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, 0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
+        var dp = accessory.DrawStatic(center, (uint)0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
         dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
@@ -2171,7 +2252,12 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
     {
-        return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+        return target switch
+        {
+            uint uintTarget => accessory.DrawKnockBack(accessory.Data.Me, uintTarget, length, delay, destroy, name, width, byTime),
+            Vector3 vectorTarget => accessory.DrawKnockBack(accessory.Data.Me, vectorTarget, length, delay, destroy, name, width, byTime),
+            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+        };
     }
     
     /// <summary>
@@ -2210,7 +2296,12 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
     {
-        return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+        return target switch
+        {
+            uint uintTarget => accessory.DrawSightAvoid(accessory.Data.Me, uintTarget, delay, destroy, name),
+            Vector3 vectorTarget => accessory.DrawSightAvoid(accessory.Data.Me, vectorTarget, delay, destroy, name),
+            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+        };
     }
 
     /// <summary>
