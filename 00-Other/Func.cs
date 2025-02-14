@@ -73,12 +73,6 @@ public class Hello
 }
 
 #region 函数集
-
-// private ManualResetEvent _event = new(false);
-// _event.Set();
-// _event.Reset();
-// _event.WaitOne();
-
 public static class EventExtensions
 {
     private static bool ParseHexId(string? idStr, out uint id)
@@ -426,6 +420,18 @@ public static class DirectionCalc
         Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
         var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
         return targetPos;
+    }
+    
+    /// <summary>
+    /// 获得两点之间距离
+    /// </summary>
+    /// <param name="point"></param>
+    /// <param name="target"></param>
+    /// <returns></returns>
+    public static float DistanceTo(this Vector3 point, Vector3 target)
+    {
+        Vector2 v2 = new(point.X - target.X, point.Z - target.Z);
+        return v2.Length();
     }
 }
 
@@ -843,25 +849,53 @@ public static class AssignDp
     /// <summary>
     /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
     /// </summary>
-    /// <param name="center">绘图中心位置</param>
+    /// <param name="ownerObj">绘图起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">绘图目标，可输入uint或Vector3，为0则无目标</param>
     /// <param name="radian">图形角度</param>
     /// <param name="rotation">旋转角度，以北为0度顺时针</param>
     /// <param name="width">绘图宽度</param>
     /// <param name="length">绘图长度</param>
+    /// <param name="color">是Vector4则选用该颜色</param>
     /// <param name="delay">延时delay ms出现</param>
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, Vector3 center, float radian, float rotation, float width, float length, int delay, int destroy, string name)
+    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, object ownerObj, object targetObj,
+        float radian, float rotation, float width, float length, object color, int delay, int destroy, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
-        dp.Position = center;
+        switch (ownerObj)
+        {
+            case uint sid:
+                dp.Owner = sid;
+                break;
+            case Vector3 spos:
+                dp.Position = spos;
+                break;
+        }
+        switch (targetObj)
+        {
+            case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos;
+                break;
+        }
         dp.Radian = radian;
         dp.Rotation = rotation.Logic2Game();
-        dp.Color = accessory.Data.DefaultDangerColor;
+        switch (color)
+        {
+            case Vector4 clr:
+                dp.Color = clr;
+                break;
+            default:
+                dp.Color = accessory.Data.DefaultDangerColor;
+                break;
+        }
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         return dp;
@@ -880,8 +914,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
-        dp.Color = color;
+        var dp = accessory.DrawStatic(center, 0, 0, 0, scale, scale, color, delay, destroy, name);
         return dp;
     }
 
@@ -899,8 +932,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, float.Pi * 2, 0, scale, scale, delay, destroy, name);
-        dp.Color = color;
+        var dp = accessory.DrawStatic(center, 0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
         dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
@@ -1004,7 +1036,6 @@ public static class AssignDp
     {
         return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
     }
-
     
     /// <summary>
     /// 返回背对
@@ -1043,6 +1074,85 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
     {
         return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+    }
+
+    /// <summary>
+    /// 返回多方向延伸指引
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="owner">分散源</param>
+    /// <param name="extendDirs">分散角度</param>
+    /// <param name="myDirIdx">玩家对应角度idx</param>
+    /// <param name="width">指引箭头宽度</param>
+    /// <param name="length">指引箭头长度</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPlayer">玩家对应箭头指引颜色</param>
+    /// <param name="colorNormal">其他玩家对应箭头指引颜色</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static List<DrawPropertiesEdit> DrawExtendDirection(this ScriptAccessory accessory, object owner,
+        List<float> extendDirs, int myDirIdx, float width, float length, int delay, int destroy, string name,
+        Vector4 colorPlayer, Vector4 colorNormal)
+    {
+        List<DrawPropertiesEdit> dpList = [];
+        switch (owner)
+        {
+            case uint sid:
+                for (var i = 0; i < extendDirs.Count; i++)
+                {
+                    var dp = accessory.DrawRect(sid, width, length, delay, destroy, $"{name}{i}");
+                    dp.Rotation = extendDirs[i];
+                    dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                    dpList.Add(dp);
+                }
+                break;
+            case Vector3 spos:
+                for (var i = 0; i < extendDirs.Count; i++)
+                {
+                    var dp = accessory.DrawGuidance(spos, spos.ExtendPoint(extendDirs[i], length), delay, destroy,
+                        $"{name}{i}", 0, width);
+                    dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                    dpList.Add(dp);
+                }
+                break;
+            default:
+                throw new ArgumentException("DrawExtendDirection的目标类型输入错误");
+        }
+
+        return dpList;
+    }
+
+    /// <summary>
+    /// 返回多地点指路指引列表
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="positions">地点位置</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPosPlayer">对应位置标记行动颜色</param>
+    /// <param name="colorPosNormal">对应位置标记准备颜色</param>
+    /// <param name="colorGo">指路出发箭头颜色</param>
+    /// <param name="colorPrepare">指路准备箭头颜色</param>
+    /// <returns>dpList中的三个List：位置标记，玩家指路箭头，地点至下个地点的指路箭头</returns>
+    public static List<List<DrawPropertiesEdit>> DrawMultiGuidance(this ScriptAccessory accessory,
+        List<Vector3> positions, List<int> delay, List<int> destroy, string name,
+        Vector4 colorGo, Vector4 colorPrepare, Vector4 colorPosNormal, Vector4 colorPosPlayer)
+    {
+        List<List<DrawPropertiesEdit>> dpList = [[], [], []];
+        for (var i = 0; i < positions.Count; i++)
+        {
+            var dpPos = accessory.DrawStaticCircle(positions[i], colorPosPlayer, delay[i], destroy[i], $"{name}pos{i}");
+            dpList[0].Add(dpPos);
+            var dpGuide = accessory.DrawGuidance(positions[i], colorGo, delay[i], destroy[i], $"{name}guide{i}");
+            dpList[1].Add(dpPos);
+            if (i == positions.Count - 1) break;
+            var dpPrep = accessory.DrawGuidance(positions[i], positions[i + 1], delay[i], destroy[i], $"{name}prep{i}");
+            dpList[2].Add(dpPos);
+        }
+        return dpList;
     }
     
     /// <summary>

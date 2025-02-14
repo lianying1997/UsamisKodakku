@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures.InfoProxy;
@@ -21,6 +22,7 @@ using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using Lumina.Data.Structs.Excel;
+using UsamisKodakku.Scripts.LocalTest.DSR;
 
 namespace UsamisKodakku.Scripts.LocalTest.AMR;
 
@@ -56,17 +58,32 @@ public class Amr
 
     private AmrPhase _phase = AmrPhase.Init;
     private static Vector3 _centerBoss1 = new Vector3(0, 0, -100);
+    private static Vector3 _centerBoss2 = new Vector3(0, 0, -100);      // TODO 待记录
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private List<AutoResetEvent> _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();   // 自动线程
     private List<ManualResetEvent> _manualEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();   // 手动线程
-
+    DateTime _timeLock = new();
+    
+    /* 事件记录 _drawn
+     * 2: 雷暴云
+     */
+    
+    /* 事件记录 _manualEvents
+     * 0: 黑赤招魂
+     * 1: 雷暴云
+     * 2: 雷暴云
+     */
+    
     private VengefulSouls _vs = new VengefulSouls();
     private StormClouds _sc = new StormClouds();
+    private FlameAndSulphur _fas = new FlameAndSulphur();
+    private HumbleHammer _hh = new HumbleHammer();
     
     private List<bool> _wailIsStackAndFirst = new bool[5].ToList();     // Boss1 不寻常咒声，分摊，先分摊记录
     private List<int> _liveFireStackIdx = [];                           // Boss2 火印分摊点名记录
     private int _buffCount = 0;                                         // Boss2 分摊buff计数
+    private static bool _stackSwap = false;                             // Boss2 分摊交换
     
     public void Init(ScriptAccessory accessory)
     {
@@ -162,7 +179,7 @@ public class Amr
         userControl: false)]
     public void UnnaturalWailBuffRecord(Event @event, ScriptAccessory accessory)
     {
-        const uint spread = 3565;
+        // const uint spread = 3565;
         const uint stack = 3566;
         const uint buffLongThreshold = 20000;
         
@@ -457,18 +474,60 @@ public class Amr
         _manualEvents[1].WaitOne();
         var dpList = _sc.ExportCloudSolution();
 
-        for (var i = 0; i < dpList[0].Count(); i++)
+        for (var i = 0; i < dpList[0].Length; i++)
         {
+            // 雷暴云危险区
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dpList[0][i]);
         }
-        // TODO 没写完
+        for (var i = 0; i < dpList[1].Length; i++)
+        {
+            // 雷暴云就位区与目的地
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dpList[1][i]);
+        }
+        for (var i = 0; i < 2; i++)
+        {
+            // 雷暴云指路
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[2][i]);
+        }
+        _manualEvents[1].Reset();
+        _manualEvents[2].WaitOne();
+        accessory.Method.RemoveDraw($"雷云就位区1");
+        accessory.Method.RemoveDraw($"雷云指路1");
+        accessory.Method.RemoveDraw($"雷云指路12");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[2][2]);
+        _manualEvents[2].Reset();
+    }
+    
+    [ScriptMethod(name: "雷暴云范围移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(33(79[123]|83[012]))$"],
+        userControl: false)]
+    public void StormCloudDangerFieldRemove(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        accessory.Method.RemoveDraw($"雷云{sid}");
+        if (_drawn[2]) return;
+        lock (this)
+        {
+            // 等待下一波雷暴云爆炸后移除
+            if ((DateTime.Now - _timeLock).TotalSeconds < 0.6f) return;
+            _timeLock = DateTime.Now; 
+            _drawn[2] = true;
+            _manualEvents[2].Set();
+        }
+    }
+    
+    [ScriptMethod(name: "雷暴云指路移除", eventType: EventTypeEnum.EnvControl, eventCondition: ["ActionId:regex:^(33(79[123]|83[012]))$"],
+        userControl: false)]
+    public void StormCloudGuidanceRemove(Event @event, ScriptAccessory accessory)
+    {
+        // TODO 通过圆形场地变回方形场地事件移除所有绘图
+        accessory.Method.RemoveDraw($".*");
     }
     
     private class StormClouds
     {
-        public ScriptAccessory accessory {get; set;} = null!;
-        private List<(uint, Vector3, bool)> _cloud = [];
-        private List<float> _bossRotation = [];
+        private ScriptAccessory accessory {get; set;} = null!;
+        private readonly List<(uint, Vector3, bool)> _cloud = [];
+        private readonly List<float> _bossRotation = [];
         private int _smokeatTime = 0;
         
         public void Init(ScriptAccessory _accessory)
@@ -621,8 +680,7 @@ public class Amr
         _liveFireStackIdx.Clear();
     }
     
-    [ScriptMethod(name: "火印分摊分散Buff", eventType: EventTypeEnum.StatusAdd,
-        eventCondition: ["StatusID:regex:^(360[78])$"], userControl: true)]
+    [ScriptMethod(name: "火印分摊分散Buff", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(360[78])$"], userControl: true)]
     public void LiveFireBuff(Event @event, ScriptAccessory accessory)
     {
         // const uint spread = 3608;
@@ -648,11 +706,13 @@ public class Amr
                     $"分摊{_liveFireStackIdx[0]}");
                 if (IsRangePartner(_liveFireStackIdx[0], _liveFireStackIdx[1]))
                 {
+                    _stackSwap = true;
                     if (IsJobPartner(myIndex, _liveFireStackIdx[0]))
                         dp.Color = accessory.Data.DefaultSafeColor;
                 }
                 else
                 {
+                    _stackSwap = false;
                     if (IsRangePartner(myIndex, _liveFireStackIdx[0]))
                         dp.Color = accessory.Data.DefaultSafeColor;
                 }
@@ -667,32 +727,53 @@ public class Amr
         }
     }
     
-    // NGreaterBallOfFire = 34053, // Helper->players, no cast, range 6 circle, 2-man stack
-    // NGreatBallOfFire = 34054, // Helper->players, no cast, range 10 circle spread
-    // SGreaterBallOfFire = 34105, // Helper->players, no cast, range 6 circle, 2-man stack
-    // SGreatBallOfFire = 34106, // Helper->players, no cast, range 10 circle spread
-    // FlameAndSulphur = 34056, // *Boss->self, 3.0s cast, single-target, visual (create rocks)
-    // BrazenBalladExpanding = 34057, // *Boss->self, 5.0s cast, single-target, visual (expanding aoes)
-    // BrazenBalladSplitting = 34058, // *Boss->self, 5.0s cast, single-target, visual (splitting aoes)
-    // NFireSpreadExpand = 34059, // Helper->self, no cast, range 46 width 10 rect
-    // NFireSpreadSplit = 34060, // Helper->self, no cast, range 46 width 5 rect
-    // NFallingRockExpand = 34062, // Helper->self, no cast, range 11 circle
-    // NFallingRockSplit = 34063, // Helper->self, no cast, range 6-16 donut
-    // SFireSpreadExpand = 34108, // Helper->self, no cast, range 46 width 10 rect
-    // SFireSpreadSplit = 34109, // Helper->self, no cast, range 46 width 5 rect
-    // SFallingRockExpand = 34111, // Helper->self, no cast, range 11 circle
-    // SFallingRockSplit = 34112, // Helper->self, no cast, range 6-16 donut
-    //
-    // var dpSpreadChariot = accessory.DrawCircle(sid, 11, 0, 5000, $"扩散钢铁");
-    // var dpSpreadDonut = accessory.DrawDonut(sid, 16, 6, 0, 5000, $"扩散月环");
-    // var dpSpreadStraight = accessory.DrawRect(sid, 10, 46, 0, 5000, $"扩散辣尾");
-    // var dpSpreadWing = accessory.DrawDonut(sid, 5, 10, 0, 5000, $"扩散辣翅");
+    [ScriptMethod(name: "岩火招来重置", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:34056"], userControl: false)]
+    public void FlameAndSulphurReset(Event @event, ScriptAccessory accessory)
+    {
+        _fas.Init(accessory);
+    }
+    
+    [ScriptMethod(name: "岩火招来添加元素", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["Operate:Add","DataId:regex:^(201333[12])$"], userControl: false)]
+    public void FlameAndSulphurAddElements(Event @event, ScriptAccessory accessory)
+    {
+        // TODO 增加岩与火
+        var did = @event.DataId();
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
+        // const uint flame = 2013332;
+        const uint sulphur = 2013331;
+        
+        if (did == sulphur)
+            _fas.AddSulphur(sid, spos);
+        else
+            _fas.AddFire(sid, spos);
+    }
+    
+    [ScriptMethod(name: "琵琶旋律范围指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3405[78])$"], userControl: true)]
+    public void BrazenBalledGuidance(Event @event, ScriptAccessory accessory)
+    {
+        var aid = @event.ActionId();
+        var targetSulphur = _fas.ExportBalladSolution(aid);
+        var dp = accessory.DrawGuidance(targetSulphur.Item1, 0, 3500, $"琵琶旋律指路石头");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        accessory.Method.TextInfo($"寻找指向石头的安全区", 3500);
+    }
 
-    public class FlameAndSulphur(ScriptAccessory accessory)
+    private class FlameAndSulphur()
     {
         private List<(uint, Vector3)> _sulphurs = [];
         private List<(uint, Vector3)> _fire = [];
+        private List<(uint, Vector3)> _safeSulphurs = [];
+        private ScriptAccessory accessory {get; set;} = null!;
 
+        public void Init(ScriptAccessory _accessory)
+        {
+            _sulphurs.Clear();
+            _fire.Clear();
+            _safeSulphurs.Clear();
+            accessory = _accessory;
+        }
+        
         public void AddSulphur(uint id, Vector3 pos)
         {
             _sulphurs.Add((id, pos));
@@ -703,14 +784,237 @@ public class Amr
             _fire.Add((id, pos));
         }
 
-        private void SortElements()
+        private void DrawFire(bool isExpand)
         {
-            // var towerDir = _towerPos.Select(pos => pos.Position2Dirs(_centerBoss1, 8)).ToList();
-            // var combinedList = towerDir.Zip(_towerPos, (dir, pos) => (dir, pos));
-            // var sortedCombined = combinedList.OrderBy(x => x.dir).ToList();
-            // _towerPos = sortedCombined.Select(x => x.pos).ToList();
+            foreach (var fire in _fire)
+            {
+                if (isExpand)
+                {
+                    // Rect
+                    var dp = accessory.DrawRect(fire.Item1, 10, 46, 0, 5000, $"扩散辣尾");
+                    dp.Color = ColorHelper.ColorCyan.V4.WithW(2f);
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+                }
+                else
+                {
+                    // Hot wing
+                    var dp = accessory.DrawDonut(fire.Item1, 5, 10, 0, 5000, $"扩散辣翅");
+                    dp.Color = ColorHelper.ColorCyan.V4.WithW(2f);
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.HotWing, dp);
+                }
+            }
+        }
+
+        private void DrawSulphur(bool isExpand)
+        {
+            foreach (var sulphur in _sulphurs)
+            {
+                if (isExpand)
+                {
+                    var dp = accessory.DrawCircle(sulphur.Item1, 11, 0, 5000, $"扩散钢铁");
+                    dp.Color = ColorHelper.ColorCyan.V4.WithW(2f);
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+                }
+                else
+                {
+                    var dp = accessory.DrawDonut(sulphur.Item1, 16, 6, 0, 5000, $"扩散月环");
+                    dp.Color = ColorHelper.ColorCyan.V4.WithW(2f);
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+                }
+            }
+        }
+
+        public (uint, Vector3) ExportBalladSolution(uint balladType)
+        {
+            const uint expandBallad = 34057;
+            const uint splitBallad = 34058;
+            var isExpand = balladType == expandBallad;
+            FindSafeSulphurs();
+            DrawFire(isExpand);
+            DrawSulphur(isExpand);
+            
+            var myIndex = accessory.GetMyIndex();
+            var targetSulphur = myIndex switch
+            {
+                0 => _stackSwap ? _safeSulphurs[1]: _safeSulphurs[0],
+                1 => _safeSulphurs[0],
+                2 => _stackSwap ? _safeSulphurs[0]: _safeSulphurs[1],
+                3 => _safeSulphurs[1],
+                _ => _safeSulphurs[0],
+            };
+            return targetSulphur;
+
+            // TODO
+            // NGreaterBallOfFire = 34053, // Helper->players, no cast, range 6 circle, 2-man stack
+            // NGreatBallOfFire = 34054, // Helper->players, no cast, range 10 circle spread
+            // SGreaterBallOfFire = 34105, // Helper->players, no cast, range 6 circle, 2-man stack
+            // SGreatBallOfFire = 34106, // Helper->players, no cast, range 10 circle spread
+            // FlameAndSulphur = 34056, // *Boss->self, 3.0s cast, single-target, visual (create rocks)
+            // BrazenBalladExpanding = 34057, // *Boss->self, 5.0s cast, single-target, visual (expanding aoes)
+            // BrazenBalladSplitting = 34058, // *Boss->self, 5.0s cast, single-target, visual (splitting aoes)
+            // NFireSpreadExpand = 34059, // Helper->self, no cast, range 46 width 10 rect
+            // NFireSpreadSplit = 34060, // Helper->self, no cast, range 46 width 5 rect
+            // NFallingRockExpand = 34062, // Helper->self, no cast, range 11 circle
+            // NFallingRockSplit = 34063, // Helper->self, no cast, range 6-16 donut
+            // SFireSpreadExpand = 34108, // Helper->self, no cast, range 46 width 10 rect
+            // SFireSpreadSplit = 34109, // Helper->self, no cast, range 46 width 5 rect
+            // SFallingRockExpand = 34111, // Helper->self, no cast, range 11 circle
+            // SFallingRockSplit = 34112, // Helper->self, no cast, range 6-16 donut
+            //
+            // var dpSpreadChariot = accessory.DrawCircle(sid, 11, 0, 5000, $"扩散钢铁");
+            // var dpSpreadDonut = accessory.DrawDonut(sid, 16, 6, 0, 5000, $"扩散月环");
+            // var dpSpreadStraight = accessory.DrawRect(sid, 10, 46, 0, 5000, $"扩散辣尾");
+            // var dpSpreadWing = accessory.DrawDonut(sid, 5, 10, 0, 5000, $"扩散辣翅");
+        }
+
+        private void FindSafeSulphurs()
+        {
+            var str = "";
+            // 当石头出现在鬼火的攻击范围中才是安全的
+            foreach (var sulphur in _sulphurs)
+            {
+                foreach (var fire in _fire)
+                {
+                    if (!IsInRange(sulphur.Item2, fire.Item2)) continue;
+                    _safeSulphurs.Add(sulphur);
+                    str += $"位于{sulphur.Item2}的石头在火的攻击范围内，观察其安全区\n";
+                }
+            }
+            // 排序，0北1南
+            _safeSulphurs.Sort((a, b) => a.Item2.Z.CompareTo(b.Item2.Z));
+            accessory.DebugMsg(str, DebugMode);
+        }
+        private bool IsInRange(Vector3 pos1, Vector3 pos2)
+        {
+            return Math.Abs(pos1.X - pos2.X) <= 1f || Math.Abs(pos1.Z - pos2.Z) <= 1f;
         }
     }
+    
+    [ScriptMethod(name: "炎流范围与指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34095)$"], userControl: true)]
+    public void ImpurePurgationGuidance(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var myIndex = accessory.GetMyIndex();
+        for (var i = 0; i < accessory.Data.PartyList.Count; i++)
+        {
+            var dp = accessory.DrawFan(sid, 45f.DegToRad(), 0, 60, 0, 0, 3600, $"炎流{i}");
+            dp.TargetObject = accessory.Data.PartyList[i];
+            if (i == myIndex)
+                dp.Color = accessory.Data.DefaultSafeColor;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        }
+        List<float> extendDirs = [0, -90f.DegToRad().Logic2Game(), 180f.DegToRad().Logic2Game(), 90f.DegToRad().Logic2Game()];
+        var dpList = accessory.DrawExtendDirection(sid, extendDirs, myIndex, 4f, 10f, 0, 3600, $"炎流方向",
+            PosColorPlayer.V4.WithW(2f), PosColorNormal.V4);
+        foreach (var dp in dpList)
+        {
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "炎流引导范围", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: true)]
+    public void ImpurePurgationBaitField(Event @event, ScriptAccessory accessory)
+    {
+        var spos = @event.SourcePosition();
+        var tpos = @event.TargetPosition();
+        for (var i = 0; i < accessory.Data.PartyList.Count; i++)
+        {
+            var dp = accessory.DrawStatic(spos, tpos, 45f.DegToRad(), 0, 60f, 60f, 0, 0, 2000, $"炎流引导{i}");
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "万宝槌初始化", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: false)]
+    public void HumbleHammerReset(Event @event, ScriptAccessory accessory)
+    {
+        _hh.Init(accessory);
+    }
+
+    [ScriptMethod(name: "万宝槌添加球", eventType: EventTypeEnum.AddCombatant, eventCondition: ["ActionId:regex:^(34(097|131))$"], userControl: false)]
+    public void HumbleHammerAddOrb(Event @event, ScriptAccessory accessory)
+    {
+        // TODO eventCondition
+        var sid = @event.SourceId();
+        var spos = @event.SourcePosition();
+        _hh.AddOrbs(sid, spos);
+    }
+    
+    [ScriptMethod(name: "万宝槌目标球提示与挡枪", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34084)$"], userControl: true)]
+    public void HumbleHammerSolution(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+        var targetOrb = _hh.ExportTargetOrb();
+        // 目标球范围
+        var dp = accessory.DrawCircle(targetOrb, 8, 0, 5000, $"万宝槌目标球");
+        dp.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        
+        // 目标球指路
+        if (IbcHelper.IsHealer(accessory.Data.Me))
+        {
+            var dpGuideToOrb = accessory.DrawGuidance(targetOrb, 0, 5000, $"万宝槌球指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuideToOrb);
+        }
+
+        // 奶妈挡枪
+        var dpWildCharge = accessory.DrawRect(sid, 8, 50, 3000, 5000, $"万宝槌挡枪");
+        if (!IbcHelper.IsDps(accessory.Data.Me))
+        {
+            dp.Color = accessory.Data.DefaultSafeColor;
+        }
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dpWildCharge);
+    }
+    
+    private class HumbleHammer
+    {
+        private List<(uint, Vector3)> _orbsCorner = [];
+        private List<(uint, Vector3)> _orbsMiddle = [];
+        private ScriptAccessory accessory {get; set;} = null!;
+
+        public void Init(ScriptAccessory _accessory)
+        {
+            _orbsCorner.Clear();
+            _orbsMiddle.Clear();
+            accessory = _accessory;
+        }
+
+        public void AddOrbs(uint id, Vector3 pos)
+        {
+            if (AtCorner(pos))
+                _orbsCorner.Add((id, pos));
+            else
+                _orbsMiddle.Add((id, pos));
+        }
+
+        private bool AtCorner(Vector3 pos)
+        {
+            return pos.DistanceTo(_centerBoss2) > 24f;
+        }
+
+        public uint ExportTargetOrb()
+        {
+            var targetOrb = 0u;
+            var minOrbDistance = 255f;
+            foreach (var orb in _orbsCorner)
+            {
+                var distance = 0f;
+                foreach (var orbMiddle in _orbsMiddle)
+                {
+                    distance += orb.Item2.DistanceTo(orbMiddle.Item2);
+                }
+                if (!(distance < minOrbDistance)) continue;
+                minOrbDistance = distance;
+                targetOrb = orb.Item1;
+            }
+
+            return targetOrb;
+        }
+    }
+    
+    // OrangeTower1 = 0x1EB895, // R0.500, EventObj type, spawn during fight
+    // OrangeTower2 = 0x1EB906, // R0.500, EventObj type, spawn during fight
+    // BlueTower1 = 0x1EB896, // R0.500, EventObj type, spawn during fight
+    // BlueTower2 = 0x1EB897, // R0.500, EventObj type, spawn during fight
     
     #endregion
 
@@ -899,7 +1203,7 @@ public class Amr
     /// <returns></returns>
     private bool IsRangePartner(int idx1, int idx2)
     {
-        return idx1 + idx2 == 2 || idx1 + idx2 == 4;
+        return idx1 + idx2 == 2 || idx1 + idx2 == 4 || idx1 == idx2;
     }
 
     #endregion
@@ -1253,6 +1557,18 @@ public static class DirectionCalc
         Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
         var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
         return targetPos;
+    }
+
+    /// <summary>
+    /// 获得两点之间距离
+    /// </summary>
+    /// <param name="point"></param>
+    /// <param name="target"></param>
+    /// <returns></returns>
+    public static float DistanceTo(this Vector3 point, Vector3 target)
+    {
+        Vector2 v2 = new(point.X - target.X, point.Z - target.Z);
+        return v2.Length();
     }
 }
 
@@ -1670,25 +1986,53 @@ public static class AssignDp
     /// <summary>
     /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
     /// </summary>
-    /// <param name="center">绘图中心位置</param>
+    /// <param name="ownerObj">绘图起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">绘图目标，可输入uint或Vector3，为0则无目标</param>
     /// <param name="radian">图形角度</param>
     /// <param name="rotation">旋转角度，以北为0度顺时针</param>
     /// <param name="width">绘图宽度</param>
     /// <param name="length">绘图长度</param>
+    /// <param name="color">是Vector4则选用该颜色</param>
     /// <param name="delay">延时delay ms出现</param>
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, Vector3 center, float radian, float rotation, float width, float length, int delay, int destroy, string name)
+    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, object ownerObj, object targetObj,
+        float radian, float rotation, float width, float length, object color, int delay, int destroy, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
-        dp.Position = center;
+        switch (ownerObj)
+        {
+            case uint sid:
+                dp.Owner = sid;
+                break;
+            case Vector3 spos:
+                dp.Position = spos;
+                break;
+        }
+        switch (targetObj)
+        {
+            case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos;
+                break;
+        }
         dp.Radian = radian;
         dp.Rotation = rotation.Logic2Game();
-        dp.Color = accessory.Data.DefaultDangerColor;
+        switch (color)
+        {
+            case Vector4 clr:
+                dp.Color = clr;
+                break;
+            default:
+                dp.Color = accessory.Data.DefaultDangerColor;
+                break;
+        }
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         return dp;
@@ -1707,8 +2051,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
-        dp.Color = color;
+        var dp = accessory.DrawStatic(center, 0, 0, 0, scale, scale, color, delay, destroy, name);
         return dp;
     }
 
@@ -1726,8 +2069,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, float.Pi * 2, 0, scale, scale, delay, destroy, name);
-        dp.Color = color;
+        var dp = accessory.DrawStatic(center, 0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
         dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
@@ -1831,7 +2173,6 @@ public static class AssignDp
     {
         return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
     }
-
     
     /// <summary>
     /// 返回背对
@@ -1870,6 +2211,85 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
     {
         return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+    }
+
+    /// <summary>
+    /// 返回多方向延伸指引
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="owner">分散源</param>
+    /// <param name="extendDirs">分散角度</param>
+    /// <param name="myDirIdx">玩家对应角度idx</param>
+    /// <param name="width">指引箭头宽度</param>
+    /// <param name="length">指引箭头长度</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPlayer">玩家对应箭头指引颜色</param>
+    /// <param name="colorNormal">其他玩家对应箭头指引颜色</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static List<DrawPropertiesEdit> DrawExtendDirection(this ScriptAccessory accessory, object owner,
+        List<float> extendDirs, int myDirIdx, float width, float length, int delay, int destroy, string name,
+        Vector4 colorPlayer, Vector4 colorNormal)
+    {
+        List<DrawPropertiesEdit> dpList = [];
+        switch (owner)
+        {
+            case uint sid:
+                for (var i = 0; i < extendDirs.Count; i++)
+                {
+                    var dp = accessory.DrawRect(sid, width, length, delay, destroy, $"{name}{i}");
+                    dp.Rotation = extendDirs[i];
+                    dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                    dpList.Add(dp);
+                }
+                break;
+            case Vector3 spos:
+                for (var i = 0; i < extendDirs.Count; i++)
+                {
+                    var dp = accessory.DrawGuidance(spos, spos.ExtendPoint(extendDirs[i], length), delay, destroy,
+                        $"{name}{i}", 0, width);
+                    dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                    dpList.Add(dp);
+                }
+                break;
+            default:
+                throw new ArgumentException("DrawExtendDirection的目标类型输入错误");
+        }
+
+        return dpList;
+    }
+
+    /// <summary>
+    /// 返回多地点指路指引列表
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="positions">地点位置</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPosPlayer">对应位置标记行动颜色</param>
+    /// <param name="colorPosNormal">对应位置标记准备颜色</param>
+    /// <param name="colorGo">指路出发箭头颜色</param>
+    /// <param name="colorPrepare">指路准备箭头颜色</param>
+    /// <returns>dpList中的三个List：位置标记，玩家指路箭头，地点至下个地点的指路箭头</returns>
+    public static List<List<DrawPropertiesEdit>> DrawMultiGuidance(this ScriptAccessory accessory,
+        List<Vector3> positions, List<int> delay, List<int> destroy, string name,
+        Vector4 colorGo, Vector4 colorPrepare, Vector4 colorPosNormal, Vector4 colorPosPlayer)
+    {
+        List<List<DrawPropertiesEdit>> dpList = [[], [], []];
+        for (var i = 0; i < positions.Count; i++)
+        {
+            var dpPos = accessory.DrawStaticCircle(positions[i], colorPosPlayer, delay[i], destroy[i], $"{name}pos{i}");
+            dpList[0].Add(dpPos);
+            var dpGuide = accessory.DrawGuidance(positions[i], colorGo, delay[i], destroy[i], $"{name}guide{i}");
+            dpList[1].Add(dpPos);
+            if (i == positions.Count - 1) break;
+            var dpPrep = accessory.DrawGuidance(positions[i], positions[i + 1], delay[i], destroy[i], $"{name}prep{i}");
+            dpList[2].Add(dpPos);
+        }
+        return dpList;
     }
     
     /// <summary>
