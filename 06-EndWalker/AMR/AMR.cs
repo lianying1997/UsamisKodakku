@@ -1713,7 +1713,7 @@ public class Amr
             var name = $"霞斩{_safeRadian}, {_cleaveRadian}";
             var chara = IbcHelper.GetById(_targetId);
             var charaPos = chara.Position;
-            charaPos = charaPos.ExtendPoint(chara.Rotation.Game2Logic(), bias ? -3f : 0.5f);
+            charaPos = charaPos.ExtendPoint(chara.Rotation.Game2Logic(), bias ? -3f : -0.5f);
             SetKasumiCastPos(charaPos);
             SetKasumiSourceRotation(chara.Rotation.Game2Logic());
             SetKasumiProperty(_param);
