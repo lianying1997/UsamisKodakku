@@ -86,5 +86,13 @@
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
         "UpdateInfo": "1. 初版完成，包含机制绘图与指路，适配异闻与异闻零式。\n鸭门。"
+    },
+    {
+        "Name": "AMR [异闻六根山]",
+        "Guid": "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45",
+        "Version": "0.0.0.1",
+        "Author": "Usami",
+        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/AMR/AMR.cs",
+        "UpdateInfo": "1. 初版完成。\n鸭门。"
     }
     ]

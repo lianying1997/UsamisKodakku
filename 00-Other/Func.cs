@@ -759,6 +759,7 @@ public static class AssignDp
     /// </summary>
     /// <param name="ownerId">起始目标id，通常为自己</param>
     /// <param name="targetId">目标单位id</param>
+    /// <param name="rotation">绘图旋转角度</param>
     /// <param name="width">绘图宽度</param>
     /// <param name="length">绘图长度</param>
     /// <param name="delay">延时delay ms出现</param>
@@ -768,11 +769,12 @@ public static class AssignDp
     /// <param name="byTime">动画效果随时间填充</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, uint ownerId, uint targetId, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, uint ownerId, uint targetId, float width, float length, int delay, int destroy, string name, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
+        dp.Rotation = rotation;
         dp.Owner = ownerId;
         dp.TargetObject = targetId;
         dp.Color = accessory.Data.DefaultDangerColor;
