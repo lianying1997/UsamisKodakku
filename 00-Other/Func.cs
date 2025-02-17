@@ -784,6 +784,14 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
+    
+    public static DrawPropertiesEdit DrawFanToTarget(this ScriptAccessory accessory, uint sourceId, uint targetId, float radian, float scale, int delay, int destroy, string name, Vector4 color, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.DrawTarget2Target(sourceId, targetId, scale, scale, delay, destroy, name, rotation, lengthByDistance, byTime);
+        dp.Radian = radian;
+        dp.Color = color;
+        return dp;
+    }
 
     /// <summary>
     /// 返回owner与target之间的连线dp，使用Line绘制
