@@ -25,7 +25,7 @@ using KodakkuAssist.Module.GameOperate;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.TOP;
 
-[ScriptType(name: Name, territorys: [], guid: "b688fd29-786e-4103-82a3-7ad786af433b", 
+[ScriptType(name: Name, territorys: [1122], guid: "b688fd29-786e-4103-82a3-7ad786af433b", 
     version: Version, author: "Usami", note: NoteStr)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
@@ -65,10 +65,10 @@ public class TopPatch
     private TopPhase _phase = TopPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
-    private static DeltaVersion _dv = new(DebugMode);
-    private static SigmaVersion _sv = new(DebugMode);
+    private static DeltaVersion _dv = new();
+    private static SigmaVersion _sv = new();
     private static SigmaWorld _sw = new(DebugMode);
-    private static DynamicsPass _dyn = new(DebugMode);
+    private static DynamicsPass _dyn = new();
     
     private List<AutoResetEvent> _events = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
     
@@ -93,7 +93,13 @@ public class TopPatch
     
     #region P5 一运
     
-    [ScriptMethod(name: "P5 潜能量层数记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3444"], userControl: false)]
+    [ScriptMethod(name: "---- P5 一运 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
+        userControl: true)]
+    public void SplitLine_DeltaVersion(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
+    [ScriptMethod(name: "潜能量层数记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3444"], userControl: false)]
     public void P5_DynamicRecord(Event @event, ScriptAccessory accessory)
     {
         if (!IsInPhase5(_phase)) return;
@@ -104,16 +110,16 @@ public class TopPatch
             DebugMode);
     }
     
-    [ScriptMethod(name: "P5 一运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
+    [ScriptMethod(name: "一运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
     public void P5_RunMi_Delta_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         _phase = TopPhase.P5_Delta;
-        _dyn = new DynamicsPass(DebugMode);
-        _dv = new DeltaVersion(DebugMode);
+        _dyn = new DynamicsPass();
+        _dv = new DeltaVersion();
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
-    [ScriptMethod(name: "P5 一运 远近线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(200|201)$"], userControl: false)]
+    [ScriptMethod(name: "一运 远近线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(200|201)$"], userControl: false)]
     public void P5_Delta_LocalRemoteTetherRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Delta) return;
@@ -134,7 +140,7 @@ public class TopPatch
         }
     }
     
-    [ScriptMethod(name: "P5 一二传世界记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(344[23])$"], userControl: false)]
+    [ScriptMethod(name: "一二传 世界记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(344[23])$"], userControl: false)]
     public void P5_HelloWorldFarNearRecord(Event @event, ScriptAccessory accessory)
     {
         if (!IsInPhase5(_phase)) return;
@@ -152,22 +158,78 @@ public class TopPatch
         }
     }
     
+    public class DeltaVersion
+    {
+        public ScriptAccessory accessory { get; set; } = null!;
+        // 数大在外，锁2近世界
+        private List<uint> RemoteTetherInside { get; set; } = [];
+        private List<uint> RemoteTetherOutside { get; set; } = [];
+        private List<uint> LocalTetherInside { get; set; } = [];
+        private List<uint> LocalTetherOutside { get; set; } = [];
+        // 以光头为北的左，为场地北，A侧
+        public List<uint> TetherUp { get; set; } = [];
+        public List<uint> TetherDown { get; set; } = [];
+
+        /// <summary>
+        /// 添加近线玩家单位
+        /// </summary>
+        /// <param name="id">玩家ID</param>
+        public void LocalTetherTargetAdd(uint id)
+        {
+            if (LocalTetherInside.Count < 2)
+            {
+                LocalTetherInside.Add(id);
+                LocalTetherInside = SortByPartyList(LocalTetherInside, accessory);
+            }
+            else
+            {
+                LocalTetherOutside.Add(id);
+                LocalTetherOutside = SortByPartyList(LocalTetherOutside, accessory);
+            }
+        }
+    
+        /// <summary>
+        /// 添加远线玩家单位
+        /// </summary>
+        /// <param name="id">玩家ID</param>
+        public void RemoteTetherTargetAdd(uint id)
+        {
+            if (RemoteTetherInside.Count < 2)
+            {
+                RemoteTetherInside.Add(id);
+                RemoteTetherInside = SortByPartyList(RemoteTetherInside, accessory);
+            }
+            else
+            {
+                RemoteTetherOutside.Add(id);
+                RemoteTetherOutside = SortByPartyList(RemoteTetherOutside, accessory);
+            }
+        }
+    }
+    
     #endregion
 
     #region P5 二运
     
-    [ScriptMethod(name: "P5 二运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(32788)$"], userControl: false)]
+    [ScriptMethod(name: "---- P5 二运 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
+        userControl: true)]
+    public void SplitLine_SigmaVersion(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
+    [ScriptMethod(name: "二运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(32788)$"], userControl: false)]
     public void P5_RunMi_Sigma_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         _phase = TopPhase.P5_Sigma;
-        _sv = new SigmaVersion(DebugMode);
+        _sv = new SigmaVersion();
+        _sv.Init(accessory);
         _sw = new SigmaWorld(DebugMode);
         _dyn.DynamicIdxAdd();
         _dyn.Reset();
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
-    [ScriptMethod(name: "P5 二运中远线记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(342[78])$"], userControl: false)]
+    [ScriptMethod(name: "二运 中远线记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(342[78])$"], userControl: false)]
     public void P5_GlitchRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
@@ -178,79 +240,97 @@ public class TopPatch
         accessory.DebugMsg($"成功记录下{(_sv.IsRemoteGlitch()?"远线":"中线")}", DebugMode);
     }
     
-    [ScriptMethod(name: "P5 二运索尼标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(01A[0123])$"], userControl: false)]
+    [ScriptMethod(name: "二运 索尼标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(01A[0123])$"], userControl: false)]
     public void P5_SonyIconRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
         var id = (IconId)@event.Id();
         var tid = @event.TargetId();
-        _sv.AddPlayerToGroup(tid, id, accessory);
+        lock (_sv)
+        {
+            _sv.AddPlayerToGroup(tid, id);
+            if (_sv.SonyRecordedDone())
+                _events[(int)RecordedIdx.SigmaSonyRecord].Set();
+        }
     }
     
-    [ScriptMethod(name: "P5 二运八方炮点名标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(00F4)$"], userControl: false)]
+    [ScriptMethod(name: "二运 八方炮点名标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(00F4)$"], userControl: false)]
     public void P5_SigmaCannonIconRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
         var tid = @event.TargetId();
-        _sv.SetTargetedPlayer(tid, accessory);
+        lock (_sv)
+        {
+            _sv.SetTargetedPlayer(tid);
+            if (_sv.TargetRecordedDone())
+                _events[(int)RecordedIdx.SigmaTargetRecord].Set();
+        }
     }
     
-    [ScriptMethod(name: "P5 二运男人真北位置记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:15720"], userControl: false)]
+    [ScriptMethod(name: "二运 男人真北位置记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:15720"], userControl: false)]
     public void P5_OmegaTrueNorthRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
         var spos = @event.SourcePosition();
         var pos = spos.Position2Dirs(Center, 16);
-        _sv.SetSpreadTrueNorth(pos, accessory);
+        _sv.SetSpreadTrueNorth(pos);
     }
     
-    [ScriptMethod(name: "P5 二运索尼头标计算", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"], userControl: false)]
+    [ScriptMethod(name: "二运 索尼头标计算", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"], userControl: false)]
     public void P5_SigmaVersionMarker(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
-        lock (_sv)
+        lock (_events)
         {
-            while (!_sv.SonyRecordedDone() && !_sv.TargetRecordedDone()) ;
+            _events[(int)RecordedIdx.SigmaTargetRecord].WaitOne();
+            _events[(int)RecordedIdx.SigmaSonyRecord].WaitOne();
         }
-        _sv.BuildUntargetedGroup(accessory);
+        _sv.BuildUntargetedGroup();
         if (CaptainMode)
         {
-            _sv.BuildMarker(accessory);
+            _sv.BuildMarker();
             MarkAllPlayers(_sv.GetMarkers(), accessory);
         }
         _sv.FindSpreadTarget();
-        _sv.CalcSpreadPos(Center, accessory);
+        _sv.CalcSpreadPos(Center);
         _events[(int)RecordedIdx.SigmaSonyMarker].Set();
     }
     
-    [ScriptMethod(name: "P5 二运八方分散指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"])]
+    [ScriptMethod(name: "二运 八方分散指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"])]
     public void P5_SigmaVersionSpreadDir(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
-        _events[(int)RecordedIdx.SigmaSonyMarker].WaitOne();
-        DrawSigmaSpreadSolution(accessory);
+        lock (_events)
+        {
+            _events[(int)RecordedIdx.SigmaSonyMarker].WaitOne();
+            DrawSigmaSpreadSolution(accessory);
+            _events[(int)RecordedIdx.SigmaSonyMarker].Reset();
+            _events[(int)RecordedIdx.SigmaTargetRecord].Reset();
+            _events[(int)RecordedIdx.SigmaSonyRecord].Reset();
+        }
+
     }
     
-    [ScriptMethod(name: "P5 二运塔生成记录", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:regex:^(201324[56])$", "Operate:Add"], userControl: false)]
+    [ScriptMethod(name: "二运 塔生成记录", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:regex:^(201324[56])$", "Operate:Add"], userControl: false)]
     public void P5_SigmaTowerRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
         var id = (DataId)@event.DataId();
         var spos = @event.SourcePosition();
-        _sv.SetTowerType(id, spos, Center, accessory);
+        _sv.SetTowerType(id, spos, Center);
     }
     
-    [ScriptMethod(name: "P5 二运塔计算与指路", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:14669"])]
+    [ScriptMethod(name: "二运 塔计算与指路", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:14669"])]
     public void P5_SigmaTowerCalc(Event @event, ScriptAccessory accessory)
     {
         // 因为计算不对后续机制造成影响，所以可以放在一个事件检测里
         if (_phase != TopPhase.P5_Sigma) return;
-        _sv.BuildTargetTowerPos(accessory);
-        _sv.CalcTargetTowerPos(Center, accessory);
+        _sv.BuildTargetTowerPos();
+        _sv.CalcTargetTowerPos(Center);
         DrawSigmaTowerSolution(accessory);
     }
     
-    [ScriptMethod(name: "P5 二运前半头标消除，计算二传头标", eventType: EventTypeEnum.KnockBack, userControl: false)]
+    [ScriptMethod(name: "二运 前半头标消除，计算二传头标", eventType: EventTypeEnum.KnockBack, userControl: false)]
     public void P5_SigmaVersionMarkClear(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
@@ -261,7 +341,7 @@ public class TopPatch
         // TODO 二传算头标
     }
     
-    [ScriptMethod(name: "P5 二传标头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:3149[23]"], userControl: false)]
+    [ScriptMethod(name: "二传 标头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:3149[23]"], userControl: false)]
     public void P5_SigmaWorldMarker(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
@@ -324,7 +404,316 @@ public class TopPatch
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
         }
     }
-        
+
+    public class SigmaVersion
+    {
+        public ScriptAccessory accessory { get; set; } = null!;
+        private List<uint> CircleGroup { get; set; } = [];
+        private List<uint> CrossGroup { get; set; } = [];
+        private List<uint> TriangleGroup { get; set; } = [];
+        private List<uint> SquareGroup { get; set; } = [];
+        private List<bool> IsTargeted { get; set; } = new bool[8].ToList();
+        private List<uint> UntargetedGroup { get; set; } = [];
+        private bool GlitchType { get; set; }
+        private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
+        private List<int> TowerType { get; set; } = Enumerable.Repeat(0, 16).ToList();
+        private List<int> SpreadTargetPos { get; set; } = Enumerable.Repeat(0, 8).ToList();
+        private List<Vector3> SpreadPosV3 { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
+        private List<int> TargetTowerPos { get; set; } = Enumerable.Repeat(0, 8).ToList();
+        private List<Vector3> TargetTowerPosV3 { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
+        private int SpreadTrueNorth { get; set; }
+        public int SonyGroupCount { get; set; } = 0;
+
+        public void Init(ScriptAccessory _accessory)
+        {
+            accessory = _accessory;
+        }
+
+        public void AddPlayerToGroup(uint id, IconId group)
+        {
+            switch (group)
+            {
+                case IconId.IconCircle:
+                    CircleGroup.Add(id);
+                    break;
+                case IconId.IconCross:
+                    CrossGroup.Add(id);
+                    break;
+                case IconId.IconTriangle:
+                    TriangleGroup.Add(id);
+                    break;
+                case IconId.IconSquare:
+                    SquareGroup.Add(id);
+                    break;
+            }
+
+            SonyGroupCount++;
+            // accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", DebugMode);
+        }
+
+        public void BuildTargetTowerPos()
+        {
+            for (var i = 0; i < 8; i++)
+            {
+                var towerIdx = FindTargetTower(i);
+                if (towerIdx == -1)
+                {
+                    TargetTowerPos[i] = 0;
+                    accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", DebugMode);
+                }
+                else
+                {
+                    TargetTowerPos[i] = towerIdx;
+                    accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", DebugMode);
+                }
+            }
+        }
+
+        public int FindTargetTower(int idx)
+        {
+            var startIdx = SpreadTargetPos[idx];
+            var roundNum = TowerType.Count;
+
+            // 构建4个观察用index，忽视面前
+            var indices = new List<int>
+            {
+                RoundIndex(startIdx - 2, roundNum),
+                RoundIndex(startIdx - 1, roundNum),
+                RoundIndex(startIdx + 1, roundNum),
+                RoundIndex(startIdx + 2, roundNum)
+            };
+
+            // 存在双人塔，返回双人塔idx
+            foreach (var index in indices.Where(index => TowerType[index] == 2))
+                return index;
+
+            // 有且仅有一座塔，返回单人塔idx
+            var ones = indices.Where(index => TowerType[index] == 1).ToList();
+            if (ones.Count == 1)
+                return ones[0];
+
+            return -1;
+        }
+
+        private int RoundIndex(int idx, int roundNum)
+        {
+            return (idx + roundNum) % roundNum;
+        }
+
+        public void SetSpreadTrueNorth(int pos)
+        {
+            SpreadTrueNorth = pos;
+            accessory.DebugMsg($"设置分散真北方向为{pos}", DebugMode);
+        }
+
+        public void SetTargetedPlayer(uint id)
+        {
+            var idx = accessory.GetPlayerIdIndex(id);
+            IsTargeted[idx] = true;
+            accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", DebugMode);
+        }
+
+        public void BuildUntargetedGroup()
+        {
+            UntargetedGroup = IsTargeted
+                .Select((value, index) => new { value, index })
+                .Where(x => !x.value)
+                .Select(x => accessory.Data.PartyList[x.index])
+                .ToList();
+
+            foreach (var player in UntargetedGroup)
+                accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", DebugMode);
+        }
+
+        public IconId FindIconGroup(uint id)
+        {
+            if (CircleGroup.Contains(id))
+                return IconId.IconCircle;
+            if (CrossGroup.Contains(id))
+                return IconId.IconCross;
+            if (TriangleGroup.Contains(id))
+                return IconId.IconTriangle;
+            if (SquareGroup.Contains(id))
+                return IconId.IconSquare;
+            return IconId.None;
+        }
+
+        public uint FindPartner(uint id)
+        {
+            var group = FindIconGroup(id);
+            var chosenGroup = group switch
+            {
+                IconId.IconCircle => CircleGroup,
+                IconId.IconCross => CrossGroup,
+                IconId.IconTriangle => TriangleGroup,
+                IconId.IconSquare => SquareGroup,
+                _ => [],
+            };
+            return chosenGroup.FirstOrDefault(player => player != id);
+        }
+
+        public void BuildMarker()
+        {
+            // 无点名二人
+            var playerAttack1 = UntargetedGroup[0];
+            var playerBind1 = UntargetedGroup[1];
+            SetMarkerBySelf(playerAttack1, MarkType.Attack1);
+            SetMarkerBySelf(playerBind1, MarkType.Bind1);
+
+            // 无点名二人搭档
+            var playerCircle = FindPartner(playerAttack1);
+            var playerAttack4 = FindPartner(playerBind1);
+            SetMarkerBySelf(playerCircle, MarkType.Circle);
+            SetMarkerBySelf(playerAttack4, MarkType.Attack4);
+
+            var extraMarkIdx = 0;
+            List<MarkType> extraMarkType = [MarkType.Attack2, MarkType.Bind3, MarkType.Attack3, MarkType.Bind2];
+            // 剩余未被标记的
+            for (var i = 0; i < 8; i++)
+            {
+                if (IsMarkered(i)) continue;
+                var markPrepPlayer = accessory.Data.PartyList[i];
+                SetMarkerBySelf(markPrepPlayer, extraMarkType[extraMarkIdx]);
+                extraMarkIdx++;
+                var markPlayerPartner = FindPartner(markPrepPlayer);
+                SetMarkerBySelf(markPlayerPartner, extraMarkType[extraMarkIdx]);
+                extraMarkIdx++;
+            }
+        }
+
+        public void FindSpreadTarget()
+        {
+            for (var i = 0; i < 8; i++)
+            {
+                var marker = Marker[i];
+                var pos = marker switch
+                {
+                    MarkType.Attack1 => 15,
+                    MarkType.Attack2 => 13,
+                    MarkType.Attack3 => 11,
+                    MarkType.Attack4 => 9,
+                    MarkType.Bind1 => 1,
+                    MarkType.Bind2 => 3,
+                    MarkType.Bind3 => 5,
+                    MarkType.Circle => 7,
+                    _ => 0
+                };
+                SpreadTargetPos[i] = (pos + SpreadTrueNorth) % 16;
+            }
+        }
+
+        public void CalcSpreadPos(Vector3 center)
+        {
+            // TODO 该“中远线距离”值待测试
+            var basicDistance = IsRemoteGlitch() ? 19.5f : 11.25f;
+            var basicPoint = new Vector3(100, 0, 100 - basicDistance);
+            for (var i = 0; i < 8; i++)
+            {
+                var posV3 = basicPoint.RotatePoint(center, SpreadTargetPos[i] * float.Pi / 8);
+                // 第二排往内一步避免引导，第一排往外一步引导
+                if (GetMarkerTypeFromIdx(i) is MarkType.Attack2 or MarkType.Bind2)
+                    posV3 = posV3.PointInOutside(center, 0.5f);
+                if (GetMarkerTypeFromIdx(i) is MarkType.Attack1 or MarkType.Bind1)
+                    posV3 = posV3.PointInOutside(center, 0.5f, true);
+                SpreadPosV3[i] = posV3;
+                accessory.DebugMsg(
+                    $"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的分散位置{SpreadPosV3[i]}",
+                    DebugMode);
+            }
+        }
+
+        public void CalcTargetTowerPos(Vector3 center)
+        {
+            var knockBackDistance = 13f;
+            var basicPoint = new Vector3(100, 0, 82.5f + knockBackDistance);
+            for (var i = 0; i < 8; i++)
+            {
+                var posV3 = basicPoint.RotatePoint(center, TargetTowerPos[i] * float.Pi / 8);
+                TargetTowerPosV3[i] = posV3;
+                accessory.DebugMsg(
+                    $"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的击退塔位置{TargetTowerPosV3[i]}",
+                    DebugMode);
+            }
+        }
+
+        public void SetMarkerFromOut(uint id, MarkType marker)
+        {
+            var idx = accessory.GetPlayerIdIndex(id);
+            Marker[idx] = marker;
+            accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", DebugMode);
+        }
+
+        public void SetMarkerBySelf(uint id, MarkType marker)
+        {
+            var idx = accessory.GetPlayerIdIndex(id);
+            Marker[idx] = marker;
+            accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", DebugMode);
+        }
+
+        public void SetTowerType(DataId towerId, Vector3 towerPos, Vector3 center)
+        {
+            var pos = towerPos.Position2Dirs(center, 16);
+            var towerType = towerId switch
+            {
+                DataId.SingleTower => 1,
+                DataId.PartnerTower => 2,
+                _ => 0
+            };
+            TowerType[pos] = towerType;
+            accessory.DebugMsg($"检测到方位{pos}的{towerType}人塔", DebugMode);
+        }
+
+        public bool IsMarkered(int idx)
+        {
+            return Marker[idx] != MarkType.None;
+        }
+
+        public bool IsRemoteGlitch()
+        {
+            return GlitchType;
+        }
+
+        public void SetGlitchType(StatusId type)
+        {
+            GlitchType = type == StatusId.RemoteGlitch;
+        }
+
+        public List<MarkType> GetMarkers()
+        {
+            return Marker;
+        }
+
+        public List<int> GetSpreadTargetPos()
+        {
+            return SpreadTargetPos;
+        }
+
+        public MarkType GetMarkerTypeFromIdx(int idx)
+        {
+            return Marker[idx];
+        }
+
+        public List<Vector3> GetSpreadPosV3()
+        {
+            return SpreadPosV3;
+        }
+
+        public List<Vector3> GetTargetTowerPosV3()
+        {
+            return TargetTowerPosV3;
+        }
+
+        public bool SonyRecordedDone()
+        {
+            return SonyGroupCount == 8;
+        }
+
+        public bool TargetRecordedDone()
+        {
+            return IsTargeted.Count(x => x) == 6;
+        }
+    }
+
     #endregion
     
     [ScriptMethod(name: "P5 三运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(32789)$"], userControl: false)]
@@ -338,341 +727,15 @@ public class TopPatch
     {
         return phase is TopPhase.P5_Delta or TopPhase.P5_Sigma or TopPhase.P5_Omega;
     }
-}
 
-public class DeltaVersion(bool debugMode)
-{
-    private readonly bool _debugMode = debugMode;    // 测试完成后置为False
-    // 数大在外，锁2近世界
-    private List<uint> RemoteTetherInside { get; set; } = [];
-    private List<uint> RemoteTetherOutside { get; set; } = [];
-    private List<uint> LocalTetherInside { get; set; } = [];
-    private List<uint> LocalTetherOutside { get; set; } = [];
-    // 以光头为北的左，为场地北，A侧
-    public List<uint> TetherUp { get; set; } = [];
-    public List<uint> TetherDown { get; set; } = [];
+    #region General Functions
 
-    /// <summary>
-    /// 添加近线玩家单位
-    /// </summary>
-    /// <param name="id">玩家ID</param>
-    public void LocalTetherTargetAdd(uint id)
+    private static List<uint> SortByPartyList(List<uint> unsortedList, ScriptAccessory accessory)
     {
-        if (LocalTetherInside.Count < 2)
-            LocalTetherInside.Add(id);
-        else
-            LocalTetherOutside.Add(id);
-    }
-    
-    /// <summary>
-    /// 添加远线玩家单位
-    /// </summary>
-    /// <param name="id">玩家ID</param>
-    public void RemoteTetherTargetAdd(uint id)
-    {
-        if (RemoteTetherInside.Count < 2)
-            RemoteTetherInside.Add(id);
-        else
-            RemoteTetherOutside.Add(id);
-    }
-}
-    
-public class SigmaVersion(bool debugMode)
-{
-    private readonly bool _debugMode = debugMode;
-    private List<uint> CircleGroup { get; set; } = [];
-    private List<uint> CrossGroup { get; set; } = [];
-    private List<uint> TriangleGroup { get; set; } = [];
-    private List<uint> SquareGroup { get; set; } = [];
-    private List<bool> IsTargeted { get; set; } = new bool[8].ToList();
-    private List<uint> UntargetedGroup { get; set; } = [];
-    private bool GlitchType { get; set; }
-    private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
-    private List<int> TowerType { get; set; } = Enumerable.Repeat(0, 16).ToList();
-    private List<int> SpreadTargetPos { get; set; } = Enumerable.Repeat(0, 8).ToList();
-    private List<Vector3> SpreadPosV3 { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
-    private List<int> TargetTowerPos { get; set; } = Enumerable.Repeat(0, 8).ToList();
-    private List<Vector3> TargetTowerPosV3 { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
-    private int SpreadTrueNorth { get; set; }
-    public int SonyGroupCount { get; set; } = 0;
-
-    public void AddPlayerToGroup(uint id, IconId group, ScriptAccessory accessory)
-    {
-        switch (group)
-        {
-            case IconId.IconCircle:
-                CircleGroup.Add(id);
-                break;
-            case IconId.IconCross:
-                CrossGroup.Add(id);
-                break;
-            case IconId.IconTriangle:
-                TriangleGroup.Add(id);
-                break;
-            case IconId.IconSquare:
-                SquareGroup.Add(id);
-                break;
-        }
-        SonyGroupCount++;
-        // accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", _debugMode);
+        return unsortedList.OrderBy(x => accessory.Data.PartyList.IndexOf(x)).ToList();
     }
 
-    public void BuildTargetTowerPos(ScriptAccessory accessory)
-    {
-        for (var i = 0; i < 8; i++)
-        {
-            var towerIdx = FindTargetTower(i);
-            if (towerIdx == -1)
-            {
-                TargetTowerPos[i] = 0;
-                accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", _debugMode);
-            }
-            else
-            {
-                TargetTowerPos[i] = towerIdx;
-                accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", _debugMode);
-            }
-        }
-    }
-    
-    public int FindTargetTower(int idx)
-    {
-        var startIdx = SpreadTargetPos[idx];
-        var roundNum = TowerType.Count;
-        
-        // 构建4个观察用index，忽视面前
-        var indices = new List<int>
-        {
-            RoundIndex(startIdx - 2, roundNum),
-            RoundIndex(startIdx - 1, roundNum),
-            RoundIndex(startIdx + 1, roundNum),
-            RoundIndex(startIdx + 2, roundNum)
-        };
-        
-        // 存在双人塔，返回双人塔idx
-        foreach (var index in indices.Where(index => TowerType[index] == 2))
-            return index;
-
-        // 有且仅有一座塔，返回单人塔idx
-        var ones = indices.Where(index => TowerType[index] == 1).ToList();
-        if (ones.Count == 1)
-            return ones[0];
-        
-        return -1;
-    }
-    
-    private int RoundIndex(int idx, int roundNum)
-    {
-        return (idx + roundNum) % roundNum;
-    }
-
-    public void SetSpreadTrueNorth(int pos, ScriptAccessory accessory)
-    {
-        SpreadTrueNorth = pos;
-        accessory.DebugMsg($"设置分散真北方向为{pos}", _debugMode);
-    }
-
-    public void SetTargetedPlayer(uint id, ScriptAccessory accessory)
-    {
-        var idx = accessory.GetPlayerIdIndex(id);
-        IsTargeted[idx] = true;
-        accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", _debugMode);
-    }
-
-    public void BuildUntargetedGroup(ScriptAccessory accessory)
-    {
-        UntargetedGroup = IsTargeted
-            .Select((value, index) => new { value, index })
-            .Where(x => !x.value)
-            .Select(x => accessory.Data.PartyList[x.index])
-            .ToList();
-        
-        foreach (var player in UntargetedGroup)
-            accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", _debugMode);
-    }
-
-    public IconId FindIconGroup(uint id)
-    {
-        if (CircleGroup.Contains(id))
-            return IconId.IconCircle;
-        if (CrossGroup.Contains(id))
-            return IconId.IconCross;
-        if (TriangleGroup.Contains(id))
-            return IconId.IconTriangle;
-        if (SquareGroup.Contains(id))
-            return IconId.IconSquare;
-        return IconId.None;
-    }
-
-    public uint FindPartner(uint id)
-    {
-        var group = FindIconGroup(id);
-        var chosenGroup = group switch
-        {
-            IconId.IconCircle => CircleGroup,
-            IconId.IconCross => CrossGroup,
-            IconId.IconTriangle => TriangleGroup,
-            IconId.IconSquare => SquareGroup,
-            _ => [],
-        };
-        return chosenGroup.FirstOrDefault(player => player != id);
-    }
-
-    public void BuildMarker(ScriptAccessory accessory)
-    {
-        // 无点名二人
-        var playerAttack1 = UntargetedGroup[0];
-        var playerBind1 = UntargetedGroup[1];
-        SetMarkerBySelf(playerAttack1, MarkType.Attack1, accessory);
-        SetMarkerBySelf(playerBind1, MarkType.Bind1, accessory);
-
-        // 无点名二人搭档
-        var playerCircle = FindPartner(playerAttack1);
-        var playerAttack4 = FindPartner(playerBind1);
-        SetMarkerBySelf(playerCircle, MarkType.Circle, accessory);
-        SetMarkerBySelf(playerAttack4, MarkType.Attack4, accessory);
-
-        var extraMarkIdx = 0;
-        List<MarkType> extraMarkType = [MarkType.Attack2, MarkType.Bind3, MarkType.Attack3, MarkType.Bind2];
-        // 剩余未被标记的
-        for (var i = 0; i < 8; i++)
-        {
-            if (IsMarkered(i)) continue;
-            var markPrepPlayer = accessory.Data.PartyList[i];
-            SetMarkerBySelf(markPrepPlayer, extraMarkType[extraMarkIdx], accessory);
-            extraMarkIdx++;
-            var markPlayerPartner = FindPartner(markPrepPlayer);
-            SetMarkerBySelf(markPlayerPartner, extraMarkType[extraMarkIdx], accessory);
-            extraMarkIdx++;
-        }
-    }
-
-    public void FindSpreadTarget()
-    {
-        for (var i = 0; i < 8; i++)
-        {
-            var marker = Marker[i];
-            var pos = marker switch
-            {
-                MarkType.Attack1 => 15,
-                MarkType.Attack2 => 13,
-                MarkType.Attack3 => 11,
-                MarkType.Attack4 => 9,
-                MarkType.Bind1 => 1,
-                MarkType.Bind2 => 3,
-                MarkType.Bind3 => 5,
-                MarkType.Circle => 7,
-                _ => 0
-            };
-            SpreadTargetPos[i] = (pos + SpreadTrueNorth) % 16;
-        }
-    }
-
-    public void CalcSpreadPos(Vector3 center, ScriptAccessory accessory)
-    {
-        // TODO 该“中远线距离”值待测试
-        var basicDistance = IsRemoteGlitch() ? 19.5f : 11.25f;
-        var basicPoint = new Vector3(100, 0, 100 - basicDistance);
-        for (var i = 0; i < 8; i++)
-        {
-            var posV3 = basicPoint.RotatePoint(center, SpreadTargetPos[i] * float.Pi / 8);
-            // 第二排往内一步避免引导，第一排往外一步引导
-            if (GetMarkerTypeFromIdx(i) is MarkType.Attack2 or MarkType.Bind2)
-                posV3 = posV3.PointInOutside(center, 0.5f);
-            if (GetMarkerTypeFromIdx(i) is MarkType.Attack1 or MarkType.Bind1)
-                posV3 = posV3.PointInOutside(center, 0.5f, true);
-            SpreadPosV3[i] = posV3;
-            accessory.DebugMsg($"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的分散位置{SpreadPosV3[i]}",
-                _debugMode);
-        }
-    }
-
-    public void CalcTargetTowerPos(Vector3 center, ScriptAccessory accessory)
-    {
-        var knockBackDistance = 13f;
-        var basicPoint = new Vector3(100, 0, 82.5f + knockBackDistance);
-        for (var i = 0; i < 8; i++)
-        {
-            var posV3 = basicPoint.RotatePoint(center, TargetTowerPos[i] * float.Pi / 8);
-            TargetTowerPosV3[i] = posV3;
-            accessory.DebugMsg($"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的击退塔位置{TargetTowerPosV3[i]}",
-                _debugMode);
-        }
-    }
-   
-    public void SetMarkerFromOut(uint id, MarkType marker, ScriptAccessory accessory)
-    {
-        var idx = accessory.GetPlayerIdIndex(id);
-        Marker[idx] = marker;
-        accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", _debugMode);
-    }
-    
-    public void SetMarkerBySelf(uint id, MarkType marker, ScriptAccessory accessory)
-    {
-        var idx = accessory.GetPlayerIdIndex(id);
-        Marker[idx] = marker;
-        accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", _debugMode);
-    }
-
-    public void SetTowerType(DataId towerId, Vector3 towerPos, Vector3 center, ScriptAccessory accessory)
-    {
-        var pos = towerPos.Position2Dirs(center, 16);
-        var towerType = towerId switch
-        {
-            DataId.SingleTower => 1,
-            DataId.PartnerTower => 2,
-            _ => 0
-        };
-        TowerType[pos] = towerType;
-        accessory.DebugMsg($"检测到方位{pos}的{towerType}人塔", _debugMode);
-    }
-    
-    public bool IsMarkered(int idx)
-    {
-        return Marker[idx] != MarkType.None;
-    }
-
-    public bool IsRemoteGlitch()
-    {
-        return GlitchType;
-    }
-
-    public void SetGlitchType(StatusId type)
-    {
-        GlitchType = type == StatusId.RemoteGlitch;
-    }
-
-    public List<MarkType> GetMarkers()
-    {
-        return Marker;
-    }
-
-    public List<int> GetSpreadTargetPos()
-    {
-        return SpreadTargetPos;
-    }
-
-    public MarkType GetMarkerTypeFromIdx(int idx)
-    {
-        return Marker[idx];
-    }
-
-    public List<Vector3> GetSpreadPosV3()
-    {
-        return SpreadPosV3;
-    }
-    public List<Vector3> GetTargetTowerPosV3()
-    {
-        return TargetTowerPosV3;
-    }
-    public bool SonyRecordedDone()
-    {
-        return SonyGroupCount == 8;
-    }
-    public bool TargetRecordedDone()
-    {
-        return IsTargeted.Count(x => x) == 6;
-    }
+    #endregion
 }
 
 public class SigmaWorld(bool debugMode)
@@ -693,9 +756,8 @@ public class SigmaWorld(bool debugMode)
     }
 }
 
-public class DynamicsPass(bool debugMode)
+public class DynamicsPass
 {
-    private readonly bool _debugMode = debugMode;
     private int DynamicIdx { get; set; } = 0;
     private List<int> BuffLevel { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0];
     private uint FarSource { get; set; } = 0;
@@ -808,15 +870,11 @@ public enum DataId : uint
 public enum RecordedIdx : int
 {
     SigmaSonyMarker = 0,
+    SigmaSonyRecord = 1,
+    SigmaTargetRecord = 2,
 }
 
 #region 函数集
-
-// private ManualResetEvent _event = new(false);
-// _event.Set();
-// _event.Reset();
-// _event.WaitOne();
-
 public static class EventExtensions
 {
     private static bool ParseHexId(string? idStr, out uint id)
@@ -1165,6 +1223,18 @@ public static class DirectionCalc
         var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
         return targetPos;
     }
+
+    /// <summary>
+    /// 获得两点之间距离
+    /// </summary>
+    /// <param name="point"></param>
+    /// <param name="target"></param>
+    /// <returns></returns>
+    public static float DistanceTo(this Vector3 point, Vector3 target)
+    {
+        Vector2 v2 = new(point.X - target.X, point.Z - target.Z);
+        return v2.Length();
+    }
 }
 
 public static class IndexHelper
@@ -1209,16 +1279,17 @@ public static class IndexHelper
     /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
     /// </summary>
     /// <param name="idx">位置index</param>
+    /// <param name="fourPeople">是否为四人迷宫</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx)
+    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx, bool fourPeople = false)
     {
         var str = idx switch
         {
             0 => "MT",
-            1 => "ST",
-            2 => "H1",
-            3 => "H2",
+            1 => fourPeople ? "H1" : "ST",
+            2 => fourPeople ? "D1" : "H1",
+            3 => fourPeople ? "D2" : "H2",
             4 => "D1",
             5 => "D2",
             6 => "D3",
@@ -1296,7 +1367,12 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
         object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
     {
-        return accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+        return targetObj switch
+        {
+            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
+            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
+            _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
+        };
     }
     
     /// <summary>
@@ -1485,6 +1561,7 @@ public static class AssignDp
     /// </summary>
     /// <param name="ownerId">起始目标id，通常为自己</param>
     /// <param name="targetId">目标单位id</param>
+    /// <param name="rotation">绘图旋转角度</param>
     /// <param name="width">绘图宽度</param>
     /// <param name="length">绘图长度</param>
     /// <param name="delay">延时delay ms出现</param>
@@ -1494,11 +1571,12 @@ public static class AssignDp
     /// <param name="byTime">动画效果随时间填充</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, uint ownerId, uint targetId, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, uint ownerId, uint targetId, float width, float length, int delay, int destroy, string name, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
+        dp.Rotation = rotation;
         dp.Owner = ownerId;
         dp.TargetObject = targetId;
         dp.Color = accessory.Data.DefaultDangerColor;
@@ -1506,6 +1584,14 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+    
+    public static DrawPropertiesEdit DrawFanToTarget(this ScriptAccessory accessory, uint sourceId, uint targetId, float radian, float scale, int delay, int destroy, string name, Vector4 color, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.DrawTarget2Target(sourceId, targetId, scale, scale, delay, destroy, name, rotation, lengthByDistance, byTime);
+        dp.Radian = radian;
+        dp.Color = color;
         return dp;
     }
 
@@ -1580,25 +1666,53 @@ public static class AssignDp
     /// <summary>
     /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
     /// </summary>
-    /// <param name="center">绘图中心位置</param>
+    /// <param name="ownerObj">绘图起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">绘图目标，可输入uint或Vector3，为0则无目标</param>
     /// <param name="radian">图形角度</param>
     /// <param name="rotation">旋转角度，以北为0度顺时针</param>
     /// <param name="width">绘图宽度</param>
     /// <param name="length">绘图长度</param>
+    /// <param name="color">是Vector4则选用该颜色</param>
     /// <param name="delay">延时delay ms出现</param>
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, Vector3 center, float radian, float rotation, float width, float length, int delay, int destroy, string name)
+    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, object ownerObj, object targetObj,
+        float radian, float rotation, float width, float length, object color, int delay, int destroy, string name)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(width, length);
-        dp.Position = center;
+        switch (ownerObj)
+        {
+            case uint sid:
+                dp.Owner = sid;
+                break;
+            case Vector3 spos:
+                dp.Position = spos;
+                break;
+        }
+        switch (targetObj)
+        {
+            case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos;
+                break;
+        }
         dp.Radian = radian;
         dp.Rotation = rotation.Logic2Game();
-        dp.Color = accessory.Data.DefaultDangerColor;
+        switch (color)
+        {
+            case Vector4 clr:
+                dp.Color = clr;
+                break;
+            default:
+                dp.Color = accessory.Data.DefaultDangerColor;
+                break;
+        }
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         return dp;
@@ -1617,8 +1731,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
     {
-        var dp = accessory.DrawStatic(center, 0, 0, scale, scale, delay, destroy, name);
-        dp.Color = color;
+        var dp = accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
         return dp;
     }
 
@@ -1636,8 +1749,7 @@ public static class AssignDp
     /// <returns></returns>
     public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
     {
-        var dp = accessory.DrawStatic(center, float.Pi * 2, 0, scale, scale, delay, destroy, name);
-        dp.Color = color;
+        var dp = accessory.DrawStatic(center, (uint)0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
         dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
@@ -1739,9 +1851,13 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
     {
-        return accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+        return target switch
+        {
+            uint uintTarget => accessory.DrawKnockBack(accessory.Data.Me, uintTarget, length, delay, destroy, name, width, byTime),
+            Vector3 vectorTarget => accessory.DrawKnockBack(accessory.Data.Me, vectorTarget, length, delay, destroy, name, width, byTime),
+            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+        };
     }
-
     
     /// <summary>
     /// 返回背对
@@ -1779,7 +1895,91 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
     {
-        return accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+        return target switch
+        {
+            uint uintTarget => accessory.DrawSightAvoid(accessory.Data.Me, uintTarget, delay, destroy, name),
+            Vector3 vectorTarget => accessory.DrawSightAvoid(accessory.Data.Me, vectorTarget, delay, destroy, name),
+            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+        };
+    }
+
+    /// <summary>
+    /// 返回多方向延伸指引
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="owner">分散源</param>
+    /// <param name="extendDirs">分散角度</param>
+    /// <param name="myDirIdx">玩家对应角度idx</param>
+    /// <param name="width">指引箭头宽度</param>
+    /// <param name="length">指引箭头长度</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPlayer">玩家对应箭头指引颜色</param>
+    /// <param name="colorNormal">其他玩家对应箭头指引颜色</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static List<DrawPropertiesEdit> DrawExtendDirection(this ScriptAccessory accessory, object owner,
+        List<float> extendDirs, int myDirIdx, float width, float length, int delay, int destroy, string name,
+        Vector4 colorPlayer, Vector4 colorNormal)
+    {
+        List<DrawPropertiesEdit> dpList = [];
+        switch (owner)
+        {
+            case uint sid:
+                for (var i = 0; i < extendDirs.Count; i++)
+                {
+                    var dp = accessory.DrawRect(sid, width, length, delay, destroy, $"{name}{i}");
+                    dp.Rotation = extendDirs[i];
+                    dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                    dpList.Add(dp);
+                }
+                break;
+            case Vector3 spos:
+                for (var i = 0; i < extendDirs.Count; i++)
+                {
+                    var dp = accessory.DrawGuidance(spos, spos.ExtendPoint(extendDirs[i], length), delay, destroy,
+                        $"{name}{i}", 0, width);
+                    dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                    dpList.Add(dp);
+                }
+                break;
+            default:
+                throw new ArgumentException("DrawExtendDirection的目标类型输入错误");
+        }
+
+        return dpList;
+    }
+
+    /// <summary>
+    /// 返回多地点指路指引列表
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="positions">地点位置</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPosPlayer">对应位置标记行动颜色</param>
+    /// <param name="colorPosNormal">对应位置标记准备颜色</param>
+    /// <param name="colorGo">指路出发箭头颜色</param>
+    /// <param name="colorPrepare">指路准备箭头颜色</param>
+    /// <returns>dpList中的三个List：位置标记，玩家指路箭头，地点至下个地点的指路箭头</returns>
+    public static List<List<DrawPropertiesEdit>> DrawMultiGuidance(this ScriptAccessory accessory,
+        List<Vector3> positions, List<int> delay, List<int> destroy, string name,
+        Vector4 colorGo, Vector4 colorPrepare, Vector4 colorPosNormal, Vector4 colorPosPlayer)
+    {
+        List<List<DrawPropertiesEdit>> dpList = [[], [], []];
+        for (var i = 0; i < positions.Count; i++)
+        {
+            var dpPos = accessory.DrawStaticCircle(positions[i], colorPosPlayer, delay[i], destroy[i], $"{name}pos{i}");
+            dpList[0].Add(dpPos);
+            var dpGuide = accessory.DrawGuidance(positions[i], colorGo, delay[i], destroy[i], $"{name}guide{i}");
+            dpList[1].Add(dpPos);
+            if (i == positions.Count - 1) break;
+            var dpPrep = accessory.DrawGuidance(positions[i], positions[i + 1], delay[i], destroy[i], $"{name}prep{i}");
+            dpList[2].Add(dpPos);
+        }
+        return dpList;
     }
     
     /// <summary>
