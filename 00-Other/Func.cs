@@ -69,7 +69,18 @@ public class Hello
         // -- DEBUG CODE END --
     }
     
+    [ScriptMethod(name: "---- P1 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_Phase1(Event @event, ScriptAccessory accessory)
+    {
+    }
 
+    [ScriptMethod(name: "阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:40995"], userControl: false)]
+    public void PhaseChange(Event @event, ScriptAccessory accessory)
+    {
+        // _phase = Phase.P2;
+        // accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
+    }
 }
 
 #region 函数集
@@ -1186,7 +1197,7 @@ public static class AssignDp
     /// <param name="str"></param>
     /// <param name="debugMode"></param>
     /// <param name="accessory"></param>
-    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode)
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = true)
     {
         if (!debugMode)
             return;

@@ -70,13 +70,13 @@ public class TopPatch
     private static SigmaWorld _sw = new(DebugMode);
     private static DynamicsPass _dyn = new();
     
-    private List<AutoResetEvent> _events = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
+    private List<ManualResetEvent> _events = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
     
     public void Init(ScriptAccessory accessory)
     {
         accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
         _phase = TopPhase.Init;
-        _events = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
+        _events = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }
