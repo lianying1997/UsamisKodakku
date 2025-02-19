@@ -225,8 +225,6 @@ public class QueenEternalEx
             dp.Offset = new(0, -3.5f, 0);
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Fan, dp);
         }
-        else if (_phase is QueenEternalPhase.Ice)
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Fan, dp);
         else
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }   
