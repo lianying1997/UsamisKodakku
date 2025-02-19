@@ -1,44 +1,37 @@
 using System;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Script;
-using KodakkuAssist.Module.Draw;
-using Dalamud.Utility.Numerics;
+using System.Linq;
 using System.Numerics;
-using System.Runtime.Intrinsics.Arm;
-using Dalamud.Memory.Exceptions;
-using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Network.Structures.InfoProxy;
+using Newtonsoft.Json;
+using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
-using System.Linq;
-using ImGuiNET;
-using static Dalamud.Interface.Utility.Raii.ImRaii;
-using KodakkuAssist.Module.GameOperate;
-using System.Security.Cryptography;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.ComponentModel;
-// using System.DirectoryServices.ActiveDirectory;
-using System.Collections;
-using System.ComponentModel.DataAnnotations.Schema;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using ECommons.MathHelpers;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
-using Dalamud.Game.ClientState.Objects.Types;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
-using System.Security.AccessControl;
-using System.Timers;
-using FFXIVClientStructs.FFXIV.Client.UI.Misc;
-// using Lumina.Data.Parsing.Scd;
-// using Lumina.Excel.GeneratedSheets;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs;
+using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p8s;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.4", author: "Usami", note: noteStr)]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.5", author: "Usami", note: noteStr)]
 public class p8s
 {
     const string noteStr =
     """
+    v0.0.0.5
+    为了7.1编译成功的尝试。
+    
     v0.0.0.4
     1. 调整迭代次数随实际人数变更，避免报错弹出。
 

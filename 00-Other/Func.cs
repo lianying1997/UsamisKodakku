@@ -1183,10 +1183,10 @@ public static class AssignDp
             var dpPos = accessory.DrawStaticCircle(positions[i], colorPosPlayer, delay[i], destroy[i], $"{name}pos{i}");
             dpList[0].Add(dpPos);
             var dpGuide = accessory.DrawGuidance(positions[i], colorGo, delay[i], destroy[i], $"{name}guide{i}");
-            dpList[1].Add(dpPos);
+            dpList[1].Add(dpGuide);
             if (i == positions.Count - 1) break;
             var dpPrep = accessory.DrawGuidance(positions[i], positions[i + 1], delay[i], destroy[i], $"{name}prep{i}");
-            dpList[2].Add(dpPos);
+            dpList[2].Add(dpPrep);
         }
         return dpList;
     }

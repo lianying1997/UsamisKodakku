@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Enums;
@@ -12,26 +13,18 @@ using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Timers;
-using Lumina.Excel.GeneratedSheets;
-using ECommons.SplatoonAPI;
-using System.ComponentModel;
-using Microsoft.VisualBasic;
-using System.Reflection.Metadata.Ecma335;
-using System.Drawing;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
-using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs;
+using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.6", author: "Usami", note: noteStr)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.7", author: "Usami", note: noteStr)]
 
 public class p12s
 {
@@ -39,6 +32,9 @@ public class p12s
     """
     请先按需求检查并设置“用户设置”栏目。
     门神到超链后对话，本体到黑白塔。
+    v0.0.0.7
+    为了7.1编译成功的尝试。
+    
     v0.0.0.6
     1. 调整迭代次数随实际人数变更，避免报错弹出。
 

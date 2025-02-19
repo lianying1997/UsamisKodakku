@@ -21,12 +21,11 @@ using FFXIVClientStructs;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using System.Drawing;
 using System.Security.AccessControl;
-using Lumina.Excel.GeneratedSheets2;
 using System.ComponentModel;
 
 namespace UsamisScript.EndWalker.p4s;
 
-[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.2", author: "Usami", note: noteStr)]
+[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.3", author: "Usami", note: noteStr)]
 
 public class p4s
 {
@@ -35,6 +34,8 @@ public class p4s
     请先按需求检查并设置“用户设置”栏目。
     “逃课”即为黑糖荔枝攻略演示。
     门神仅线毒提示，本体到二运。
+    v0.0.0.3
+    为了7.1编译成功的尝试。
 
     v0.0.0.2
     1. 初版完成。

@@ -2,26 +2,26 @@
     {
         "Name": "P8S [零式万魔殿 炼净之狱4]",
         "Guid": "97df6974-c726-4a00-9016-293c184adf5c",
-        "Version": "0.0.0.4",
+        "Version": "0.0.0.5",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
-        "UpdateInfo": "1. 调整迭代次数随实际人数变更，避免报错弹出。"
+        "UpdateInfo": "为了7.1编译成功的尝试。"
     },
     {
         "Name": "P12S [零式万魔殿 荒天之狱4]",
         "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
-        "Version": "0.0.0.6",
+        "Version": "0.0.0.7",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
-        "UpdateInfo": "1. 调整迭代次数随实际人数变更，避免报错弹出。"
+        "UpdateInfo": "为了7.1编译成功的尝试。"
     },
     {
         "Name": "P4S [零式万魔殿 边境之狱4]",
         "Guid": "de9e31e6-d040-48e3-bf0b-aa4e2643f79d",
-        "Version": "0.0.0.2",
+        "Version": "0.0.0.3",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p4s.cs",
-        "UpdateInfo": "1. 门神仅线毒提示，本体到二运，二运含逃课与正攻打法。"
+        "UpdateInfo": "为了7.1编译成功的尝试。"
     },
     {
         "Name": "Lv87 [创造环境极北造物院]",
