@@ -42,10 +42,10 @@
     {
         "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",
         "Guid": "e24a0c8b-5c41-4e58-87c3-355f1f925986",
-        "Version": "0.0.0.4",
+        "Version": "0.0.0.5",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ZodiarkEx.cs",
-        "UpdateInfo": "1. 我忘了，反正改了点什么东西。"
+        "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。"
     },
     {
         "Name": "Rubicante-Ex [卢比坎特歼殛战]",
@@ -66,10 +66,10 @@
     {
         "Name": "Zodiark [佐迪亚克歼灭战]",
         "Guid": "ed3f32fe-fc12-4485-baa4-bec6c357e70b",
-        "Version": "0.0.0.1",
+        "Version": "0.0.0.2",
         "Author": "Usami",
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Zodiark.cs",
-        "UpdateInfo": "鸭门。"
+        "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。"
     },
     {
         "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",

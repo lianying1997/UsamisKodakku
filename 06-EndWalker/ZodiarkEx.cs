@@ -1,43 +1,37 @@
 using System;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Script;
-using KodakkuAssist.Module.Draw;
-using Dalamud.Utility.Numerics;
-using System.Numerics;
-using System.Runtime.Intrinsics.Arm;
-using Dalamud.Memory.Exceptions;
-using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using ECommons;
 using System.Linq;
-using ImGuiNET;
-using static Dalamud.Interface.Utility.Raii.ImRaii;
-using KodakkuAssist.Module.GameOperate;
-using System.Security.Cryptography;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.ComponentModel;
-// using System.DirectoryServices.ActiveDirectory;
-using System.Collections;
-using System.ComponentModel.DataAnnotations.Schema;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using KodakkuAssist.Module.Draw.Manager;
-using Dalamud.Game.ClientState.Objects.Types;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
-using System.Runtime;
-using System.Timers;
-// using Lumina.Excel.GeneratedSheets;
+using System.Numerics;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Security.AccessControl;
-using Lumina.Excel.GeneratedSheets;
+using System.Threading;
+using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Network.Structures.InfoProxy;
+using Newtonsoft.Json;
+using Dalamud.Utility.Numerics;
+using ECommons;
+using ECommons.DalamudServices;
+using ECommons.GameFunctions;
+using ECommons.MathHelpers;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Module.Draw.Manager;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs;
+using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.ZodiarkEx;
 
-[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.4", author: "Usami", note: noteStr)]
+[ScriptType(name: "Zodiark-Ex [佐迪亚克暝暗歼灭战]", territorys: [993], guid: "e24a0c8b-5c41-4e58-87c3-355f1f925986", version: "0.0.0.5", author: "Usami", note: noteStr)]
 public class ZodiarkEx
 {
     const string noteStr =
     """
+    v0.0.0.5:
+    我再也不using lumina了。
+    
     v0.0.0.4:
     1. 我忘了，反正改了点什么东西。
 

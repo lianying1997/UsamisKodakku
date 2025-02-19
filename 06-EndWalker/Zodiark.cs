@@ -1,43 +1,37 @@
 using System;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Script;
-using KodakkuAssist.Module.Draw;
-using Dalamud.Utility.Numerics;
-using System.Numerics;
-using System.Runtime.Intrinsics.Arm;
-using Dalamud.Memory.Exceptions;
-using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using ECommons;
 using System.Linq;
-using ImGuiNET;
-using static Dalamud.Interface.Utility.Raii.ImRaii;
-using KodakkuAssist.Module.GameOperate;
-using System.Security.Cryptography;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.ComponentModel;
-// using System.DirectoryServices.ActiveDirectory;
-using System.Collections;
-using System.ComponentModel.DataAnnotations.Schema;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using KodakkuAssist.Module.Draw.Manager;
-using Dalamud.Game.ClientState.Objects.Types;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
-using System.Runtime;
-using System.Timers;
-// using Lumina.Excel.GeneratedSheets;
+using System.Numerics;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Security.AccessControl;
-using Lumina.Excel.GeneratedSheets;
+using System.Threading;
+using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Network.Structures.InfoProxy;
+using Newtonsoft.Json;
+using Dalamud.Utility.Numerics;
+using ECommons;
+using ECommons.DalamudServices;
+using ECommons.GameFunctions;
+using ECommons.MathHelpers;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Module.Draw.Manager;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs;
+using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.Zodiark;
 
-[ScriptType(name: "Zodiark [佐迪亚克歼灭战]", territorys: [992], guid: "ed3f32fe-fc12-4485-baa4-bec6c357e70b", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "Zodiark [佐迪亚克歼灭战]", territorys: [992], guid: "ed3f32fe-fc12-4485-baa4-bec6c357e70b", version: "0.0.0.2", author: "Usami", note: noteStr)]
 public class Zodiark
 {
     const string noteStr =
     """
+    v0.0.0.2:
+    我再也不using Lumina了。
+    
     v0.0.0.1:
     鸭门。
     """;
