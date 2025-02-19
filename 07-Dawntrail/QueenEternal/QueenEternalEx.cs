@@ -65,7 +65,7 @@ public class QueenEternalEx
     private static readonly Vector3 GravityFieldLeft = new Vector3(92f, 0, 94f);
     private List<ManualResetEvent> _manualResetEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
     private List<AutoResetEvent> _autoResetEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
-    private readonly List<bool> _earthPhaseTarget = new bool[8].ToList(); // 绘图记录
+    private List<bool> _earthPhaseTarget = new bool[8].ToList(); // 绘图记录
     
     private bool _isFlareTarget = false;    // 绝对君权核爆目标
     private Vector3 _sourceIceDartPos = new Vector3(0, 0, 0);     // 与玩家连线的目标冰柱位置
@@ -83,6 +83,7 @@ public class QueenEternalEx
         _manualResetEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
         _autoResetEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
         
+        _earthPhaseTarget = new bool[8].ToList(); // 绘图记录
         _isFlareTarget = false;     // 绝对君权核爆目标
         _sourceIceDartPos = new Vector3(0, 0, 0);     // 与玩家连线的目标冰柱位置
         _myIceBridgeIdx = 0;       // 冰阶段走的冰桥
