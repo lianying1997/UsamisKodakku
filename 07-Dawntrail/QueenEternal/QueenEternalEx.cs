@@ -33,13 +33,16 @@ public class QueenEternalEx
 {
     const string NoteStr =
     """
+    v0.0.0.2
+    1. 修复冰阶段分摊接线角落错误指向。
+    
     v0.0.0.1
     初版完成。绝对君权为正攻，若逃课请忽略核爆远离指路箭头。
     鸭门。
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
@@ -1008,8 +1011,8 @@ public class QueenEternalEx
         
         var myIndex = accessory.GetMyIndex();
         if (myIndex != 4 && myIndex != 5) return;
-        var topLeftCorner = new Vector3(115.5f, 0, 80.5f);
-        var topRightCorner = topLeftCorner.FoldPointHorizon(CenterIce.X);
+        var topRightCorner = new Vector3(115.5f, 0, 80.5f);
+        var topLeftCorner = topRightCorner.FoldPointHorizon(CenterIce.X);
         List<Vector3> targetPosList = myIndex switch
         {
             4 => [CenterIce, _upIceBridgeRoute[0], _upIceBridgeRoute[1], topLeftCorner],
@@ -1041,8 +1044,8 @@ public class QueenEternalEx
         _raisedTribute = false;
         accessory.Method.RemoveDraw($"D接线.*");
         
-        var topLeftCorner = new Vector3(115.5f, 0, 80.5f);
-        var topRightCorner = topLeftCorner.FoldPointHorizon(CenterIce.X);
+        var topRightCorner = new Vector3(115.5f, 0, 80.5f);
+        var topLeftCorner = topRightCorner.FoldPointHorizon(CenterIce.X);
         
         List<int> idxList = [0, 1, 4, 5];
         if (!idxList.Contains(myIndex)) return;
