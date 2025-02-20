@@ -33,6 +33,10 @@ public class QueenEternalEx
 {
     const string NoteStr =
     """
+    v0.0.0.3
+    1. 修复土阶段MT/D1第二轮陨石指向场中的bug。
+    2. 修复冰阶段第二轮判断错误的bug。
+    
     v0.0.0.2
     1. 修复冰阶段分摊接线角落错误指向。
     
@@ -112,31 +116,9 @@ public class QueenEternalEx
         uint sid = 0x4000FAEC;
         var myIndex = 1;
 
-        var aid = 40992;
-        const float deltaZ = 10.5f;   // 上半场与下半场Z轴差
-        const float centerDeltaX = 1f;  // 躲左右刀X轴差
-        const float edgeX = 12f;    // 场中X与风场地边缘X差
-        
-        // 是TN在下半场，所以增加dz。此处以上半场为基准
-        var dz = myIndex <= 3 ? new Vector3(0, 0, deltaZ) : new Vector3(0, 0, -deltaZ);
-
-        // 根据左右刀顺序决定dx偏置
-        const uint attackRightFirst = 40992;
-        var dx = aid == attackRightFirst ? new Vector3(-centerDeltaX, 0, 0) : new Vector3(centerDeltaX, 0, 0);
-
-        // 根据击退方向决定dxWind偏置
-        var dxWind = _windChargeToLeft ? new Vector3(edgeX, 0, 0) : new Vector3(-edgeX, 0, 0);
-
-        var targetPos1 = CenterWind + dz + dx;
-        var targetPos2 = CenterWind + dz - dx;
-        var targetPos3 = CenterWind + dz + dxWind;
-        _windChargeGuidancePosition = [targetPos1, targetPos2, targetPos3];
-        
-        var dp1 = accessory.DrawGuidance(_windChargeGuidancePosition[0], 0, 8000, $"风击退1");
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
-        var dp12 = accessory.DrawGuidance(_windChargeGuidancePosition[0], _windChargeGuidancePosition[1], 0, 8000, $"风击退12");
-        dp12.Color = accessory.Data.DefaultDangerColor;
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp12);
+        var pos = new Vector3(83, 1, 94);
+        var iceIdx = pos.Position2Dirs(CenterIce, 4, false);
+        accessory.DebugMsg($"北起顺时针第{iceIdx+1}");
 
         // -- DEBUG CODE END --
     }
@@ -494,7 +476,7 @@ public class QueenEternalEx
         
         // 8人对应踩塔位置
         List<Vector3> targetPos2 = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
-        targetPos2[0] = new Vector3(94f, 0, 88f); // TODO MT踩塔位置
+        targetPos2[0] = new Vector3(94f, 0, 88f);
         targetPos2[2] = targetPos2[0].FoldPointVertical(CenterEarth.Z);
         targetPos2[4] = targetPos2[0].FoldPointHorizon(GravityFieldLeft.X);
         targetPos2[6] = targetPos2[4].FoldPointVertical(CenterEarth.Z);
@@ -642,7 +624,6 @@ public class QueenEternalEx
         accessory.DebugMsg($"waitone后，现在有{count1}个目标", DebugMode);
         
         var myIndex = accessory.GetMyIndex();
-        if (_earthPhaseTarget[myIndex]) return;
         
         // 根据D1-MT-D3-H1, D2-ST-D4-H2的优先级排序
         List<int> priorityIdx = [4, 0, 6, 2, 5, 1, 7, 3];
@@ -661,6 +642,11 @@ public class QueenEternalEx
             .OrderBy(index => priorityMap[index])
             .ToList();
 
+        var str = accessory.BuildListStr(sortedTowerTargetIdxs);
+        accessory.DebugMsg($"踩塔优先级: {str}");
+
+        if (_earthPhaseTarget[myIndex]) return;
+        
         var myTowerIdx = sortedTowerTargetIdxs.IndexOf(myIndex);
         List<Vector3> targetTowerPositions = Enumerable.Repeat(new Vector3(0, 0, 0), 4).ToList();
         targetTowerPositions[0] = new Vector3(GravityFieldLeft.X, 0, 89f);
@@ -710,9 +696,9 @@ public class QueenEternalEx
         List<Vector3[]> targetPos = Enumerable.Range(0, 8)
             .Select(_ => new Vector3[] { new(0, 0, 0), new(0, 0, 0) })
             .ToList();
-        targetPos[0] = [new Vector3(88.5f, 0, GravityFieldLeft.Z), new Vector3(99.5f, 0, GravityFieldLeft.Z)];
+        targetPos[0] = [new Vector3(88.5f, 0, GravityFieldLeft.Z), new Vector3(95.5f, 0, GravityFieldLeft.Z)];
         targetPos[1] = [new Vector3(104.5f, 0, GravityFieldLeft.Z), new Vector3(111.5f, 0, GravityFieldLeft.Z)];
-        targetPos[4] = [new Vector3(88.5f, 0, 86.5f), new Vector3(99.5f, 0, 86.5f)];
+        targetPos[4] = [new Vector3(88.5f, 0, 86.5f), new Vector3(95.5f, 0, 86.5f)];
         targetPos[5] = [new Vector3(104.5f, 0, 86.5f), new Vector3(111.5f, 0, 86.5f)];
         targetPos[2] = [CenterEarth, CenterEarth];
         targetPos[3] = [CenterEarth, CenterEarth];
@@ -924,7 +910,7 @@ public class QueenEternalEx
         }
         else
         {
-            var iceIdx = _sourceIceDartPos.Position2Dirs(CenterIce, 4);
+            var iceIdx = _sourceIceDartPos.Position2Dirs(CenterIce, 4, false);
             accessory.DebugMsg($"被第二轮左右冰柱，北顺时针起第{iceIdx+1}个所连", DebugMode);
             List<Vector3> iceBaitPos = Enumerable.Repeat(new Vector3(0, 0, 0), 4).ToList();
             iceBaitPos[0] = new(84.5f, 0, 109.5f);
@@ -2281,6 +2267,11 @@ public static class AssignDp
         if (!debugMode)
             return;
         accessory.Method.SendChat($"/e [DEBUG] {str}");
+    }
+    
+    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList)
+    {
+        return string.Join(", ", myList.Select(item => item?.ToString() ?? ""));
     }
 }
 
