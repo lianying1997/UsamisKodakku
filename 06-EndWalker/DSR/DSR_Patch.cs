@@ -35,33 +35,11 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
-    v0.0.0.7
-    1. 再次调整P7各机制时间间隔。
-    2. 重构了代码，尽可能移除了async/await
-    3. 修复P7地火特殊跑法电椅。
-    
-    v0.0.0.5
-    感谢贾老板的帮助，孩子抄代码抄的很开心！
-    1. 增加P7地火特殊跑法指引。
-    
-    v0.0.0.4
-    1. 调整了P3放塔面向颜色避免误解。
-    2. 修复P7地火步进距离错误问题。
-    
-    v0.0.0.3
-    1. 增加P3堕天龙炎冲（麻将塔）指引。
-    
-    v0.0.0.2
-    1. 修复P7地火间隔错误问题。
-    2. 调整P7地火预设颜色，于“用户设置”增加一系列可选项。
-    
-    v0.0.0.1
-    初版完成。
     鸭门。
     """;
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.7";
+    private const string Version = "0.0.0.8";
     private const string DebugVersion = "a";
     private const string Note = "测试时间间隔";
     

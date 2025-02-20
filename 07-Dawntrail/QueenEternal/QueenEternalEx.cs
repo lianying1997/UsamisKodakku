@@ -656,18 +656,6 @@ public class QueenEternalEx
         
         var dp = accessory.DrawGuidance(targetTowerPositions[myTowerIdx], 0, 8000, $"踩塔{myTowerIdx}");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-
-        // var towerPosStr = myTowerIdx switch
-        // {
-        //     0 => "左上",
-        //     1 => "左下",
-        //     2 => "右上",
-        //     3 => "右下",
-        //     _ => "???"
-        // };
-        //
-        // accessory.Method.TextInfo($"去踩{towerPosStr}塔", 4000);
-        // accessory.Method.TTS($"去踩{towerPosStr}塔");
     }
     
     [ScriptMethod(name: "土阶段重力帝国机制删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(41003)$"], userControl: false)]
@@ -746,7 +734,7 @@ public class QueenEternalEx
         List<Vector3> targetPos = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
         for (var i = 0; i < 4; i++)
         {
-            targetPos[i] = Center.ExtendPoint((45f + 90f * i).DegToRad(), 28.8f);
+            targetPos[i] = Center.ExtendPoint((45f + 90f * i).DegToRad(), 28f);
             targetPos[i + 4] = Center.ExtendPoint((90f * i).DegToRad(), 19.5f);
         }
         var myTargetPos = id == relativeRightCorner ? targetPos[dir] : targetPos[dir + 4];

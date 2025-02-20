@@ -32,7 +32,7 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.7", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.8", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     // TODO
@@ -40,43 +40,9 @@ public class Ucob
 
     const string noteStr =
     """
+    基于@Joshua的巴哈初版程序改写扩充，
+    感谢合作者@KnightRider。
     请先按需求检查并设置“用户设置”栏目。
-
-    Original code by Joshua, adjustments by Usami.
-    Great Thanks to Contributor @KnightRider. 
-    v0.0.1.7:
-    1. 修复奈尔钢铁范围。
-    
-    v0.0.1.6:
-    【重要】1. 修复P3连击BUG。
-
-    v0.0.1.5:
-    1. 修复P3连击拘束器撞球全局提示的一条提示文字Bug。
-    2. 增加P3连击拘束器撞球全局提示信息的开关可选项。
-
-    v0.0.1.4:
-    1. 修复P4月环-钢铁-分散，分散预警绘图出现时机问题，并添加相对北提示。
-    2. 增加了P3连击拘束器撞球与截球的提示与指路。
-    3. 修复了一些不可控函数可被玩家关闭的设置错误。
-
-    v0.0.1.3:
-    感谢KnightRider佬的帮助，孩子抄代码抄的很开心！
-    1. 添加了P2火龙分摊吃火/不吃火的情况判断。
-
-    v0.0.1.2:
-    1. 删了一个可能引起国际服编译错误的引用。
-    2. P3连击添加场中-拘束器-场边的三点一线标志。
-    3. P4根据奈尔台词添加了分散/旋风前的方向指引，在用户设置处修改参数。
-    4. P4撞球添加拘束器提示与指路。
-    5. 调淡了一些绘图颜色。
-
-    v0.0.1.1:
-    1. 修改了黑球危险区绘图逻辑，改为基于拘束器位置绘图。
-    2. 增加双塔与火龙火球分摊范围预警。
-    3. 连击增加每人的陨石流预警。
-
-    v0.0.1.0:
-    初版完成。
     鸭门。
     """;
 
