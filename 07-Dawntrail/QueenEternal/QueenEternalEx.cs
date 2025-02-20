@@ -33,20 +33,13 @@ public class QueenEternalEx
 {
     const string NoteStr =
     """
-    v0.0.0.3
-    1. 修复土阶段MT/D1第二轮陨石指向场中的bug。
-    2. 修复冰阶段第二轮判断错误的bug。
-    
-    v0.0.0.2
-    1. 修复冰阶段分摊接线角落错误指向。
-    
-    v0.0.0.1
-    初版完成。绝对君权为正攻，若逃课请忽略核爆远离指路箭头。
+    绝对君权为正攻，若逃课请忽略核爆远离指路箭头。
+    请确认小队列表排序正确（特别关注D1/D2），避免土阶段涉及优先级的踩塔判断错误。
     鸭门。
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.3";
+    private const string Version = "0.0.0.4";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
@@ -113,12 +106,8 @@ public class QueenEternalEx
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        uint sid = 0x4000FAEC;
-        var myIndex = 1;
-
-        var pos = new Vector3(83, 1, 94);
-        var iceIdx = pos.Position2Dirs(CenterIce, 4, false);
-        accessory.DebugMsg($"北起顺时针第{iceIdx+1}");
+        
+        // uint sid = 0x4000FAEC;
 
         // -- DEBUG CODE END --
     }
@@ -237,8 +226,6 @@ public class QueenEternalEx
     [ScriptMethod(name: "左右刀第二段消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4099[34])"], userControl: false)]
     public void LegitimateForceRemove(Event @event, ScriptAccessory accessory)
     {
-        var sid = @event.SourceId();
-        var aid = @event.ActionId();
         accessory.Method.RemoveDraw($"左右刀2");
     }
     
@@ -278,7 +265,7 @@ public class QueenEternalEx
         // accessory.Method.TTS($"{stackPosStr}分摊");
     }
     
-    [ScriptMethod(name: "拉线集合提示", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:146"], userControl: true)]
+    [ScriptMethod(name: "拉线集合提示", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:0146"], userControl: true)]
     public void MissingLinkStackFirst(Event @event, ScriptAccessory accessory)
     {
         if (_phase != QueenEternalPhase.Wind) return;
@@ -403,6 +390,7 @@ public class QueenEternalEx
     public void WindOfChangeGuidanceRemove(Event @event, ScriptAccessory accessory)
     {
         if (_phase != QueenEternalPhase.Wind) return;
+        if (@event.TargetId() != accessory.Data.Me) return;
         accessory.Method.RemoveDraw($".*");
     }
     
@@ -734,7 +722,7 @@ public class QueenEternalEx
         List<Vector3> targetPos = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
         for (var i = 0; i < 4; i++)
         {
-            targetPos[i] = Center.ExtendPoint((45f + 90f * i).DegToRad(), 28f);
+            targetPos[i] = Center.ExtendPoint((45f + 90f * i).DegToRad(), 27.5f);
             targetPos[i + 4] = Center.ExtendPoint((90f * i).DegToRad(), 19.5f);
         }
         var myTargetPos = id == relativeRightCorner ? targetPos[dir] : targetPos[dir + 4];
