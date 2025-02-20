@@ -46,7 +46,7 @@ public class QueenEternalEx
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
