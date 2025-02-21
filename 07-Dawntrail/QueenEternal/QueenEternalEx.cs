@@ -46,7 +46,7 @@ public class QueenEternalEx
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
     [UserSetting("土阶段四人塔智能优先级判断")]
-    public static bool IntelligentPriorTowerMode { get; set; } = false;
+    public static bool IntelligentPriorTowerMode { get; set; } = true;
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]

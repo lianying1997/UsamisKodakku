@@ -39,9 +39,9 @@ public class DsrPatch
     """;
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.8";
+    private const string Version = "0.0.0.9";
     private const string DebugVersion = "a";
-    private const string Note = "测试时间间隔";
+    private const string Note = "远近双重加锁";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -113,6 +113,7 @@ public class DsrPatch
     private uint _p7BossId = 0;                                         // P7 boss Id
     
     private ManualResetEvent _IceAndFireEvent = new(false);
+    private ManualResetEvent _NearOrFarWingsEvent = new(false);
     private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
     private ManualResetEvent _NearOrFarInOutEvent = new(false);
     private ManualResetEvent _BladeEvent = new(false);
@@ -130,6 +131,7 @@ public class DsrPatch
         _p7BossId = 0;
         
         _IceAndFireEvent = new ManualResetEvent(false);
+        _NearOrFarWingsEvent = new ManualResetEvent(false);
         _NearOrFarCauterizeEvent = new ManualResetEvent(false);
         _NearOrFarInOutEvent = new ManualResetEvent(false);
         _BladeEvent = new ManualResetEvent(false);
@@ -972,6 +974,7 @@ public class DsrPatch
         _p6DragonsWingAction[0] = aid is leftFar or rightFar;
         _p6DragonsWingAction[1] = aid is leftFar or leftNear;
         DebugMsg($"检测到{(_p6DragonsWingAction[0] ? "T远离" : "T靠近")}, {(_p6DragonsWingAction[1] ? "左" : "右")}安全", accessory);
+        _NearOrFarWingsEvent.Set();
     }
 
     
@@ -1004,6 +1007,7 @@ public class DsrPatch
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
         _NearOrFarCauterizeEvent.WaitOne();
+        _NearOrFarWingsEvent.WaitOne();
         Vector3[] nearOrFarSafePos = GetQuarterSafePos(_p6DragonsWingAction);
         var nearOrFarDirPosIdx = GetQuarterSafePosIdx(_p6DragonsWingAction);
         DebugMsg($"MT去{nearOrFarDirPosIdx[0]}, ST去{nearOrFarDirPosIdx[1]}, 人群去{nearOrFarDirPosIdx[2]}", accessory);
@@ -1023,6 +1027,7 @@ public class DsrPatch
         var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"一远近指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         _NearOrFarCauterizeEvent.Reset();
+        _NearOrFarWingsEvent.Reset();
     }
 
     private Vector3[] GetQuarterSafePos(List<bool> wings)
@@ -1061,6 +1066,7 @@ public class DsrPatch
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
         _NearOrFarInOutEvent.WaitOne();
+        _NearOrFarWingsEvent.WaitOne();
 
         Vector3[] nearOrFarSafePos = GetLineSafePos(_p6DragonsWingAction);
         int[] nearOrFarDirPosIdx = GetLineSafePosIdx(_p6DragonsWingAction);
@@ -1080,6 +1086,7 @@ public class DsrPatch
         var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"二远近指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         _NearOrFarInOutEvent.Reset();
+        _NearOrFarWingsEvent.Reset();
     }
 
     private static Vector3[] GetLineSafePos(List<bool> wings)
