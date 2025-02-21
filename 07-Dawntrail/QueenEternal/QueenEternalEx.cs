@@ -39,12 +39,14 @@ public class QueenEternalEx
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.4";
+    private const string Version = "0.0.0.5";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
+    [UserSetting("土阶段四人塔智能优先级判断")]
+    public static bool IntelligentPriorTowerMode { get; set; } = false;
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
@@ -66,6 +68,8 @@ public class QueenEternalEx
     private List<ManualResetEvent> _manualResetEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
     private List<AutoResetEvent> _autoResetEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
     private List<bool> _earthPhaseTarget = new bool[8].ToList(); // 绘图记录
+    private List<int> _intelligentPriority = Enumerable.Repeat(0, 8).ToList();
+    private bool _intelligentPriorityValid = true;
     
     private bool _isFlareTarget = false;    // 绝对君权核爆目标
     private Vector3 _sourceIceDartPos = new Vector3(0, 0, 0);     // 与玩家连线的目标冰柱位置
@@ -90,6 +94,9 @@ public class QueenEternalEx
         _iceRushRangeDrawn = new bool[8].ToList();   // 冰柱突刺是否被绘图
         _raisedTributeNum = 0;      // 接线分摊，分摊次数
         _exaflareShown = false;     // 是否显示地火
+        
+        _intelligentPriority = Enumerable.Repeat(0, 8).ToList();    // 四人塔智能优先级模式权重
+        _intelligentPriorityValid = true;   // 四人塔智能优先级模式是否合理
         
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
@@ -514,6 +521,78 @@ public class QueenEternalEx
         accessory.Method.RemoveDraw($".*");
     }
     
+    [ScriptMethod(name: "踩塔优先级判断", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4100[12])$"], userControl: false)]
+    public void Tower4PriorityJudge(Event @event, ScriptAccessory accessory)
+    {
+        // 根据八人塔相对位置判断
+        if (_phase != QueenEternalPhase.Earth) return;
+        if (_drawn[3]) return;
+        _drawn[3] = true;
+        if (!IntelligentPriorTowerMode) return;
+
+        for (var i = 0; i < accessory.Data.PartyList.Count; i++)
+        {
+            var str = $"玩家设定{accessory.GetPlayerJobByIndex(i)}的信息：";
+            var id = accessory.Data.PartyList[i];
+            var chara = IbcHelper.GetById(id);
+
+            if (chara == null || chara.IsDead)
+            {
+                _intelligentPriorityValid = false;
+                accessory.DebugMsg($"发现存在角色阵亡或不存在，智能判断失效。", DebugMode);
+                return;
+            }
+
+            if (!IbcHelper.IsDps(id))
+            {
+                _intelligentPriority[i] += 1;
+                str += $"为TN(+1)";
+            }
+            else
+            {
+                str += $"为DPS(+0)";
+            }
+
+            if (chara.Position.X > CenterEarth.X)
+            {
+                _intelligentPriority[i] += 100;
+                str += $"，在右半场(+100)";
+            }
+            else
+            {
+                str += $"，在左半场(+0)";
+            }
+            
+            if (chara.Position.Z > CenterEarth.Z)
+            {
+                _intelligentPriority[i] += 10;
+                str += $"，在下半场(+10)";
+            }
+            else
+            {
+                str += $"，在上半场(+0)";
+            }
+            accessory.DebugMsg($"{str} = {_intelligentPriority[i]}分。", DebugMode);
+        }
+        
+        // 判断是否合法
+        // 1. 右半场4人 (>= 100)
+        // 2. 下半场4人 (% 100 >= 10)
+        if (_intelligentPriority.Count(x => x >= 100) != 4)
+        {
+            _intelligentPriorityValid = false;
+            accessory.DebugMsg($"右半场人数不为4人，智能判断失效", DebugMode);
+            return;
+        }
+
+        if (_intelligentPriority.Count(x => x % 100 >= 10) != 4)
+        {
+            _intelligentPriorityValid = false;
+            accessory.DebugMsg($"下半场人数不为4人，智能判断失效", DebugMode);
+            return;
+        }
+    }
+    
     [ScriptMethod(name: "大圈提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(41004)$"], userControl: true)]
     public void LawsofEarthDefamation(Event @event, ScriptAccessory accessory)
     {
@@ -603,45 +682,74 @@ public class QueenEternalEx
     {
         if (_phase != QueenEternalPhase.Earth) return;
         
-        var count = _earthPhaseTarget.Count(x => x == true);
-        accessory.DebugMsg($"waitone前，现在有{count}个目标", DebugMode);
-        
+        // var count = _earthPhaseTarget.Count(x => x == true);
+        // accessory.DebugMsg($"waitone前，现在有{count}个目标", DebugMode);
         _manualResetEvents[0].WaitOne();
-        
-        var count1 = _earthPhaseTarget.Count(x => x == true);
-        accessory.DebugMsg($"waitone后，现在有{count1}个目标", DebugMode);
+        // var count1 = _earthPhaseTarget.Count(x => x == true);
+        // accessory.DebugMsg($"waitone后，现在有{count1}个目标", DebugMode);
         
         var myIndex = accessory.GetMyIndex();
+        List<int> sortedTowerTargetIdxs;
+
+        if (_intelligentPriorityValid)
+        {
+            var str = "";
+            // 找到_earthPhaseTarget为false的四个index
+            var towerTargetIdxs = _earthPhaseTarget
+                .Select((value, index) => new { value, index })
+                .Where(x => x.value == false)
+                .Select(x => x.index)
+                .ToList();
+            str = $"要去踩塔的是：{accessory.BuildListStr(towerTargetIdxs)}\n";
+            
+            // 找到_intelligentPriority中对应index的值
+            var priorityValues = towerTargetIdxs
+                .Select(index => _intelligentPriority[index])
+                .ToList();
+            str = $"对应的优先级权重是：{accessory.BuildListStr(priorityValues)}\n";
+            
+            // 将他们从小到大排序，并记下对应index
+            sortedTowerTargetIdxs = priorityValues
+                .Select((value, index) => new { OriginalIndex = towerTargetIdxs[index], Value = value })
+                .OrderBy(x => x.Value)
+                .Select(x => x.OriginalIndex)
+                .ToList();
+            str = $"踩塔智能优先级为：{accessory.BuildListStr(sortedTowerTargetIdxs)}\n";
+            
+            accessory.DebugMsg($"{str}");
+        }
+        else
+        {
+            // 根据D1-MT-D3-H1, D2-ST-D4-H2的优先级排序
+            List<int> priorityIdx = [4, 0, 6, 2, 5, 1, 7, 3];
+
+            var towerTargetIdxs = _earthPhaseTarget
+                .Select((value, index) => new { value, index })
+                .Where(x => x.value == false)
+                .Select(x => x.index)
+                .ToList();
+
+            var priorityMap = priorityIdx
+                .Select((value, index) => new { value, index })
+                .ToDictionary(x => x.value, x => x.index);
+
+            sortedTowerTargetIdxs = towerTargetIdxs
+                .OrderBy(index => priorityMap[index])
+                .ToList();
+
+            var str = accessory.BuildListStr(sortedTowerTargetIdxs);
+            accessory.DebugMsg($"踩塔优先级为: {str}");
+        }
         
-        // 根据D1-MT-D3-H1, D2-ST-D4-H2的优先级排序
-        List<int> priorityIdx = [4, 0, 6, 2, 5, 1, 7, 3];
-        
-        var towerTargetIdxs = _earthPhaseTarget
-            .Select((value, index) => new { value, index })
-            .Where(x => x.value == false)
-            .Select(x => x.index)
-            .ToList();
-
-        var priorityMap = priorityIdx
-            .Select((value, index) => new { value, index })
-            .ToDictionary(x => x.value, x => x.index);
-
-        var sortedTowerTargetIdxs = towerTargetIdxs
-            .OrderBy(index => priorityMap[index])
-            .ToList();
-
-        var str = accessory.BuildListStr(sortedTowerTargetIdxs);
-        accessory.DebugMsg($"踩塔优先级: {str}");
-
         if (_earthPhaseTarget[myIndex]) return;
-        
+
         var myTowerIdx = sortedTowerTargetIdxs.IndexOf(myIndex);
         List<Vector3> targetTowerPositions = Enumerable.Repeat(new Vector3(0, 0, 0), 4).ToList();
         targetTowerPositions[0] = new Vector3(GravityFieldLeft.X, 0, 89f);
         targetTowerPositions[1] = targetTowerPositions[0].FoldPointVertical(GravityFieldLeft.Z);
         targetTowerPositions[2] = targetTowerPositions[0].FoldPointHorizon(CenterEarth.X);
         targetTowerPositions[3] = targetTowerPositions[1].FoldPointHorizon(CenterEarth.X);
-        
+
         var dp = accessory.DrawGuidance(targetTowerPositions[myTowerIdx], 0, 8000, $"踩塔{myTowerIdx}");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
