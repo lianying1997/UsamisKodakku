@@ -39,7 +39,7 @@ public class QueenEternalEx
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.5";
+    private const string Version = "0.0.0.6";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
@@ -199,6 +199,7 @@ public class QueenEternalEx
         var aid = @event.ActionId();
         _legitimateForce = true;
         const uint attackLeftHand = 40992;
+        
         var dp = accessory.DrawLeftRightCleave(sid, aid == attackLeftHand, 3000, 5000, $"左右刀1");
         dp.Scale = new Vector2(150f);
         if (_phase is QueenEternalPhase.Earth)
@@ -208,7 +209,7 @@ public class QueenEternalEx
         }
         else
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
-    }   
+    }
 
     [ScriptMethod(name: "左右刀第二段", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4099[02])"], userControl: false)]
     public void LegitimateForceSecond(Event @event, ScriptAccessory accessory)
@@ -334,6 +335,7 @@ public class QueenEternalEx
     }
 
     private List<Vector3> _windChargeGuidancePosition = [new(0, 0, 0), new(0, 0, 0), new(0, 0, 0)];
+    private bool _windGuidance;
     [ScriptMethod(name: "风击退指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4099[02])$"], userControl: true)]
     public void WindOfChangeGuidancePart1(Event @event, ScriptAccessory accessory)
     {
@@ -341,6 +343,7 @@ public class QueenEternalEx
         _autoResetEvents[0].WaitOne();
         var aid = @event.ActionId();
         var myIndex = accessory.GetMyIndex();
+        _windGuidance = true;
         
         const float deltaZ = 10.5f;   // 上半场与下半场Z轴差
         const float centerDeltaX = 1f;  // 躲左右刀X轴差
@@ -372,9 +375,10 @@ public class QueenEternalEx
     public void WindOfChangeGuidancePart2(Event @event, ScriptAccessory accessory)
     {
         if (_phase != QueenEternalPhase.Wind) return;
-        
         accessory.Method.RemoveDraw($"风击退1");
         accessory.Method.RemoveDraw($"风击退12");
+        
+        if (!_windGuidance) return;
         var dp2 = accessory.DrawGuidance(_windChargeGuidancePosition[1], 0, 6000, $"风击退2");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp2);
         var dp23 = accessory.DrawGuidance(_windChargeGuidancePosition[1], _windChargeGuidancePosition[2], 0, 8000, $"风击退23");
@@ -386,9 +390,10 @@ public class QueenEternalEx
     public void WindOfChangeGuidancePart3(Event @event, ScriptAccessory accessory)
     {
         if (_phase != QueenEternalPhase.Wind) return;
-        
         accessory.Method.RemoveDraw($"风击退2");
         accessory.Method.RemoveDraw($"风击退23");
+        
+        if (!_windGuidance) return;
         var dp3 = accessory.DrawGuidance(_windChargeGuidancePosition[2], 0, 6000, $"风击退3");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp3);
     }
@@ -399,6 +404,7 @@ public class QueenEternalEx
         if (_phase != QueenEternalPhase.Wind) return;
         if (@event.TargetId() != accessory.Data.Me) return;
         accessory.Method.RemoveDraw($".*");
+        _windGuidance = false;
     }
     
     #endregion 风阶段
