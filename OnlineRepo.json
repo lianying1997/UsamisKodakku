@@ -110,10 +110,10 @@
     {
         "Name": "QueenEternalEx [永恒女王忆想歼灭战]",
         "Guid": "45fff289-e23d-41ab-9039-71cd310668e4",
-        "Version": "0.0.0.6",
+        "Version": "0.0.0.7",
         "Author": "Usami",
         "TerritoryIds": [1243],
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/QueenEternal/QueenEternalEx.cs",
-        "UpdateInfo": "1. 修复了关闭风击退指路却仍出现错误指路的Bug。"
+        "UpdateInfo": "1. 调整了冰阶段冰柱范围的出现时间为生效前4秒，避免过桥时画面凌乱。"
     }
     ]

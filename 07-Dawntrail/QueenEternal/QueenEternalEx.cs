@@ -34,12 +34,13 @@ public class QueenEternalEx
     const string NoteStr =
     """
     绝对君权为正攻，若逃课请忽略核爆远离指路箭头。
-    请确认小队列表排序正确（特别关注D1/D2），避免土阶段涉及优先级的踩塔判断错误。
+    针对土阶段涉及优先级的踩塔判断，可以开启用户设置中“土阶段四人塔智能优先级判断”。
+    若不使用此功能，请确认小队列表排序正确（特别关注D1/D2），避免踩塔指路错误。
     鸭门。
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.6";
+    private const string Version = "0.0.0.7";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
@@ -114,8 +115,6 @@ public class QueenEternalEx
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
         
-        // uint sid = 0x4000FAEC;
-
         // -- DEBUG CODE END --
     }
     
@@ -950,14 +949,21 @@ public class QueenEternalEx
         var tid = @event.TargetId();
         var tidx = accessory.GetPlayerIdIndex(tid);
         if (_iceRushRangeDrawn[tidx]) return;
-        _iceRushRangeDrawn[tidx] = true;
-
+        
         var sid = @event.SourceId();
         var myIndex = accessory.GetMyIndex();
-        
-        var dp = accessory.DrawTarget2Target(sid, tid, 4, 80, 4000, 8000, $"冰柱突刺范围{tidx}");
-        dp.Color = tidx == myIndex ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+
+        lock (_earthPhaseTarget)
+        {
+            _iceRushRangeDrawn[tidx] = true;
+            var count = _earthPhaseTarget.Count(x => x == true);
+            var delay = count <= 4 ? 8000 : 4000;
+            var destroy = 4000;
+            var dp = accessory.DrawTarget2Target(sid, tid, 4, 80, delay, destroy, $"冰柱突刺范围{tidx}");
+            dp.Color = tidx == myIndex ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        }
+
     }
     
     private List<Vector3> _upIceBridgeRoute = [new(100, 0, 96), new(90, 0, 96), new(110, 0, 96)];
