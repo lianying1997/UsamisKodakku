@@ -40,7 +40,7 @@ public class QueenEternalEx
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.7";
+    private const string Version = "0.0.0.8";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
@@ -721,7 +721,7 @@ public class QueenEternalEx
                 .ToList();
             str = $"踩塔智能优先级为：{accessory.BuildListStr(sortedTowerTargetIdxs)}\n";
             
-            accessory.DebugMsg($"{str}");
+            accessory.DebugMsg($"{str}", DebugMode);
         }
         else
         {
@@ -743,7 +743,7 @@ public class QueenEternalEx
                 .ToList();
 
             var str = accessory.BuildListStr(sortedTowerTargetIdxs);
-            accessory.DebugMsg($"踩塔优先级为: {str}");
+            accessory.DebugMsg($"踩塔优先级为: {str}", DebugMode);
         }
         
         if (_earthPhaseTarget[myIndex]) return;
@@ -912,7 +912,7 @@ public class QueenEternalEx
     }
     
     [ScriptMethod(name: "孤独感提示删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4103[23])$"],
-        userControl: true)]
+        userControl: false)]
     public void AbsoluteAuthorityHeelGuideRemove(Event @event, ScriptAccessory accessory)
     {
         accessory.Method.RemoveDraw($".*");
