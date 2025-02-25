@@ -40,7 +40,7 @@ public class QueenEternalEx
     """;
 
     private const string Name = "QueenEternalEx [永恒女王忆想歼灭战]";
-    private const string Version = "0.0.0.8";
+    private const string Version = "0.0.0.9";
     private const string DebugVersion = "a";
     private const string Note = "初版完成";
     
@@ -445,6 +445,15 @@ public class QueenEternalEx
         // };
         // accessory.Method.TextInfo($"{standPosStr}引导后躲开", 4000);
         // accessory.Method.TTS($"{standPosStr}引导后躲开");
+    }
+    
+    [ScriptMethod(name: "分治法第二段", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30505)$"], userControl: true)]
+    public void DivideAndConquerDelayCast(Event @event, ScriptAccessory accessory)
+    {
+        var sid = @event.SourceId();
+
+        var dp = accessory.DrawRect(sid, 5, 60, 0, 3000, $"分治法第二段{sid}");
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
     }
     
     #endregion 分治法
