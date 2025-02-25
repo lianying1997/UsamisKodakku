@@ -39,9 +39,9 @@ public class DsrPatch
     """;
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.9";
+    private const string Version = "0.0.0.10";
     private const string DebugVersion = "a";
-    private const string Note = "远近双重加锁";
+    private const string Note = "调整用户设置显示结构，增加P4";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -173,7 +173,13 @@ public class DsrPatch
     
     #region P2
 
-    [ScriptMethod(name: "P2：引导不可视刀范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25545"])]
+    [ScriptMethod(name: "---- 《P2：骑神托尔丹》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseKingThordan(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
+    [ScriptMethod(name: "引导不可视刀范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25545"])]
     public void P2_AscalonConcealed(Event @event, ScriptAccessory accessory)
     {
         var sid = @event.SourceId();
@@ -185,6 +191,13 @@ public class DsrPatch
     #endregion
 
     #region P3
+    
+    [ScriptMethod(name: "---- 《P3：尼德霍格》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseNidhogg(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
     [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26376"], userControl:false)]
     public void P3_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
@@ -295,7 +308,7 @@ public class DsrPatch
         }
 
         /// <summary>
-        /// 通过玩家id设置麻将位置是否确定，已弃用
+        /// 通过玩家id设置麻将位置是否确定
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
@@ -536,7 +549,7 @@ public class DsrPatch
         DebugMsg($"我需要踩他的塔：{_diveFromGrace.ShowPlayerAction(_p3MyTowerPartner)}", accessory);
     }
     
-    [ScriptMethod(name: "P3：麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
+    [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
     public void P3_LimitCutAction(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
@@ -642,7 +655,7 @@ public class DsrPatch
         }
     }
     
-    [ScriptMethod(name: "P3：麻将流程，踩塔", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
+    [ScriptMethod(name: "麻将流程，踩塔", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
     public void P3_TowerAfterPlaced(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
@@ -764,10 +777,16 @@ public class DsrPatch
     // TowerExistTime       6800, 6600, 6800
     // PlaceTowerTimeNode   7600, 17700, 28900
     
-    #endregion
+    #endregion P3
     
     #region P5
 
+    [ScriptMethod(name: "---- 《P5：伪典托尔丹》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseAlternateThordan(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
     [ScriptMethod(name: "P5：一运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27529"], userControl: false)]
     public void P5_HeavensWrath_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
@@ -775,7 +794,7 @@ public class DsrPatch
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
-    [ScriptMethod(name: "P5：旋风冲旋风预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27531"])]
+    [ScriptMethod(name: "旋风冲旋风预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27531"])]
     public async void P5_TwistingDive(Event @event, ScriptAccessory accessory)
     {
         DrawTwister(3000, 3000, accessory);
@@ -783,7 +802,7 @@ public class DsrPatch
         accessory.Method.TextInfo("旋风", 3000, true);
     }
 
-    [ScriptMethod(name: "P5：旋风危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001168", "Operate:Add"])]
+    [ScriptMethod(name: "旋风危险位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:2001168", "Operate:Add"])]
     public void TwisterField(Event @event, ScriptAccessory accessory)
     {
         var spos = @event.SourcePosition();
@@ -801,7 +820,7 @@ public class DsrPatch
         }
     }
 
-    [ScriptMethod(name: "P5：大圈火预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25573"])]
+    [ScriptMethod(name: "大圈火预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25573"])]
     public void P5_AlterFlare(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase5HeavensWrath) return;
@@ -818,7 +837,7 @@ public class DsrPatch
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
-    [ScriptMethod(name: "P5：二运，找到斧头哥方位", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12637"])]
+    [ScriptMethod(name: "二运斧头哥方位指引", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12637"])]
     public void P5_FindSerGuerrique(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
@@ -829,10 +848,16 @@ public class DsrPatch
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
     }
 
-    #endregion
+    #endregion P5
     
     #region P6 冰火
 
+    [ScriptMethod(name: "---- 《P6：双龙》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseDragons(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
     [ScriptMethod(name: "P6：一冰火，阶段记录", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:12613"], userControl: false)]
     public void P6_IceAndFire1_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
@@ -885,7 +910,7 @@ public class DsrPatch
         }
     }
 
-    [ScriptMethod(name: "P6：冰火死刑双T处理", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27960"])]
+    [ScriptMethod(name: "冰火死刑双T处理", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27960"])]
     public void P6_IceAndFireTankSolution(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase is not (DsrPhase.Phase6IceAndFire1 or DsrPhase.Phase6IceAndFire2))
@@ -937,7 +962,7 @@ public class DsrPatch
         _IceAndFireEvent.Reset();
     }
 
-    #endregion
+    #endregion P6 冰火
 
     #region P6 远近
 
@@ -1002,7 +1027,7 @@ public class DsrPatch
         _NearOrFarInOutEvent.Set();
     }
 
-    [ScriptMethod(name: "P6：一远近，指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"])]
+    [ScriptMethod(name: "一远近指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"])]
     public void P6_NearOrFar1_Dir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
@@ -1061,7 +1086,7 @@ public class DsrPatch
         return wings[0] ? [2, 3, 1] : [1, 0, 3];
     }
 
-    [ScriptMethod(name: "P6：二远近，指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"])]
+    [ScriptMethod(name: "二远近指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"])]
     public void P6_NearOrFar2_Dir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
@@ -1119,7 +1144,7 @@ public class DsrPatch
         return wings[0] ? [1, 2, 0] : [1, 0, 2];
     }
 
-    #endregion
+    #endregion P6 远近
     
     #region P6 十字火
 
@@ -1130,7 +1155,7 @@ public class DsrPatch
         DebugMsg($"当前阶段为：{_dsrPhase}", accessory);
     }
 
-    [ScriptMethod(name: "P6：十字火，分摊目标", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27974"])]
+    [ScriptMethod(name: "十字火分摊目标", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27974"])]
     public void P6_FlameStackTarget(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6Flame) return;
@@ -1140,11 +1165,11 @@ public class DsrPatch
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    #endregion
+    #endregion P6 十字火
 
     #region P6 俯冲
 
-    [ScriptMethod(name: "P6：俯冲，双T指路", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7737", "SourceDataId:12613"])]
+    [ScriptMethod(name: "俯冲双T指路", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7737", "SourceDataId:12613"])]
     public void P6_CauterizeDir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6IceAndFire2) return;
@@ -1162,10 +1187,16 @@ public class DsrPatch
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
 
-    #endregion
+    #endregion P6 俯冲
 
     #region P7 地火
 
+    [ScriptMethod(name: "---- 《P7：龙威骑神托尔丹》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseDragonKingThordan(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
     [ScriptMethod(name: "P7：BossId记录与地火类初始化", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:12616"], userControl: false)]
     public void P7_BossIdRecord(Event @event, ScriptAccessory accessory)
     {
@@ -1193,7 +1224,7 @@ public class DsrPatch
         _BladeEvent.Set();
     }
     
-    [ScriptMethod(name: "P7：地火范围绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:28060"])]
+    [ScriptMethod(name: "地火范围绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:28060"])]
     public void P7_ExaflareDrawn(Event @event, ScriptAccessory accessory)
     {
         // 面相为前、左、右的扩散
@@ -1221,7 +1252,7 @@ public class DsrPatch
         }
     }
     
-    [ScriptMethod(name: "P7：地火特殊解法指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"])]
+    [ScriptMethod(name: "地火特殊解法指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"])]
     public void P7_ExaflareGuidance(Event @event, ScriptAccessory accessory)
     {
         // 记录完钢铁月环后可计算
@@ -1430,7 +1461,7 @@ public class DsrPatch
         DrawExaflareGuidePos(guidePosList, accessory);
     }
 
-    #endregion
+    #endregion P7 地火
     
     #region P7 接刀
 
@@ -1493,7 +1524,7 @@ public class DsrPatch
         return _dsrPhase is DsrPhase.Phase7Stack1 or DsrPhase.Phase7Stack2 or DsrPhase.Phase7Stack3;
     }
 
-    [ScriptMethod(name: "P7：三剑一体接刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179])$"])]
+    [ScriptMethod(name: "三剑一体接刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179])$"])]
     public void P7_TrinityAttack(Event @event, ScriptAccessory accessory)
     {
         _TrinityEvent.WaitOne();
@@ -1566,7 +1597,7 @@ public class DsrPatch
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    [ScriptMethod(name: "P7：三剑一体接刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:28065"], userControl: false)]
+    [ScriptMethod(name: "三剑一体接刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:28065"], userControl: false)]
     public void P7_TrinityOrderRecord(Event @event, ScriptAccessory accessory)
     {
         // 主视角为T，忽略脚下接刀
@@ -1601,7 +1632,7 @@ public class DsrPatch
         DebugMsg($"刚刚接刀的是{targetRecent}，下一个接刀人为{targetNext}", accessory);
     }
 
-    [ScriptMethod(name: "P7：三剑一体T刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2806[34])$"], userControl: false)]
+    [ScriptMethod(name: "三剑一体T刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2806[34])$"], userControl: false)]
     public void P7_TrinityTankRecord(Event @event, ScriptAccessory accessory)
     {
         var aid = @event.ActionId();
@@ -1628,7 +1659,7 @@ public class DsrPatch
         _p7TrinityTankDisordered = true;
     }
 
-    #endregion
+    #endregion P7 接刀
 
 }
 
