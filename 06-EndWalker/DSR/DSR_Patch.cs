@@ -35,13 +35,14 @@ public class DsrPatch
     """
     基于K佬绝龙诗绘图的个人向补充，
     请先按需求检查并设置“用户设置”栏目。
+    开启Debug模式，在忆罪宫输入"/e =TST"可以测试地火特殊跑法。
     鸭门。
     """;
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.10";
-    private const string DebugVersion = "a";
-    private const string Note = "调整用户设置显示结构，增加P4";
+    private const string DebugVersion = "b";
+    private const string Note = "增加纯洁心灵指路，P2一运具体位置";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -73,6 +74,8 @@ public class DsrPatch
     private enum DsrPhase
     {
         Init,                   // 初始
+        Phase2Strength,         // P2 一运
+        Phase2Sancity,          // P2 二运
         Phase3Nidhogg,          // P3 大师兄
         Phase5HeavensWrath,     // P5 一运
         Phase5HeavensDeath,     // P5 二运
@@ -97,6 +100,8 @@ public class DsrPatch
     private DsrPhase _dsrPhase = DsrPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
+    private int _pureOfHeartBaitCount = 0;                              // P1/P4.5 纯洁心灵引导次数
+    private List<bool> _p2SafeDirection = new bool[8].ToList();         // P2 一运冲锋安全位置
     private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
     private int _p3LimitCutStep = 0;                                    // P3 麻将机制流程
     private uint _p3MyTowerPartner = 0;                                 // P3 我要踩的放塔搭档
@@ -112,6 +117,7 @@ public class DsrPatch
     private DsrExaflare? _p7Exaflare = null;                            // P7 地火Class
     private uint _p7BossId = 0;                                         // P7 boss Id
     
+    private ManualResetEvent _ThrustEvent = new(false);
     private ManualResetEvent _IceAndFireEvent = new(false);
     private ManualResetEvent _NearOrFarWingsEvent = new(false);
     private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
@@ -125,11 +131,14 @@ public class DsrPatch
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         
+        _pureOfHeartBaitShown = false;      // 是否显示纯洁心灵引导
+        
         _dsrPhase = DsrPhase.Init;
         _drawn = new bool[20].ToList();
         _recorded = new bool[20].ToList();
         _p7BossId = 0;
         
+        _ThrustEvent = new ManualResetEvent(false);
         _IceAndFireEvent = new ManualResetEvent(false);
         _NearOrFarWingsEvent = new ManualResetEvent(false);
         _NearOrFarCauterizeEvent = new ManualResetEvent(false);
@@ -138,32 +147,92 @@ public class DsrPatch
         _TrinityEvent = new ManualResetEvent(false);
     }
     
-    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
-    public void EchoDebug(Event @event, ScriptAccessory accessory)
+
+    
+    [ScriptMethod(name: "随时DEBUG用2", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST2"], userControl: false)]
+    public void EchoDebug2(Event @event, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        
-        Center = new Vector3(400, -54.97f, -400);
-        Random random = new Random();
-        float bossRotLogicDeg = random.Next(0, 360);
-        var bossRotLogicRad = bossRotLogicDeg.DegToRad();
-        accessory.DebugMsg($"随机到的Boss面向为{bossRotLogicRad.RadToDeg()}", DebugMode);
-        float[] srot =
-        [
-            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
-            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
-            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game()
-        ];
-        Vector3 bossFace = Center.ExtendPoint(bossRotLogicRad, 8f);
-        var dp = accessory.DrawDirPos2Pos(Center, bossFace, 0, 7000, $"面相", 7.9f);
-        dp.Color = ColorHelper.ColorDark.V4;
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        DebugExaflare(srot, bossRotLogicRad.Logic2Game(), (uint)random.Next(0, 2) + 42, accessory);
+        _p2SafeDirection = [true, true, false, true, false, false, false, false];
+        var safeDir = _p2SafeDirection.IndexOf(false);
+        var northPos = new Vector3(100, 0, 80);
+        var myIndex = accessory.GetMyIndex();
+        var isStGroup = myIndex % 2 == 1;
+        // ST组在0、1、2、3
+        var tposCenter =
+            northPos.RotatePoint(Center, isStGroup ? safeDir * float.Pi / 4 : (safeDir + 4) * float.Pi / 4);
+        var tposIn = tposCenter.PointInOutside(Center, 7.5f);
+        var tposLeft = tposCenter.RotatePoint(Center, 20f.DegToRad());
+        var tposRight = tposCenter.RotatePoint(Center, -20f.DegToRad());
+        List<Vector3> tposList = [tposCenter, tposIn, tposLeft, tposRight];
 
-        
+        var dp = accessory.DrawGuidance(tposList[myIndex / 2], 0, 2000, $"安全区位置");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         // -- DEBUG CODE END --
     }
+    
+    #region P1
+    
+    [ScriptMethod(name: "---- 《P1&P4.5：门神》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseDoorBoss(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
+    private bool _pureOfHeartBaitShown = false;
+    [ScriptMethod(name: "纯洁心灵引导", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25316"], 
+        userControl: true)]
+    public void PureOfHeartBait(Event @event, ScriptAccessory accessory)
+    {
+        _pureOfHeartBaitCount = 0;
+        _pureOfHeartBaitShown = true;
+        // 纯洁心灵引导顺序H1H2, D3D4，D1D2，MTST
+        var myIndex = accessory.GetMyIndex();
+        // 此处为第一次纯洁心灵，如果非H1H2，不参与
+        if (myIndex is not (2 or 3)) return;
+        // todo 修改delay与destroy
+        DrawPureOfHeartBait(accessory, 0, 15000);
+    }
+
+    private void DrawPureOfHeartBait(ScriptAccessory accessory, int delay, int destroy)
+    {
+        var myIndex = accessory.GetMyIndex();
+        Vector3[] baitPos = [new(86.5f, 0.0f, 107.0f), new(86.5f, 0.0f, 103.0f), new(91.5f, 0.0f, 107.0f), new(91.5f, 0.0f, 103.0f)];   //91.5
+        var baitPosIdx = myIndex % 2;   // 高在上，低在下
+        if (myIndex is 0 or 1 or 6 or 7)
+            baitPosIdx += 2;
+        for (var posIdx = 0; posIdx < 4; posIdx++)
+        {
+            var color = baitPosIdx == posIdx ? PosColorPlayer.V4 : PosColorNormal.V4;
+            var dp = accessory.DrawStaticCircle(baitPos[posIdx], color, delay, destroy, $"纯洁心灵", 0.5f);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            if (baitPosIdx != posIdx) continue;
+            var dpGuide = accessory.DrawGuidance(baitPos[posIdx], delay, destroy, $"纯洁心灵指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuide);
+        }
+    }
+    
+    [ScriptMethod(name: "纯洁心灵引导后续", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:25369"], 
+        userControl: false)]
+    public void PureOfHeartBaitRest(Event @event, ScriptAccessory accessory)
+    {
+        if (!_pureOfHeartBaitShown) return;
+        if (@event.TargetIndex() != 1) return;
+        var myIndex = accessory.GetMyIndex();
+        lock (this)
+        {
+            _pureOfHeartBaitCount++;
+            accessory.DebugMsg($"纯洁心灵引导次数：{_pureOfHeartBaitCount}", DebugMode);
+            if (_pureOfHeartBaitCount > 6) return;
+            var baitDict = new Dictionary<int, int> { { 1, 6 }, { 2, 7 }, { 3, 4 }, { 4, 5 }, { 5, 0 }, { 6, 1 } };
+            if (baitDict[_pureOfHeartBaitCount] != myIndex) return;
+            accessory.DebugMsg($"开始绘制玩家的纯洁心灵引导", DebugMode);
+            DrawPureOfHeartBait(accessory, 0, 5000);
+        }
+    }
+    
+    #endregion P1
     
     #region P2
 
@@ -182,7 +251,65 @@ public class DsrPatch
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
     }
     
-    #endregion
+    [ScriptMethod(name: "一运阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25555"], userControl: false)]
+    public void P2_StrengthPhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = DsrPhase.Phase2Strength;
+        _p2SafeDirection = new bool[8].ToList();
+        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+    }
+    
+    [ScriptMethod(name: "一运冲锋位置记录", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(378[123])$"], userControl: false)]
+    public void ThurstDirectionRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase2Strength) return;
+
+        var spos = @event.SourcePosition();
+        var dir = spos.Position2Dirs(Center, 8);
+        lock (_p2SafeDirection)
+        {
+            _p2SafeDirection[dir % 4] = true;
+            accessory.DebugMsg($"List内部true的数量：{_p2SafeDirection.Count(x => x)}", DebugMode);
+            if (_p2SafeDirection.Count(x => x) != 3) return;
+            _ThrustEvent.Set();
+            
+        }
+    }
+        
+    [ScriptMethod(name: "一运分散安全位置指引", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:3781"], userControl: true)]
+    public void ThrustSafePosDraw(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase2Strength) return;
+        _ThrustEvent.WaitOne();
+        
+        // 由于在处理_p2SafeDirection时，设置了其方位余4，即一定为0、1、2、3，必能在前4个index中找到唯一的false。
+        var safeDir = _p2SafeDirection.IndexOf(false);
+        var northPos = new Vector3(100, 0, 80);
+        var myIndex = accessory.GetMyIndex();
+        var isStGroup = myIndex % 2 == 1;
+        // ST组在0、1、2、3
+        var tposCenter =
+            northPos.RotatePoint(Center, isStGroup ? safeDir * float.Pi / 4 : (safeDir + 4) * float.Pi / 4);
+        var tposIn = tposCenter.PointInOutside(Center, 7.5f);
+        var tposLeft = tposCenter.RotatePoint(Center, 20f.DegToRad());
+        var tposRight = tposCenter.RotatePoint(Center, -20f.DegToRad());
+        List<Vector3> tposList = [tposCenter, tposIn, tposLeft, tposRight];
+
+        var dp = accessory.DrawGuidance(tposList[myIndex / 2], 0, 7000, $"P2一运安全区位置{myIndex}");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        
+        _ThrustEvent.Reset();
+    }
+    
+    [ScriptMethod(name: "一运分散安全位置指引消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:25548"], userControl: false)]
+    public void ThrustSafePosRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase2Strength) return;
+        var myIndex = accessory.GetMyIndex();
+        accessory.Method.RemoveDraw($"P2一运安全区位置{myIndex}");
+    }
+    
+    #endregion P2
 
     #region P3
     
@@ -1458,6 +1585,31 @@ public class DsrPatch
         DrawExaflareGuidePos(guidePosList, accessory);
     }
 
+    [ScriptMethod(name: "忆罪宫地火模拟器", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
+    public void ExaflareEchoDebug(Event @event, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        // ---- DEBUG CODE ----
+        
+        Center = new Vector3(400, -54.97f, -400);
+        Random random = new Random();
+        float bossRotLogicDeg = random.Next(0, 360);
+        var bossRotLogicRad = bossRotLogicDeg.DegToRad();
+        accessory.DebugMsg($"随机到的Boss面向为{bossRotLogicRad.RadToDeg()}", DebugMode);
+        float[] srot =
+        [
+            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
+            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
+            (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game()
+        ];
+        Vector3 bossFace = Center.ExtendPoint(bossRotLogicRad, 8f);
+        var dp = accessory.DrawDirPos2Pos(Center, bossFace, 0, 7000, $"面相", 7.9f);
+        dp.Color = ColorHelper.ColorDark.V4;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        DebugExaflare(srot, bossRotLogicRad.Logic2Game(), (uint)random.Next(0, 2) + 42, accessory);
+        // -- DEBUG CODE END --
+    }
+    
     #endregion P7 地火
     
     #region P7 接刀
@@ -2613,6 +2765,68 @@ public static class ListHelper
 public static class AssignDp
 {
     /// <summary>
+    /// 返回箭头指引相关dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerObj">箭头起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">箭头指向目标，可输入uint或Vector3，为0则无目标</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="rotation">箭头旋转角度</param>
+    /// <param name="scale">箭头宽度</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
+        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Rotation = rotation;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        
+        switch (ownerObj)
+        {
+            case uint sid:
+                dp.Owner = sid;
+                break;
+            case Vector3 spos:
+                dp.Position = spos;
+                break;
+            default:
+                throw new ArgumentException("ownerObj的目标类型输入错误");
+        }
+
+        switch (targetObj)
+        {
+            case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case Vector3 tpos:
+                dp.TargetPosition = tpos;
+                break;
+        }
+
+        return dp;
+    }
+    
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
+        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+    {
+        return targetObj switch
+        {
+            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
+            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
+            _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
+        };
+    }
+    
+    
+    /// <summary>
     /// 返回自己指向某目标地点的dp，可修改dp.TargetPosition, dp.Scale
     /// </summary>
     /// <param name="targetPos">指向地点</param>
@@ -3089,7 +3303,7 @@ public static class AssignDp
     /// <param name="str"></param>
     /// <param name="debugMode"></param>
     /// <param name="accessory"></param>
-    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode)
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = false)
     {
         if (!debugMode)
             return;
