@@ -77,6 +77,7 @@ public class DsrPatch
         Phase2Strength,         // P2 一运
         Phase2Sancity,          // P2 二运
         Phase3Nidhogg,          // P3 大师兄
+        Phase4Eyes,             // P4 龙眼
         Phase5HeavensWrath,     // P5 一运
         Phase5HeavensDeath,     // P5 二运
         Phase6IceAndFire1,      // P6 一冰火
@@ -102,6 +103,8 @@ public class DsrPatch
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private int _pureOfHeartBaitCount = 0;                              // P1/P4.5 纯洁心灵引导次数
     private List<bool> _p2SafeDirection = new bool[8].ToList();         // P2 一运冲锋安全位置
+    private Vector3 _p2ThordanPos = new Vector3(0, 0, 0);               // P2 一运托尔丹位置
+    private List<uint> _p2TetherKnightId = [0, 0];                      // P2 一运接线骑士ID，顺序左、右
     private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
     private int _p3LimitCutStep = 0;                                    // P3 麻将机制流程
     private uint _p3MyTowerPartner = 0;                                 // P3 我要踩的放塔搭档
@@ -118,6 +121,7 @@ public class DsrPatch
     private uint _p7BossId = 0;                                         // P7 boss Id
     
     private ManualResetEvent _ThrustEvent = new(false);
+    private ManualResetEvent _ThordanCastAtEdgeEvent = new(false);
     private ManualResetEvent _IceAndFireEvent = new(false);
     private ManualResetEvent _NearOrFarWingsEvent = new(false);
     private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
@@ -138,6 +142,7 @@ public class DsrPatch
         _recorded = new bool[20].ToList();
         _p7BossId = 0;
         
+        _ThordanCastAtEdgeEvent = new ManualResetEvent(false);
         _ThrustEvent = new ManualResetEvent(false);
         _IceAndFireEvent = new ManualResetEvent(false);
         _NearOrFarWingsEvent = new ManualResetEvent(false);
@@ -147,28 +152,24 @@ public class DsrPatch
         _TrinityEvent = new ManualResetEvent(false);
     }
     
-
-    
-    [ScriptMethod(name: "随时DEBUG用2", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST2"], userControl: false)]
-    public void EchoDebug2(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST2"], userControl: false)]
+    public void EchoDebug(Event @event, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        _p2SafeDirection = [true, true, false, true, false, false, false, false];
-        var safeDir = _p2SafeDirection.IndexOf(false);
-        var northPos = new Vector3(100, 0, 80);
-        var myIndex = accessory.GetMyIndex();
-        var isStGroup = myIndex % 2 == 1;
-        // ST组在0、1、2、3
-        var tposCenter =
-            northPos.RotatePoint(Center, isStGroup ? safeDir * float.Pi / 4 : (safeDir + 4) * float.Pi / 4);
-        var tposIn = tposCenter.PointInOutside(Center, 7.5f);
-        var tposLeft = tposCenter.RotatePoint(Center, 20f.DegToRad());
-        var tposRight = tposCenter.RotatePoint(Center, -20f.DegToRad());
-        List<Vector3> tposList = [tposCenter, tposIn, tposLeft, tposRight];
 
-        var dp = accessory.DrawGuidance(tposList[myIndex / 2], 0, 2000, $"安全区位置");
+        var spos_left = new Vector3(108.66f, 0, 95f);
+        var spos_right = new Vector3(91.34f, 0, 95f);
+        var spos_thordan = new Vector3(99.99f, 0, 122.97f);
+        var rad_left = spos_left.FindRadian(spos_thordan);
+        var rad_right = spos_right.FindRadian(spos_thordan);
+        accessory.DebugMsg($"rad_left:{rad_left.RadToDeg()}, rad_right:{rad_right.RadToDeg()}", DebugMode);
+        
+        var tetherEdgePos = spos_thordan.RotatePoint(Center, 18f.DegToRad());
+        tetherEdgePos = tetherEdgePos.PointInOutside(Center, 3f);
+        var dp = accessory.DrawGuidance(spos_left, tetherEdgePos, 0, 2000, $"接线路径");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        
         // -- DEBUG CODE END --
     }
     
@@ -256,6 +257,8 @@ public class DsrPatch
     {
         _dsrPhase = DsrPhase.Phase2Strength;
         _p2SafeDirection = new bool[8].ToList();
+        _p2ThordanPos = new Vector3(0, 0, 0);
+        _p2TetherKnightId = [0, 0];
         accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
     }
     
@@ -272,7 +275,6 @@ public class DsrPatch
             accessory.DebugMsg($"List内部true的数量：{_p2SafeDirection.Count(x => x)}", DebugMode);
             if (_p2SafeDirection.Count(x => x) != 3) return;
             _ThrustEvent.Set();
-            
         }
     }
         
@@ -306,7 +308,63 @@ public class DsrPatch
     {
         if (_dsrPhase != DsrPhase.Phase2Strength) return;
         var myIndex = accessory.GetMyIndex();
+
         accessory.Method.RemoveDraw($"P2一运安全区位置{myIndex}");
+    }
+    
+    [ScriptMethod(name: "一运托尔丹边缘位置记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25550"], userControl: false)]
+    public void ThordanPosRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase2Strength) return;
+        var spos = @event.SourcePosition();
+        _p2ThordanPos = spos;
+        _ThordanCastAtEdgeEvent.Set();
+    }
+    
+    [ScriptMethod(name: "一运坦克接线提示", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(255[01])$"], userControl: true)]
+    public void TankTetherRouteGuidance(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase2Strength) return;
+        var myIndex = accessory.GetMyIndex();
+        if (myIndex > 1) return;
+        _ThordanCastAtEdgeEvent.WaitOne();
+        lock (_p2TetherKnightId)
+        {
+            var sid = @event.SourceId();
+            var sname = @event.SourceName();
+            var spos = @event.SourcePosition();
+            var rad = spos.FindRadian(_p2ThordanPos);
+            _p2TetherKnightId[rad > float.Pi ? 1 : 0] = sid;
+            
+            // 此处Id为16进制转10进制表示
+            accessory.DebugMsg($"记录{sname}（对话{@event.Id()}）在{(rad > float.Pi ? "右" : "左")}", DebugMode);
+
+            if (_p2TetherKnightId.Contains(0)) return;
+            var targetKnightIdx = myIndex == 0 ? 0 : 1;
+            var chara = IbcHelper.GetById(_p2TetherKnightId[targetKnightIdx]);
+            if (chara == null) return;
+            
+            var knightPos = chara.Position;
+            var tetherEdgePos = _p2ThordanPos.RotatePoint(Center, (myIndex == 0 ? 1 : -1) * 18f.DegToRad());
+            tetherEdgePos = tetherEdgePos.PointInOutside(Center, 3f);
+            var dp = accessory.DrawGuidance(knightPos, tetherEdgePos, 0, 10000, $"接线路径");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "一运接线提示删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:25550"], userControl: false)]
+    public void TankTetherRouteGuidanceRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase2Strength) return;
+        accessory.Method.RemoveDraw($"接线路径");
+        _ThordanCastAtEdgeEvent.Reset();
+    }
+    
+    [ScriptMethod(name: "二运阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25555"], userControl: false)]
+    public void P2_SancityPhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        _dsrPhase = DsrPhase.Phase2Sancity;
+        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
     }
     
     #endregion P2
@@ -899,6 +957,73 @@ public class DsrPatch
     // PlaceTowerTimeNode   7600, 17700, 28900
     
     #endregion P3
+
+    #region P4
+
+    [ScriptMethod(name: "---- 《P4：龙眼》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: true)]
+    public void SplitLine_PhaseEyes(Event @event, ScriptAccessory accessory)
+    {
+    }
+
+    [ScriptMethod(name: "P4阶段记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2748"],
+        userControl: false)]
+    public void P4_EyesPhaseRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase == DsrPhase.Phase4Eyes) return;
+        _dsrPhase = DsrPhase.Phase4Eyes;
+        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+    }
+    
+    [ScriptMethod(name: "开场就位提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2748"],
+        userControl: true)]
+    public void EyesTargetMention(Event @event, ScriptAccessory accessory)
+    {
+        var tid = @event.TargetId();
+        if (tid != accessory.Data.Me) return;
+        var myIndex = accessory.GetMyIndex();
+        // MT D1 D2 H1
+        var isBlueEye = myIndex is 0 or 2 or 4 or 5;
+        accessory.Method.TextInfo($"{(isBlueEye ? "左侧蓝球" : "右侧红球")}就位", 3000);
+    }
+    
+    [ScriptMethod(name: "红蓝Buff置换提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(277[56])$"],
+        userControl: true)]
+    public void EyesBuffExchange(Event @event, ScriptAccessory accessory)
+    {
+        var tid = @event.TargetId();
+        if (tid != accessory.Data.Me) return;
+        const uint redBuff = 2775;
+        const uint blueBuff = 2776;
+        var stid = @event.StatusId();
+        var myIndex = accessory.GetMyIndex();
+        if (_drawn[0]) return;
+        _drawn[0] = true;
+        
+        var needChange = (myIndex < 4 && stid != blueBuff) || (myIndex >= 4 && stid != redBuff);
+        if (!needChange) return;
+        var dp = accessory.DrawGuidance(Center, 0, 5000, $"红蓝Buff置换");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        accessory.Method.TextInfo($"场中换Buff", 3000);
+    }
+    
+    [ScriptMethod(name: "红蓝Buff置换消除", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(277[56])$"],
+        userControl: false)]
+    public void EyesBuffExchangeRemove(Event @event, ScriptAccessory accessory)
+    {
+        var tid = @event.TargetId();
+        if (tid != accessory.Data.Me) return;
+        const uint redBuff = 2775;
+        const uint blueBuff = 2776;
+        var stid = @event.StatusId();
+        var myIndex = accessory.GetMyIndex();
+        
+        var changeComplete = (myIndex < 4 && stid == blueBuff) || (myIndex >= 4 && stid == redBuff);
+        if (!changeComplete) return;
+        accessory.Method.RemoveDraw($"红蓝Buff置换");
+    }
+    
+    #endregion P4
     
     #region P5
 
