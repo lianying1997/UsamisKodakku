@@ -984,7 +984,8 @@ public class DsrPatch
         var myIndex = accessory.GetMyIndex();
         // MT D1 D2 H1
         var isBlueEye = myIndex is 0 or 2 or 4 or 5;
-        accessory.Method.TextInfo($"{(isBlueEye ? "左侧蓝球" : "右侧红球")}就位", 3000);
+        var isTank = myIndex is 0 or 1;
+        accessory.Method.TextInfo($"{(isTank ? "开启盾姿，" : "")}{(isBlueEye ? "左侧蓝球" : "右侧红球")}就位", 3000, isTank);
     }
     
     [ScriptMethod(name: "红蓝Buff置换提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(277[56])$"],
