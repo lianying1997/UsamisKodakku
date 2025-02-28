@@ -115,7 +115,7 @@ public class DsrPatch
     private Vector3 _p5VedrfolnirPos = new Vector3(0, 0, 0);            // P5 白龙位置
     private List<bool> _p6DragonsGlowAction = [false, false];           // P6 双龙吐息记录
     private List<bool> _p6DragonsWingAction = [false, false, false];    // P6 双龙远近记录 [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
-    private List<bool> _p7FirstEntityOrder = [false, false];            // P7 平A仇恨记录
+    private List<bool> _p7FirstEnmityOrder = [false, false];            // P7 平A仇恨记录
     private readonly List<int> _p7TrinityOrderIdx = [4, 5, 6, 7, 2, 3]; // P7 接刀顺序
     private bool _p7TrinityDisordered = false;                          // P7 接刀顺序是否出错
     private bool _p7TrinityTankDisordered = false;                      // P7 坦克接刀仇恨是否出错
@@ -2038,19 +2038,19 @@ public class DsrPatch
         };
         accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
 
-        if (!_p7FirstEntityOrder.Contains(true))
+        if (!_p7FirstEnmityOrder.Contains(true))
         {
             // 初始化
-            _p7FirstEntityOrder = [true, false];
+            _p7FirstEnmityOrder = [true, false];
             _p7TrinityDisordered = false;
             _p7TrinityTankDisordered = false;
             _p7TrinityNum = 0;
         }
         else
         {
-            _p7FirstEntityOrder[0] = !_p7FirstEntityOrder[0];
-            _p7FirstEntityOrder[1] = !_p7FirstEntityOrder[1];
-            accessory.DebugMsg($"MT为{(_p7FirstEntityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEntityOrder[1] ? "一仇" : "二仇")}", DebugMode);
+            _p7FirstEnmityOrder[0] = !_p7FirstEnmityOrder[0];
+            _p7FirstEnmityOrder[1] = !_p7FirstEnmityOrder[1];
+            accessory.DebugMsg($"MT为{(_p7FirstEnmityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEnmityOrder[1] ? "一仇" : "二仇")}", DebugMode);
         }
         _TrinityEvent.Set();
         
@@ -2122,7 +2122,7 @@ public class DsrPatch
             color = accessory.Data.DefaultDangerColor;
         else
         {
-            switch (_p7FirstEntityOrder[myIndex])
+            switch (_p7FirstEnmityOrder[myIndex])
             {
                 case true when aggroIdx == 1:
                 case false when aggroIdx == 2:
@@ -2134,7 +2134,7 @@ public class DsrPatch
             }
         }
         
-        var dp = accessory.DrawOwnersEntityOrder(sid, aggroIdx, 3f, 3f, delay, destroy, $"三剑一体仇恨{aggroIdx}", byTime: true);
+        var dp = accessory.DrawOwnersEnmityOrder(sid, aggroIdx, 3f, 3f, delay, destroy, $"三剑一体仇恨{aggroIdx}", byTime: true);
         dp.Color = color.WithW(2f);
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
@@ -2207,7 +2207,7 @@ public class DsrPatch
         const uint aggro2 = 28064;
 
         // 一仇效果，但目标是二仇 || 二仇效果，但目标是一仇
-        if ((_p7FirstEntityOrder[tidx] || aid != aggro1) && (!_p7FirstEntityOrder[tidx] || aid != aggro2)) return;
+        if ((_p7FirstEnmityOrder[tidx] || aid != aggro1) && (!_p7FirstEnmityOrder[tidx] || aid != aggro2)) return;
         accessory.DebugMsg($"接刀仇恨错误，失效", DebugMode);
         accessory.Method.TextInfo($"接刀仇恨错误，不再以安全色提示", 3000, true);
         _p7TrinityTankDisordered = true;
@@ -3499,7 +3499,7 @@ public static class AssignDp
     /// <param name="lengthByDistance">长度是否随距离改变</param>
     /// <param name="name">绘图名称</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawOwnersEntityOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    public static DrawPropertiesEdit DrawOwnersEnmityOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;

@@ -67,7 +67,7 @@ public class TopPatch
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private static DeltaVersion _dv = new();
     private static SigmaVersion _sv = new();
-    private static SigmaWorld _sw = new(DebugMode);
+    private static SigmaWorld _sw = new();
     private static DynamicsPass _dyn = new();
     
     private List<ManualResetEvent> _events = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
@@ -86,7 +86,7 @@ public class TopPatch
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        // accessory.Method.Mark(accessory.Data.Me, MarkType.Attack1, false);
+        
 
         // -- DEBUG CODE END --
     }
@@ -211,7 +211,7 @@ public class TopPatch
 
     #region P5 二运
     
-    [ScriptMethod(name: "---- P5 二运 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
+    [ScriptMethod(name: "----《P5 二运》----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
         userControl: true)]
     public void SplitLine_SigmaVersion(Event @event, ScriptAccessory accessory)
     {
@@ -223,7 +223,9 @@ public class TopPatch
         _phase = TopPhase.P5_Sigma;
         _sv = new SigmaVersion();
         _sv.Init(accessory);
-        _sw = new SigmaWorld(DebugMode);
+        _sw = new SigmaWorld();
+        _sw.Init(accessory);
+        
         _dyn.DynamicIdxAdd();
         _dyn.Reset();
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
@@ -237,7 +239,7 @@ public class TopPatch
         var tid = @event.TargetId();
         if (tid != accessory.Data.Me) return;
         _sv.SetGlitchType(stid);
-        accessory.DebugMsg($"成功记录下{(_sv.IsRemoteGlitch()?"远线":"中线")}", DebugMode);
+        accessory.DebugMsg($"成功记录下{(_sv.IsRemoteGlitch() ? "远线" : "中线")}", DebugMode);
     }
     
     [ScriptMethod(name: "二运 索尼标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(01A[0123])$"], userControl: false)]
@@ -246,9 +248,10 @@ public class TopPatch
         if (_phase != TopPhase.P5_Sigma) return;
         var id = (IconId)@event.Id();
         var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
         lock (_sv)
         {
-            _sv.AddPlayerToGroup(tid, id);
+            _sv.AddPlayerToGroup(tidx, id);
             if (_sv.SonyRecordedDone())
                 _events[(int)RecordedIdx.SigmaSonyRecord].Set();
         }
@@ -259,9 +262,10 @@ public class TopPatch
     {
         if (_phase != TopPhase.P5_Sigma) return;
         var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
         lock (_sv)
         {
-            _sv.SetTargetedPlayer(tid);
+            _sv.SetTargetedPlayer(tidx);
             if (_sv.TargetRecordedDone())
                 _events[(int)RecordedIdx.SigmaTargetRecord].Set();
         }
@@ -282,18 +286,24 @@ public class TopPatch
         if (_phase != TopPhase.P5_Sigma) return;
         lock (_events)
         {
+            // 索尼标记、激光炮标记记录完毕后
             _events[(int)RecordedIdx.SigmaTargetRecord].WaitOne();
             _events[(int)RecordedIdx.SigmaSonyRecord].WaitOne();
         }
+        // 找到未被点名的两人
         _sv.BuildUntargetedGroup();
         if (CaptainMode)
         {
+            // 在指挥模式下，为两人标点
             _sv.BuildMarker();
             MarkAllPlayers(_sv.GetMarkers(), accessory);
         }
         _sv.FindSpreadTarget();
         _sv.CalcSpreadPos(Center);
-        _events[(int)RecordedIdx.SigmaSonyMarker].Set();
+        lock (_events)
+        {
+            _events[(int)RecordedIdx.SigmaSonyMarker].Set();
+        }
     }
     
     [ScriptMethod(name: "二运 八方分散指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"])]
@@ -308,7 +318,6 @@ public class TopPatch
             _events[(int)RecordedIdx.SigmaTargetRecord].Reset();
             _events[(int)RecordedIdx.SigmaSonyRecord].Reset();
         }
-
     }
     
     [ScriptMethod(name: "二运 塔生成记录", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:regex:^(201324[56])$", "Operate:Add"], userControl: false)]
@@ -341,10 +350,11 @@ public class TopPatch
         // TODO 二传算头标
     }
     
-    [ScriptMethod(name: "二传 标头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["DataId:3149[23]"], userControl: false)]
+    [ScriptMethod(name: "二传 标头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:3149[23]"], userControl: false)]
     public void P5_SigmaWorldMarker(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_Sigma) return;
+        _phase = TopPhase.P5_SigmaWorld;
         if (@event.SourceId() != accessory.Data.Me) return;
         if (!CaptainMode) return;
         // TODO 二传标头标
@@ -357,13 +367,17 @@ public class TopPatch
     /// <param name="accessory"></param>
     private static void MarkAllPlayers(List<MarkType> marker, ScriptAccessory accessory)
     {
+        var str = "";
         for (var i = 0; i < 8; i++)
         {
             var player = accessory.Data.PartyList[i];
-            accessory.DebugMsg($"为{accessory.GetPlayerJobById(player)}标上{marker[i]}", DebugMode);
+            str += $"为{accessory.GetPlayerJobById(player)}标上{marker[i]}\n";
+            
             // todo 测试完成后，删除该注释
-            accessory.Method.Mark(player, marker[i]);
+            // accessory.Method.Mark(player, marker[i]);
         }
+        str += "---------MarkAllPlayers----------\n";
+        accessory.DebugMsg(str, DebugMode);
     }
     
     /// <summary>
@@ -408,12 +422,12 @@ public class TopPatch
     public class SigmaVersion
     {
         public ScriptAccessory accessory { get; set; } = null!;
-        private List<uint> CircleGroup { get; set; } = [];
-        private List<uint> CrossGroup { get; set; } = [];
-        private List<uint> TriangleGroup { get; set; } = [];
-        private List<uint> SquareGroup { get; set; } = [];
+        private List<int> CircleGroup { get; set; } = [];
+        private List<int> CrossGroup { get; set; } = [];
+        private List<int> TriangleGroup { get; set; } = [];
+        private List<int> SquareGroup { get; set; } = [];
         private List<bool> IsTargeted { get; set; } = new bool[8].ToList();
-        private List<uint> UntargetedGroup { get; set; } = [];
+        private List<int> UntargetedGroup { get; set; } = [];
         private bool GlitchType { get; set; }
         private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
         private List<int> TowerType { get; set; } = Enumerable.Repeat(0, 16).ToList();
@@ -423,50 +437,52 @@ public class TopPatch
         private List<Vector3> TargetTowerPosV3 { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 8).ToList();
         private int SpreadTrueNorth { get; set; }
         public int SonyGroupCount { get; set; } = 0;
-
         public void Init(ScriptAccessory _accessory)
         {
             accessory = _accessory;
         }
 
-        public void AddPlayerToGroup(uint id, IconId group)
+        public void AddPlayerToGroup(int idx, IconId group)
         {
             switch (group)
             {
                 case IconId.IconCircle:
-                    CircleGroup.Add(id);
+                    CircleGroup.Add(idx);
                     break;
                 case IconId.IconCross:
-                    CrossGroup.Add(id);
+                    CrossGroup.Add(idx);
                     break;
                 case IconId.IconTriangle:
-                    TriangleGroup.Add(id);
+                    TriangleGroup.Add(idx);
                     break;
                 case IconId.IconSquare:
-                    SquareGroup.Add(id);
+                    SquareGroup.Add(idx);
                     break;
             }
 
             SonyGroupCount++;
-            // accessory.DebugMsg($"添加{accessory.GetPlayerJobById(id)}到{group}", DebugMode);
+            accessory.DebugMsg($"添加{accessory.GetPlayerJobByIndex(idx)}到{group}", DebugMode);
         }
 
         public void BuildTargetTowerPos()
         {
+            var str = "";
             for (var i = 0; i < 8; i++)
             {
                 var towerIdx = FindTargetTower(i);
                 if (towerIdx == -1)
                 {
                     TargetTowerPos[i] = 0;
-                    accessory.DebugMsg($"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到", DebugMode);
+                    str += $"出现错误，{accessory.GetPlayerJobByIndex(i)}的塔未找到\n";
                 }
                 else
                 {
                     TargetTowerPos[i] = towerIdx;
-                    accessory.DebugMsg($"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}", DebugMode);
+                    str += $"成功找到{accessory.GetPlayerJobByIndex(i)}的塔{towerIdx}\n";
                 }
             }
+            str += "---------SigmaVersion.BuildTargetTowerPos----------\n";
+            accessory.DebugMsg(str, DebugMode);
         }
 
         public int FindTargetTower(int idx)
@@ -506,9 +522,8 @@ public class TopPatch
             accessory.DebugMsg($"设置分散真北方向为{pos}", DebugMode);
         }
 
-        public void SetTargetedPlayer(uint id)
+        public void SetTargetedPlayer(int idx)
         {
-            var idx = accessory.GetPlayerIdIndex(id);
             IsTargeted[idx] = true;
             accessory.DebugMsg($"捕捉到{accessory.GetPlayerJobByIndex(idx)}被选为点名目标", DebugMode);
         }
@@ -516,31 +531,38 @@ public class TopPatch
         public void BuildUntargetedGroup()
         {
             UntargetedGroup = IsTargeted
-                .Select((value, index) => new { value, index })
-                .Where(x => !x.value)
-                .Select(x => accessory.Data.PartyList[x.index])
+                .Select((targeted, index) => new { targeted, index })
+                .Where(x => !x.targeted)
+                .Select(x => x.index)
                 .ToList();
+            
+            UntargetedGroup.Sort();
 
-            foreach (var player in UntargetedGroup)
-                accessory.DebugMsg($"{accessory.GetPlayerJobById(player)}未被选为目标", DebugMode);
+            var str = "";
+
+            foreach (var playerIdx in UntargetedGroup)
+                str += $"{accessory.GetPlayerJobByIndex(playerIdx)}未被选为目标。\n";
+            
+            str += "---------SigmaVersion.BuildUntargetedGroup----------\n";
+            accessory.DebugMsg(str, DebugMode);
         }
-
-        public IconId FindIconGroup(uint id)
+        
+        public IconId FindIconGroup(int idx)
         {
-            if (CircleGroup.Contains(id))
+            if (CircleGroup.Contains(idx))
                 return IconId.IconCircle;
-            if (CrossGroup.Contains(id))
+            if (CrossGroup.Contains(idx))
                 return IconId.IconCross;
-            if (TriangleGroup.Contains(id))
+            if (TriangleGroup.Contains(idx))
                 return IconId.IconTriangle;
-            if (SquareGroup.Contains(id))
+            if (SquareGroup.Contains(idx))
                 return IconId.IconSquare;
             return IconId.None;
         }
 
-        public uint FindPartner(uint id)
+        public int FindPartner(int idx)
         {
-            var group = FindIconGroup(id);
+            var group = FindIconGroup(idx);
             var chosenGroup = group switch
             {
                 IconId.IconCircle => CircleGroup,
@@ -549,7 +571,7 @@ public class TopPatch
                 IconId.IconSquare => SquareGroup,
                 _ => [],
             };
-            return chosenGroup.FirstOrDefault(player => player != id);
+            return chosenGroup.FirstOrDefault(player => player != idx);
         }
 
         public void BuildMarker()
@@ -572,11 +594,9 @@ public class TopPatch
             for (var i = 0; i < 8; i++)
             {
                 if (IsMarkered(i)) continue;
-                var markPrepPlayer = accessory.Data.PartyList[i];
-                SetMarkerBySelf(markPrepPlayer, extraMarkType[extraMarkIdx]);
+                SetMarkerBySelf(i, extraMarkType[extraMarkIdx]);
                 extraMarkIdx++;
-                var markPlayerPartner = FindPartner(markPrepPlayer);
-                SetMarkerBySelf(markPlayerPartner, extraMarkType[extraMarkIdx]);
+                SetMarkerBySelf(FindPartner(i), extraMarkType[extraMarkIdx]);
                 extraMarkIdx++;
             }
         }
@@ -607,6 +627,8 @@ public class TopPatch
             // TODO 该“中远线距离”值待测试
             var basicDistance = IsRemoteGlitch() ? 19.5f : 11.25f;
             var basicPoint = new Vector3(100, 0, 100 - basicDistance);
+            var str = "";
+            
             for (var i = 0; i < 8; i++)
             {
                 var posV3 = basicPoint.RotatePoint(center, SpreadTargetPos[i] * float.Pi / 8);
@@ -616,24 +638,27 @@ public class TopPatch
                 if (GetMarkerTypeFromIdx(i) is MarkType.Attack1 or MarkType.Bind1)
                     posV3 = posV3.PointInOutside(center, 0.5f, true);
                 SpreadPosV3[i] = posV3;
-                accessory.DebugMsg(
-                    $"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的分散位置{SpreadPosV3[i]}",
-                    DebugMode);
+                str += $"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的分散位置{SpreadPosV3[i]}\n";
             }
+            
+            str += "---------SigmaVersion.CalcSpreadPos----------\n";
+            accessory.DebugMsg(str, DebugMode);
         }
 
         public void CalcTargetTowerPos(Vector3 center)
         {
             var knockBackDistance = 13f;
             var basicPoint = new Vector3(100, 0, 82.5f + knockBackDistance);
+            var str = "";
             for (var i = 0; i < 8; i++)
             {
                 var posV3 = basicPoint.RotatePoint(center, TargetTowerPos[i] * float.Pi / 8);
                 TargetTowerPosV3[i] = posV3;
-                accessory.DebugMsg(
-                    $"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的击退塔位置{TargetTowerPosV3[i]}",
-                    DebugMode);
+                str += $"计算出{accessory.GetPlayerJobByIndex(i)}({GetMarkerTypeFromIdx(i)})的击退塔位置{TargetTowerPosV3[i]}\n";
             }
+
+            str += "---------SigmaVersion.CalcTargetTowerPos----------\n";
+            accessory.DebugMsg(str, DebugMode);
         }
 
         public void SetMarkerFromOut(uint id, MarkType marker)
@@ -643,11 +668,10 @@ public class TopPatch
             accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", DebugMode);
         }
 
-        public void SetMarkerBySelf(uint id, MarkType marker)
+        public void SetMarkerBySelf(int idx, MarkType marker)
         {
-            var idx = accessory.GetPlayerIdIndex(id);
             Marker[idx] = marker;
-            accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobById(id)}为{marker}", DebugMode);
+            accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobByIndex(idx)}为{marker}", DebugMode);
         }
 
         public void SetTowerType(DataId towerId, Vector3 towerPos, Vector3 center)
@@ -681,11 +705,6 @@ public class TopPatch
         public List<MarkType> GetMarkers()
         {
             return Marker;
-        }
-
-        public List<int> GetSpreadTargetPos()
-        {
-            return SpreadTargetPos;
         }
 
         public MarkType GetMarkerTypeFromIdx(int idx)
@@ -725,7 +744,9 @@ public class TopPatch
     
     private static bool IsInPhase5(TopPhase phase)
     {
-        return phase is TopPhase.P5_Delta or TopPhase.P5_Sigma or TopPhase.P5_Omega;
+        return phase is TopPhase.P5_Delta or TopPhase.P5_DeltaWorld or 
+            TopPhase.P5_Sigma or TopPhase.P5_SigmaWorld or 
+            TopPhase.P5_Omega or TopPhase.P5_OmegaWorldA or TopPhase.P5_OmegaWorldB;
     }
 
     #region General Functions
@@ -738,13 +759,18 @@ public class TopPatch
     #endregion
 }
 
-public class SigmaWorld(bool debugMode)
+public class SigmaWorld
 {
-    private readonly bool _debugMode = debugMode;
+    public ScriptAccessory accessory { get; set; } = null!;
     private int OmegaFemalePos { get; set; } = 0;
     private bool OmegaFemaleInsideSafe { get; set; } = false;
     private List<int>? _dynamicBuffLevel;
-
+    
+    public void Init(ScriptAccessory _accessory)
+    {
+        accessory = _accessory;
+    }
+    
     public void CalcMarker()
     {
         // GetDynamicBuffLevel(_dyn);
@@ -805,8 +831,12 @@ public enum TopPhase : uint
 {
     Init,                   // 初始
     P5_Delta,               // P5 一运
+    P5_DeltaWorld,          // P5 二传
     P5_Sigma,               // P5 二运
+    P5_SigmaWorld,          // P5 二传
     P5_Omega,               // P5 三运
+    P5_OmegaWorldA,         // P5 三传
+    P5_OmegaWorldB,         // P5 四传
     P5_BlindFaith,          // P5 盲信
 }
 
@@ -1112,6 +1142,27 @@ public static class DirectionCalc
     }
 
     /// <summary>
+    /// 适用于旋转，FF14游戏基顺时针旋转为负。
+    /// </summary>
+    /// <param name="radian"></param>
+    /// <returns></returns>
+    public static float Cw2Ccw(this float radian)
+    {
+        return -radian;
+    }
+    
+    /// <summary>
+    /// 适用于旋转，FF14游戏基顺时针旋转为负。
+    /// 与Cw2CCw完全相同，为了代码可读性便于区分。
+    /// </summary>
+    /// <param name="radian"></param>
+    /// <returns></returns>
+    public static float Ccw2Cw(this float radian)
+    {
+        return -radian;
+    }
+    
+    /// <summary>
     /// 输入逻辑基角度，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
     /// </summary>
     /// <param name="radian">逻辑基角度</param>
@@ -1234,6 +1285,36 @@ public static class DirectionCalc
     {
         Vector2 v2 = new(point.X - target.X, point.Z - target.Z);
         return v2.Length();
+    }
+    
+    /// <summary>
+    /// 寻找两点之间的角度差，范围0~360deg
+    /// </summary>
+    /// <param name="basePoint">基准位置</param>
+    /// <param name="targetPos">比较目标位置</param>
+    /// <param name="center">场地中心</param>
+    /// <returns></returns>
+    public static float FindRadianDifference(this Vector3 targetPos, Vector3 basePoint, Vector3 center)
+    {
+        var baseRad = basePoint.FindRadian(center);
+        var targetRad = targetPos.FindRadian(center);
+        var deltaRad = targetRad - baseRad;
+        if (deltaRad < 0)
+            deltaRad += float.Pi * 2;
+        return deltaRad;
+    }
+
+    /// <summary>
+    /// 从第三人称视角出发观察某目标是否在另一目标的右侧。
+    /// </summary>
+    /// <param name="basePoint">基准位置</param>
+    /// <param name="targetPos">比较目标位置</param>
+    /// <param name="center">场地中心</param>
+    /// <returns></returns>
+    public static bool IsAtRight(this Vector3 targetPos, Vector3 basePoint, Vector3 center)
+    {
+        // 从场中看向场外，在右侧
+        return targetPos.FindRadianDifference(basePoint, center) < float.Pi;
     }
 }
 
@@ -1366,14 +1447,16 @@ public static class AssignDp
     
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
         object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
-    {
-        return targetObj switch
-        {
-            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
-            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
-            _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
-        };
-    }
+    => accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+    
+    // {
+    //     return targetObj switch
+    //     {
+    //         uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
+    //         Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
+    //         _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
+    //     };
+    // }
     
     /// <summary>
     /// 返回扇形左右刀
@@ -1540,7 +1623,7 @@ public static class AssignDp
     /// <param name="lengthByDistance">长度是否随距离改变</param>
     /// <param name="name">绘图名称</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawOwnersEntityOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    public static DrawPropertiesEdit DrawOwnersEnmityOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -1587,6 +1670,22 @@ public static class AssignDp
         return dp;
     }
     
+    /// <summary>
+    /// 返回画向某目标的扇形绘图
+    /// </summary>
+    /// <param name="sourceId">起始目标id，通常为自己</param>
+    /// <param name="targetId">目标单位id</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="color">绘图颜色</param>
+    /// <param name="rotation">旋转角度</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
     public static DrawPropertiesEdit DrawFanToTarget(this ScriptAccessory accessory, uint sourceId, uint targetId, float radian, float scale, int delay, int destroy, string name, Vector4 color, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
     {
         var dp = accessory.DrawTarget2Target(sourceId, targetId, scale, scale, delay, destroy, name, rotation, lengthByDistance, byTime);
@@ -1729,11 +1828,13 @@ public static class AssignDp
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale = 1.5f)
-    {
-        var dp = accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
-        return dp;
-    }
+    public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color,
+        int delay, int destroy, string name, float scale = 1.5f)
+        => accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
+    // {
+    //     var dp = accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
+    //     return dp;
+    // }
 
     /// <summary>
     /// 返回静态月环dp，通常用于指引固定位置。
@@ -1747,12 +1848,16 @@ public static class AssignDp
     /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
     /// <param name="name">绘图名称</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color, int delay, int destroy, string name, float scale, float innerscale = 0)
-    {
-        var dp = accessory.DrawStatic(center, (uint)0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
-        dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
-        return dp;
-    }
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color,
+        int delay, int destroy, string name, float scale, float innerscale = 0) 
+        => accessory.DrawStatic(center, (uint)0,
+        float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
+    
+    // {
+    //     var dp = accessory.DrawStatic(center, (uint)0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
+    //     dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
+    //     return dp;
+    // }
 
     /// <summary>
     /// 返回矩形
@@ -1848,16 +1953,18 @@ public static class AssignDp
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
     }
-    
-    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
-    {
-        return target switch
-        {
-            uint uintTarget => accessory.DrawKnockBack(accessory.Data.Me, uintTarget, length, delay, destroy, name, width, byTime),
-            Vector3 vectorTarget => accessory.DrawKnockBack(accessory.Data.Me, vectorTarget, length, delay, destroy, name, width, byTime),
-            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
-        };
-    }
+
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length,
+        int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
+        => accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+    // {
+    //     return target switch
+    //     {
+    //         uint uintTarget => accessory.DrawKnockBack(accessory.Data.Me, uintTarget, length, delay, destroy, name, width, byTime),
+    //         Vector3 vectorTarget => accessory.DrawKnockBack(accessory.Data.Me, vectorTarget, length, delay, destroy, name, width, byTime),
+    //         _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+    //     };
+    // }
     
     /// <summary>
     /// 返回背对
@@ -1892,16 +1999,18 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         return dp;
     }
-    
-    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay, int destroy, string name)
-    {
-        return target switch
-        {
-            uint uintTarget => accessory.DrawSightAvoid(accessory.Data.Me, uintTarget, delay, destroy, name),
-            Vector3 vectorTarget => accessory.DrawSightAvoid(accessory.Data.Me, vectorTarget, delay, destroy, name),
-            _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
-        };
-    }
+
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay,
+        int destroy, string name)
+        => accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+    // {
+    //     return target switch
+    //     {
+    //         uint uintTarget => accessory.DrawSightAvoid(accessory.Data.Me, uintTarget, delay, destroy, name),
+    //         Vector3 vectorTarget => accessory.DrawSightAvoid(accessory.Data.Me, vectorTarget, delay, destroy, name),
+    //         _ => throw new ArgumentException("target 的类型必须是 uint 或 Vector3")
+    //     };
+    // }
 
     /// <summary>
     /// 返回多方向延伸指引
@@ -1929,8 +2038,7 @@ public static class AssignDp
             case uint sid:
                 for (var i = 0; i < extendDirs.Count; i++)
                 {
-                    var dp = accessory.DrawRect(sid, width, length, delay, destroy, $"{name}{i}");
-                    dp.Rotation = extendDirs[i];
+                    var dp = accessory.DrawGuidance(owner, sid, delay, destroy, $"{name}{i}", extendDirs[i], width);
                     dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
                     dpList.Add(dp);
                 }
@@ -1974,10 +2082,10 @@ public static class AssignDp
             var dpPos = accessory.DrawStaticCircle(positions[i], colorPosPlayer, delay[i], destroy[i], $"{name}pos{i}");
             dpList[0].Add(dpPos);
             var dpGuide = accessory.DrawGuidance(positions[i], colorGo, delay[i], destroy[i], $"{name}guide{i}");
-            dpList[1].Add(dpPos);
+            dpList[1].Add(dpGuide);
             if (i == positions.Count - 1) break;
             var dpPrep = accessory.DrawGuidance(positions[i], positions[i + 1], delay[i], destroy[i], $"{name}prep{i}");
-            dpList[2].Add(dpPos);
+            dpList[2].Add(dpPrep);
         }
         return dpList;
     }
@@ -1988,12 +2096,25 @@ public static class AssignDp
     /// <param name="str"></param>
     /// <param name="debugMode"></param>
     /// <param name="accessory"></param>
-    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode)
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = false)
     {
         if (!debugMode)
             return;
         accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
+
+    /// <summary>
+    /// 将List内信息转换为字符串。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="myList"></param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList)
+    {
+        return string.Join(", ", myList.Select(item => item?.ToString() ?? ""));
+    }
 }
 
-#endregion
+#endregion 函数集
+
