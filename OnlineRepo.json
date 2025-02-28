@@ -83,11 +83,11 @@
     {
         "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
         "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-        "Version": "0.0.0.9",
+        "Version": "0.0.0.10",
         "Author": "Usami",
         "TerritoryIds": [968],
         "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
-        "UpdateInfo": "1. 修复P6可能出现远近指路错误的Bug。"
+        "UpdateInfo": "1. 增加纯洁心灵、P4、P5一运穿天接线指路。"
     },
     {
         "Name": "ASS [异闻希拉狄哈水道]",
