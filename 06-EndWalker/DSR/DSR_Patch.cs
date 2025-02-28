@@ -41,8 +41,8 @@ public class DsrPatch
 
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
     private const string Version = "0.0.0.10";
-    private const string DebugVersion = "c";
-    private const string Note = "增加纯洁心灵指路，P2一运具体位置";
+    private const string DebugVersion = "f";
+    private const string Note = "纯洁心灵、P4、P5";
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -1052,10 +1052,11 @@ public class DsrPatch
         if (myIndex is 6 or 7)
             orbPos = orbPos.FoldPointHorizon(Center.X);
         
-        var dp0 = accessory.DrawGuidance(orbPos, 3000, 3000, $"DPS撞球准备");
+        // 要细致的话，需要找到球什么时候变大的时间点
+        var dp0 = accessory.DrawGuidance(orbPos, 4000, 2000, $"DPS撞球准备");
         dp0.Color = accessory.Data.DefaultDangerColor;
         var dp1 = accessory.DrawGuidance(orbPos, 6000, 5000, $"DPS撞球");
-        dp1.Color = accessory.Data.DefaultDangerColor;
+        dp1.Color = accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
     }
@@ -1072,7 +1073,7 @@ public class DsrPatch
         accessory.Method.RemoveDraw($"DPS撞球.*");
     }
     
-    [ScriptMethod(name: "TN撞球提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26817"],
+    [ScriptMethod(name: "TN撞球提示", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(1260[78])$"],
         userControl: true)]
     public void PobBlueOrbsGuidance(Event @event, ScriptAccessory accessory)
     {
@@ -1089,13 +1090,27 @@ public class DsrPatch
         if (myIndex % 2 == 1)
             orbPos = orbPos.FoldPointHorizon(Center.X);
         
-        accessory.Method.TextInfo($"与DPS换Buff", 2500);
-        var dp0 = accessory.DrawGuidance(orbPos, 2000, 2500, $"TN撞球准备");
+        // accessory.Method.TextInfo($"与DPS换Buff", 2500);
+        var dp0 = accessory.DrawGuidance(orbPos, 10000, 2000, $"TN撞球准备");
         dp0.Color = accessory.Data.DefaultDangerColor;
-        var dp1 = accessory.DrawGuidance(orbPos, 4500, 5000, $"TN撞球");
-        dp1.Color = accessory.Data.DefaultDangerColor;
+        var dp1 = accessory.DrawGuidance(orbPos, 12000, 5000, $"TN撞球");
+        dp1.Color = accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
+    }
+    
+    [ScriptMethod(name: "TN撞球前换Buff提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26817"],
+        userControl: true)]
+    public void BuffExchangeHintBeforePobBlueOrbs(Event @event, ScriptAccessory accessory)
+    {
+        if (_dsrPhase != DsrPhase.Phase4Eyes) return;
+        if (_drawn[5]) return;
+        _drawn[5] = true;
+        // 球出现开始计时
+        var myIndex = accessory.GetMyIndex();
+        if (myIndex >= 4) return;
+        
+        accessory.Method.TextInfo($"与DPS换Buff", 2500);
     }
     
     [ScriptMethod(name: "TN撞球提示消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26815"],
@@ -3210,17 +3225,18 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="rotation">箭头旋转角度</param>
     /// <param name="scale">箭头宽度</param>
+    /// <param name="isSafe">使用安全色</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
-        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(scale);
         dp.Rotation = rotation;
         dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Color = isSafe ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         
@@ -3250,12 +3266,12 @@ public static class AssignDp
     }
     
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
-        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
     {
         return targetObj switch
         {
-            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
-            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
+            uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale, isSafe),
+            Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale, isSafe),
             _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
         };
     }

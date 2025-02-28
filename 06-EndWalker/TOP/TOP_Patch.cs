@@ -1406,17 +1406,18 @@ public static class AssignDp
     /// <param name="name">绘图名称</param>
     /// <param name="rotation">箭头旋转角度</param>
     /// <param name="scale">箭头宽度</param>
+    /// <param name="isSafe">使用安全色</param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
-        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
+        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
         dp.Scale = new Vector2(scale);
         dp.Rotation = rotation;
         dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.Color = isSafe ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         
@@ -1446,8 +1447,8 @@ public static class AssignDp
     }
     
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
-        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f)
-    => accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale);
+        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
+    => accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale, isSafe);
     
     // {
     //     return targetObj switch
