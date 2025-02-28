@@ -1,119 +1,173 @@
 [
-    {
-        "Name": "P8S [零式万魔殿 炼净之狱4]",
-        "Guid": "97df6974-c726-4a00-9016-293c184adf5c",
-        "Version": "0.0.0.5",
-        "Author": "Usami",
-        "TerritoryIds": [1088],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
-        "UpdateInfo": "为了7.1编译成功的尝试。"
-    },
-    {
-        "Name": "P12S [零式万魔殿 荒天之狱4]",
-        "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
-        "Version": "0.0.0.7",
-        "Author": "Usami",
-        "TerritoryIds": [1154],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
-        "UpdateInfo": "为了7.1编译成功的尝试。"
-    },
-    {
-        "Name": "P4S [零式万魔殿 边境之狱4]",
-        "Guid": "de9e31e6-d040-48e3-bf0b-aa4e2643f79d",
-        "Version": "0.0.0.3",
-        "Author": "Usami",
-        "TerritoryIds": [1009],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p4s.cs",
-        "UpdateInfo": "为了7.1编译成功的尝试。"
-    },
-    {
-        "Name": "Lv87 [创造环境极北造物院]",
-        "Guid": "8d4e4a9c-b144-4ec2-82cd-46b38867e4e6",
-        "Version": "0.0.0.1",
-        "Author": "Usami",
-        "TerritoryIds": [974],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/06-EndWalker/Lv87_KtisisHyperboreia.cs",
-        "UpdateInfo": "仅老二老三。"
-    },
-    {
-        "Name": "UCOB [巴哈姆特绝境战]",
-        "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-        "Version": "0.0.1.8",
-        "Author": "Usami",
-        "TerritoryIds": [733],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-        "UpdateInfo": "没有改动任何东西，只是删掉了一长串更新日志Note。"
-    },
-    {
-        "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",
-        "Guid": "e24a0c8b-5c41-4e58-87c3-355f1f925986",
-        "Version": "0.0.0.5",
-        "Author": "Usami",
-        "TerritoryIds": [993],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ZodiarkEx.cs",
-        "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。"
-    },
-    {
-        "Name": "Rubicante-Ex [卢比坎特歼殛战]",
-        "Guid": "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d",
-        "Version": "0.0.0.3",
-        "Author": "Usami",
-        "TerritoryIds": [1096],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/RubicanteEx.cs",
-        "UpdateInfo": "1. 修改了一个不影响绘图的程序编写bug。\n2. 修改了中圈旋转时可能不绘图的bug。"
-    },
-    {
-        "Name": "Rubicante [卢比坎特歼灭战]",
-        "Guid": "dd6bb7eb-c051-4406-8ec3-ff3523c753ee",
-        "Version": "0.0.0.1",
-        "Author": "Usami",
-        "TerritoryIds": [1095],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Rubicante.cs",
-        "UpdateInfo": "大转盘必须Imgui。鸭门。"
-    },
-    {
-        "Name": "Zodiark [佐迪亚克歼灭战]",
-        "Guid": "ed3f32fe-fc12-4485-baa4-bec6c357e70b",
-        "Version": "0.0.0.2",
-        "Author": "Usami",
-        "TerritoryIds": [992],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Zodiark.cs",
-        "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。"
-    },
-    {
-        "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
-        "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-        "Version": "0.0.0.10",
-        "Author": "Usami",
-        "TerritoryIds": [968],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
-        "UpdateInfo": "1. 增加纯洁心灵、P4、P5一运穿天接线指路。"
-    },
-    {
-        "Name": "ASS [异闻希拉狄哈水道]",
-        "Guid": "bdd73dbd-2a93-4232-9324-0c9093d4a646",
-        "Version": "0.0.1.0",
-        "Author": "Usami",
-        "TerritoryIds": [1075, 1076],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
-        "UpdateInfo": "1. 初版完成，包含机制绘图与指路，适配异闻与异闻零式。\n鸭门。"
-    },
-    {
-        "Name": "AMR [异闻六根山]",
-        "Guid": "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45",
-        "Version": "0.0.0.1",
-        "Author": "Usami",
-        "TerritoryIds": [1155, 1156],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/AMR/AMR.cs",
-        "UpdateInfo": "1. 初版完成。\n鸭门。"
-    },
-    {
-        "Name": "QueenEternalEx [永恒女王忆想歼灭战]",
-        "Guid": "45fff289-e23d-41ab-9039-71cd310668e4",
-        "Version": "0.0.0.9",
-        "Author": "Usami",
-        "TerritoryIds": [1243],
-        "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/QueenEternal/QueenEternalEx.cs",
-        "UpdateInfo": "1. 增加了分治法第二段引导绘图。"
-    }
+  {
+    "Name": "P8S [零式万魔殿 炼净之狱4]",
+    "Guid": "97df6974-c726-4a00-9016-293c184adf5c",
+    "Version": "0.0.0.5",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
+    "Note": "",
+    "UpdateInfo": "为了7.1编译成功的尝试。",
+    "TerritoryIds": [
+      1088
     ]
+  },
+  {
+    "Name": "P12S [零式万魔殿 荒天之狱4]",
+    "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
+    "Version": "0.0.0.7",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
+    "Note": "",
+    "UpdateInfo": "为了7.1编译成功的尝试。",
+    "TerritoryIds": [
+      1154
+    ]
+  },
+  {
+    "Name": "P4S [零式万魔殿 边境之狱4]",
+    "Guid": "de9e31e6-d040-48e3-bf0b-aa4e2643f79d",
+    "Version": "0.0.0.3",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p4s.cs",
+    "Note": "",
+    "UpdateInfo": "为了7.1编译成功的尝试。",
+    "TerritoryIds": [
+      1009
+    ]
+  },
+  {
+    "Name": "Lv87 [创造环境极北造物院]",
+    "Guid": "8d4e4a9c-b144-4ec2-82cd-46b38867e4e6",
+    "Version": "0.0.0.1",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/06-EndWalker/Lv87_KtisisHyperboreia.cs",
+    "Note": "",
+    "UpdateInfo": "仅老二老三。",
+    "TerritoryIds": [
+      974
+    ]
+  },
+  {
+    "Name": "UCOB [巴哈姆特绝境战]",
+    "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
+    "Version": "0.0.1.8",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
+    "Note": "",
+    "UpdateInfo": "没有改动任何东西，只是删掉了一长串更新日志Note。",
+    "TerritoryIds": [
+      733
+    ]
+  },
+  {
+    "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",
+    "Guid": "e24a0c8b-5c41-4e58-87c3-355f1f925986",
+    "Version": "0.0.0.5",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ZodiarkEx.cs",
+    "Note": "",
+    "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。",
+    "TerritoryIds": [
+      993
+    ]
+  },
+  {
+    "Name": "Rubicante-Ex [卢比坎特歼殛战]",
+    "Guid": "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d",
+    "Version": "0.0.0.3",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/RubicanteEx.cs",
+    "Note": "",
+    "UpdateInfo": "1. 修改了一个不影响绘图的程序编写bug。\n2. 修改了中圈旋转时可能不绘图的bug。",
+    "TerritoryIds": [
+      1096
+    ]
+  },
+  {
+    "Name": "Rubicante [卢比坎特歼灭战]",
+    "Guid": "dd6bb7eb-c051-4406-8ec3-ff3523c753ee",
+    "Version": "0.0.0.1",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Rubicante.cs",
+    "Note": "",
+    "UpdateInfo": "大转盘必须Imgui。鸭门。",
+    "TerritoryIds": [
+      1095
+    ]
+  },
+  {
+    "Name": "Zodiark [佐迪亚克歼灭战]",
+    "Guid": "ed3f32fe-fc12-4485-baa4-bec6c357e70b",
+    "Version": "0.0.0.2",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Zodiark.cs",
+    "Note": "",
+    "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。",
+    "TerritoryIds": [
+      992
+    ]
+  },
+  {
+    "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
+    "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
+    "Version": "0.0.0.10",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
+    "Note": "",
+    "UpdateInfo": "1. 增加纯洁心灵、P4、P5一运穿天接线指路。",
+    "TerritoryIds": [
+      968
+    ]
+  },
+  {
+    "Name": "ASS [异闻希拉狄哈水道]",
+    "Guid": "bdd73dbd-2a93-4232-9324-0c9093d4a646",
+    "Version": "0.0.1.0",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
+    "Note": "",
+    "UpdateInfo": "1. 初版完成，包含机制绘图与指路，适配异闻与异闻零式。\n鸭门。",
+    "TerritoryIds": [
+      1075,
+      1076
+    ]
+  },
+  {
+    "Name": "AMR [异闻六根山]",
+    "Guid": "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45",
+    "Version": "0.0.0.1",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/AMR/AMR.cs",
+    "Note": "",
+    "UpdateInfo": "1. 初版完成。\n鸭门。",
+    "TerritoryIds": [
+      1155,
+      1156
+    ]
+  },
+  {
+    "Name": "QueenEternalEx [永恒女王忆想歼灭战]",
+    "Guid": "45fff289-e23d-41ab-9039-71cd310668e4",
+    "Version": "0.0.0.9",
+    "Author": "Usami",
+    "Repo": "https://github.com/lianying1997/UsamisKodakku",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/QueenEternal/QueenEternalEx.cs",
+    "Note": "绝对君权为正攻，若逃课请忽略核爆远离指路箭头。\r\n针对土阶段涉及优先级的踩塔判断，可以开启用户设置中“土阶段四人塔智能优先级判断”。\r\n若不使用此功能，请确认小队列表排序正确（特别关注D1/D2），避免踩塔指路错误。\r\n鸭门。",
+    "UpdateInfo": "1. 增加了分治法第二段引导绘图。",
+    "TerritoryIds": [
+      1243
+    ]
+  }
+]
