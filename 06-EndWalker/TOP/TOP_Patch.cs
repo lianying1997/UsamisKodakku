@@ -1,26 +1,21 @@
 using System;
-using System.Linq;
-using System.Numerics;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent.Struct;
+using KodakkuAssist.Module.Draw;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
-using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
-using Newtonsoft.Json;
-using Dalamud.Utility.Numerics;
 using ECommons;
+using System.Numerics;
+using Newtonsoft.Json;
+using System.Linq;
+using System.ComponentModel;
+using System.Xml.Linq;
+using Dalamud.Utility.Numerics;
+using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
-using KodakkuAssist.Script;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using KodakkuAssist.Module.GameOperate;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.TOP;
@@ -28,7 +23,8 @@ namespace UsamisKodakku.Scripts._06_EndWalker.TOP;
 [ScriptType(name: Name, territorys: [1122], guid: "b688fd29-786e-4103-82a3-7ad786af433b", 
     version: Version, author: "Usami", note: NoteStr)]
 
-// ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
+// ^(?!.*\|F).*
+// ^\[\w+\|[^|]+\|E\]\s\w+
 
 public class TopPatch
 {
@@ -60,9 +56,12 @@ public class TopPatch
     public static ScriptColor PosColorNormal { get; set; } = new() { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new() { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
-    
+
+    private static readonly bool LocalTest = true;
+    private static readonly bool LocalStrTest = true;     // 本地不标点，仅用字符串表示。
+
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
-    private TopPhase _phase = TopPhase.Init;
+    private static TopPhase _phase = TopPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private static DeltaVersion _dv = new();
@@ -77,19 +76,68 @@ public class TopPatch
         accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
         _phase = TopPhase.Init;
         _events = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList();
+        
+        LocalMarkClear(accessory);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }
 
     [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
-    public void EchoDebug(Event @event, ScriptAccessory accessory)
+    public void EchoDebugActive(Event @event, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
         // ---- DEBUG CODE ----
-        
-
+        accessory.DebugMsg($"Debug操作。", DebugMode);
         // -- DEBUG CODE END --
     }
+    [ScriptMethod(name: "随时DEBUG用 删除本地标点", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=CLEAR"], userControl: false)]
+    public void EchoDebugClearLocal(Event @event, ScriptAccessory accessory)
+    {
+        if (!DebugMode) return;
+        // ---- DEBUG CODE ----
+        accessory.DebugMsg($"删除绘图与标点 Local。", DebugMode);
+        LocalMarkClear(accessory);
+        accessory.Method.RemoveDraw(".*");
+        // -- DEBUG CODE END --
+    }
+
+    #region P5 全局
+    
+    [ScriptMethod(name: "潜能量层数记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3444"], userControl: false)]
+    public void P5_DynamicRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (!IsInPhase5(_phase)) return;
+        var tid = @event.TargetId();
+        var tidx = accessory.GetPlayerIdIndex(tid);
+        _dyn.AddDynamicBuffLevel(tidx);
+    }
+    
+    [ScriptMethod(name: "世界记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(344[23])$"], userControl: false)]
+    public void P5_HelloWorldFarNearRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (!IsInPhase5(_phase)) return;
+        lock (_dyn)
+        {
+            var stid = (StatusId)@event.StatusId();
+            var tid = @event.TargetId();
+            var tidx = accessory.GetPlayerIdIndex(tid);
+            switch (stid)
+            {
+                case StatusId.FarWorld:
+                    _dyn.SetFarSource(tidx);
+                    break;
+                case StatusId.NearWorld:
+                    _dyn.SetNearSource(tidx);
+                    break;
+            }
+
+            // 如果世界记录完毕，发送Set
+            if (_dyn.WorldRecordComplete())
+                _events[(int)RecordedIdx.WorldRecord].Set();
+        }
+    }
+    
+    #endregion P5 全局
     
     #region P5 一运
     
@@ -99,115 +147,209 @@ public class TopPatch
     {
     }
     
-    [ScriptMethod(name: "潜能量层数记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3444"], userControl: false)]
-    public void P5_DynamicRecord(Event @event, ScriptAccessory accessory)
-    {
-        if (!IsInPhase5(_phase)) return;
-        var tid = @event.TargetId();
-        var tidx = accessory.GetPlayerIdIndex(tid);
-        _dyn.AddDynamicBuffLevel(tidx);
-        accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(tidx)}的潜能量增加了，目前为{_dyn.GetDynamicBuffLevelCount(tidx)}",
-            DebugMode);
-    }
-    
     [ScriptMethod(name: "一运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
     public void P5_RunMi_Delta_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
-        _phase = TopPhase.P5_Delta;
+        _phase = TopPhase.P5_DeltaVersion;
         _dyn = new DynamicsPass();
+        _dyn.Init(accessory);
         _dv = new DeltaVersion();
+        _dv.Init(accessory);
+        
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
-    [ScriptMethod(name: "一运 远近线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(200|201)$"], userControl: false)]
+    [ScriptMethod(name: "一运 远近线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(00C[89])$"], userControl: false)]
     public void P5_Delta_LocalRemoteTetherRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Delta) return;
-        var tetherId = (TetherId)@event.Id();
-        var targetId = @event.TargetId();
-        var sourceId = @event.SourceId();
+        if (_phase != TopPhase.P5_DeltaVersion) return;
 
-        switch (tetherId)
+        lock (_dv)
         {
-            case TetherId.LocalTetherPrep:
-                _dv.LocalTetherTargetAdd(sourceId);
-                _dv.LocalTetherTargetAdd(targetId);
-                break;
-            case TetherId.RemoteTetherPrep:
-                _dv.RemoteTetherTargetAdd(sourceId);
-                _dv.RemoteTetherTargetAdd(targetId);
-                break;
+            var tetherId = (TetherId)@event.Id();
+            var targetId = @event.TargetId();
+            var targetIdx = accessory.GetPlayerIdIndex(targetId);
+            var sourceId = @event.SourceId();
+            var sourceIdx = accessory.GetPlayerIdIndex(sourceId);
+            
+            switch (tetherId)
+            {
+                case TetherId.LocalTetherPrep:
+                    _dv.LocalTetherTargetAdd(sourceIdx);
+                    _dv.LocalTetherTargetAdd(targetIdx);
+                    break;
+                case TetherId.RemoteTetherPrep:
+                    _dv.RemoteTetherTargetAdd(sourceIdx);
+                    _dv.RemoteTetherTargetAdd(targetIdx);
+                    break;
+            }
+
+            // 如果8人远近线记录完毕，发送Set
+            if (_dv.TetherRecordComplete())
+                _events[(int)RecordedIdx.DeltaTetherRecord].Set();
         }
     }
     
-    [ScriptMethod(name: "一二传 世界记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(344[23])$"], userControl: false)]
-    public void P5_HelloWorldFarNearRecord(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "一运 计算头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
+    public void P5_DeltaVersionMarker(Event @event, ScriptAccessory accessory)
     {
-        if (!IsInPhase5(_phase)) return;
-        if (_phase == TopPhase.P5_Omega) return;
-        var stid = (StatusId)@event.StatusId();
-        var targetId = @event.TargetId();
-        switch (stid)
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        if (@event.TargetId() != accessory.Data.Me) return;
+        lock (_events)
         {
-            case StatusId.FarWorld:
-                _dyn.SetFarSource(targetId);
-                break;
-            case StatusId.NearWorld:
-                _dyn.SetNearSource(targetId);
-                break;
+            // 接线与世界记录完毕，开始计算头标
+            _events[(int)RecordedIdx.DeltaTetherRecord].WaitOne();
+            _events[(int)RecordedIdx.WorldRecord].WaitOne();
         }
+
+        lock (_dv)
+        {
+            if (CaptainMode)
+            {
+                // 远近世界组程序内交换检查
+                _dv.SwapCheck();
+                // 在指挥模式下，建立标点逻辑并标点
+                _dv.BuildDeltaMarker();
+                MarkAllPlayers(_dv.GetMarkers(), accessory);
+                // 标志Delta运动会标点完毕
+                _events[(int)RecordedIdx.DeltaMarkerComplete].Set();
+            }
+            _events[(int)RecordedIdx.DeltaTetherRecord].Reset();
+            _events[(int)RecordedIdx.WorldRecord].Reset();
+        }
+    }
+    
+    [ScriptMethod(name: "一运 定位光头", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"], userControl: false)]
+    public void P5_DeltaVersionFindOmegaBald(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        var spos = @event.SourcePosition();
+        var dir = spos.Position2Dirs(Center, 4);
+        _dv.OmegaBaldDirection = dir;
     }
     
     public class DeltaVersion
     {
         public ScriptAccessory accessory { get; set; } = null!;
         // 数大在外，锁2近世界
-        private List<uint> RemoteTetherInside { get; set; } = [];
-        private List<uint> RemoteTetherOutside { get; set; } = [];
-        private List<uint> LocalTetherInside { get; set; } = [];
-        private List<uint> LocalTetherOutside { get; set; } = [];
+        private List<int> RemoteTetherInside { get; set; } = [];
+        private List<int> RemoteTetherOutside { get; set; } = [];
+        private List<int> LocalTetherInside { get; set; } = [];
+        private List<int> LocalTetherOutside { get; set; } = [];
         // 以光头为北的左，为场地北，A侧
-        public List<uint> TetherUp { get; set; } = [];
-        public List<uint> TetherDown { get; set; } = [];
+        public List<int> TetherUp { get; set; } = [];
+        public List<int> TetherDown { get; set; } = [];
+        private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
+        
+        public int OmegaBaldDirection = 0;
 
+        public void Init(ScriptAccessory _accessory)
+        {
+            accessory = _accessory;
+        }
+        
         /// <summary>
         /// 添加近线玩家单位
         /// </summary>
-        /// <param name="id">玩家ID</param>
-        public void LocalTetherTargetAdd(uint id)
+        /// <param name="idx">玩家IDX</param>
+        public void LocalTetherTargetAdd(int idx)
         {
             if (LocalTetherInside.Count < 2)
             {
-                LocalTetherInside.Add(id);
-                LocalTetherInside = SortByPartyList(LocalTetherInside, accessory);
+                LocalTetherInside.Add(idx);
+                LocalTetherInside.Sort();
             }
             else
             {
-                LocalTetherOutside.Add(id);
-                LocalTetherOutside = SortByPartyList(LocalTetherOutside, accessory);
+                LocalTetherOutside.Add(idx);
+                LocalTetherOutside.Sort();
             }
         }
     
         /// <summary>
         /// 添加远线玩家单位
         /// </summary>
-        /// <param name="id">玩家ID</param>
-        public void RemoteTetherTargetAdd(uint id)
+        /// <param name="idx">玩家IDX</param>
+        public void RemoteTetherTargetAdd(int idx)
         {
             if (RemoteTetherInside.Count < 2)
             {
-                RemoteTetherInside.Add(id);
-                RemoteTetherInside = SortByPartyList(RemoteTetherInside, accessory);
+                RemoteTetherInside.Add(idx);
+                RemoteTetherInside.Sort();
             }
             else
             {
-                RemoteTetherOutside.Add(id);
-                RemoteTetherOutside = SortByPartyList(RemoteTetherOutside, accessory);
+                RemoteTetherOutside.Add(idx);
+                RemoteTetherOutside.Sort();
             }
+        }
+
+        public bool TetherRecordComplete()
+        {
+            return RemoteTetherInside.Count == 2 && LocalTetherInside.Count == 2 &&
+                   RemoteTetherOutside.Count == 2 && LocalTetherOutside.Count == 2;
+        }
+
+        public void SwapCheck()
+        {
+            // 检查是否需Swap
+            // 远世界被标锁链1，若远世界目标处于RemoteTetherOutside内，需要交换。
+            var farSourceIdx = _dyn.GetFarSource()[0];
+            var needSwap = RemoteTetherOutside.Contains(farSourceIdx);
+            if (needSwap)
+            {
+                // RemoteTetherInside 与 RemoteTetherOutside 交换。
+                (RemoteTetherInside, RemoteTetherOutside) = (RemoteTetherOutside, RemoteTetherInside);
+                accessory.DebugMsg($"远世界被设定在外组，程序内交换。", DebugMode);
+            }
+            else
+                accessory.DebugMsg($"远世界被设定在内组，程序内无需交换。", DebugMode);
+        }
+
+        public void BuildDeltaMarker()
+        {
+            // 先获取近远世界idx，标锁链1、2
+            var farSourceIdx = _dyn.GetFarSource()[0];
+            SetMarkerBySelf(farSourceIdx, MarkType.Bind1);
+            var nearSourceIdx = _dyn.GetNearSource()[0];
+            SetMarkerBySelf(nearSourceIdx, MarkType.Bind2);
+            
+            // 获取近线玩家，标攻击1、2、3、4
+            SetMarkerBySelf(LocalTetherInside[0], MarkType.Attack1);
+            SetMarkerBySelf(LocalTetherInside[1], MarkType.Attack2);
+            SetMarkerBySelf(LocalTetherOutside[0], MarkType.Attack3);
+            SetMarkerBySelf(LocalTetherOutside[1], MarkType.Attack4);
+            
+            // 获取远世界搭档，标禁止1
+            var farSourcePartnerIdx =
+                RemoteTetherInside[0] == farSourceIdx ? RemoteTetherInside[1] : RemoteTetherInside[0];
+            SetMarkerBySelf(farSourcePartnerIdx, MarkType.Stop1);
+            
+            // 获取近世界搭档，标禁止2
+            var nearSourcePartnerIdx =
+                RemoteTetherOutside[0] == nearSourceIdx ? RemoteTetherOutside[1] : RemoteTetherOutside[0];
+            SetMarkerBySelf(nearSourcePartnerIdx, MarkType.Stop2);
+        }
+        
+        public void SetMarkerFromOut(int idx, MarkType marker)
+        {
+            Marker[idx] = marker;
+            accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobByIndex(idx)}为{marker}", DebugMode);
+        }
+
+        public void SetMarkerBySelf(int idx, MarkType marker)
+        {
+            Marker[idx] = marker;
+            accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobByIndex(idx)}为{marker}", DebugMode);
+        }
+        
+        public List<MarkType> GetMarkers()
+        {
+            return Marker;
         }
     }
     
-    #endregion
+    #endregion P5 一运
 
     #region P5 二运
     
@@ -220,21 +362,19 @@ public class TopPatch
     [ScriptMethod(name: "二运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(32788)$"], userControl: false)]
     public void P5_RunMi_Sigma_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
-        _phase = TopPhase.P5_Sigma;
+        _phase = TopPhase.P5_SigmaVersion;
         _sv = new SigmaVersion();
         _sv.Init(accessory);
         _sw = new SigmaWorld();
         _sw.Init(accessory);
-        
-        _dyn.DynamicIdxAdd();
-        _dyn.Reset();
+        _dyn.ClearWorldList();
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
     [ScriptMethod(name: "二运 中远线记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(342[78])$"], userControl: false)]
     public void P5_GlitchRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         var stid = (StatusId)@event.StatusId();
         var tid = @event.TargetId();
         if (tid != accessory.Data.Me) return;
@@ -245,7 +385,7 @@ public class TopPatch
     [ScriptMethod(name: "二运 索尼标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(01A[0123])$"], userControl: false)]
     public void P5_SonyIconRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         var id = (IconId)@event.Id();
         var tid = @event.TargetId();
         var tidx = accessory.GetPlayerIdIndex(tid);
@@ -260,7 +400,7 @@ public class TopPatch
     [ScriptMethod(name: "二运 八方炮点名标记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(00F4)$"], userControl: false)]
     public void P5_SigmaCannonIconRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         var tid = @event.TargetId();
         var tidx = accessory.GetPlayerIdIndex(tid);
         lock (_sv)
@@ -274,7 +414,7 @@ public class TopPatch
     [ScriptMethod(name: "二运 男人真北位置记录", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:15720"], userControl: false)]
     public void P5_OmegaTrueNorthRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         var spos = @event.SourcePosition();
         var pos = spos.Position2Dirs(Center, 16);
         _sv.SetSpreadTrueNorth(pos);
@@ -283,23 +423,29 @@ public class TopPatch
     [ScriptMethod(name: "二运 索尼头标计算", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"], userControl: false)]
     public void P5_SigmaVersionMarker(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         lock (_events)
         {
             // 索尼标记、激光炮标记记录完毕后
             _events[(int)RecordedIdx.SigmaTargetRecord].WaitOne();
             _events[(int)RecordedIdx.SigmaSonyRecord].WaitOne();
         }
-        // 找到未被点名的两人
-        _sv.BuildUntargetedGroup();
-        if (CaptainMode)
+
+        lock (_sv)
         {
-            // 在指挥模式下，为两人标点
-            _sv.BuildMarker();
-            MarkAllPlayers(_sv.GetMarkers(), accessory);
+            // 找到未被点名的两人
+            _sv.BuildUntargetedGroup();
+            if (CaptainMode)
+            {
+                // 在指挥模式下，为两人标点
+                // TODO：非指挥模式下，无需标点，可直接进行后续运算。但是算式逻辑待补充。
+                _sv.BuildMarker();
+                MarkAllPlayers(_sv.GetMarkers(), accessory);
+            }
+            _sv.FindSpreadTarget();
+            _sv.CalcSpreadPos(Center);
         }
-        _sv.FindSpreadTarget();
-        _sv.CalcSpreadPos(Center);
+
         lock (_events)
         {
             _events[(int)RecordedIdx.SigmaSonyMarker].Set();
@@ -309,7 +455,7 @@ public class TopPatch
     [ScriptMethod(name: "二运 八方分散指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31603"])]
     public void P5_SigmaVersionSpreadDir(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         lock (_events)
         {
             _events[(int)RecordedIdx.SigmaSonyMarker].WaitOne();
@@ -323,7 +469,7 @@ public class TopPatch
     [ScriptMethod(name: "二运 塔生成记录", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["DataId:regex:^(201324[56])$", "Operate:Add"], userControl: false)]
     public void P5_SigmaTowerRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         var id = (DataId)@event.DataId();
         var spos = @event.SourcePosition();
         _sv.SetTowerType(id, spos, Center);
@@ -333,7 +479,7 @@ public class TopPatch
     public void P5_SigmaTowerCalc(Event @event, ScriptAccessory accessory)
     {
         // 因为计算不对后续机制造成影响，所以可以放在一个事件检测里
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         _sv.BuildTargetTowerPos();
         _sv.CalcTargetTowerPos(Center);
         DrawSigmaTowerSolution(accessory);
@@ -342,9 +488,9 @@ public class TopPatch
     [ScriptMethod(name: "二运 前半头标消除，计算二传头标", eventType: EventTypeEnum.KnockBack, userControl: false)]
     public void P5_SigmaVersionMarkClear(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         if (!CaptainMode) return;
-        accessory.Method.MarkClear();
+        MarkClear(accessory);
         accessory.Method.RemoveDraw(".*");
         _sw.CalcMarker();
         // TODO 二传算头标
@@ -353,7 +499,7 @@ public class TopPatch
     [ScriptMethod(name: "二传 标头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:3149[23]"], userControl: false)]
     public void P5_SigmaWorldMarker(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_Sigma) return;
+        if (_phase != TopPhase.P5_SigmaVersion) return;
         _phase = TopPhase.P5_SigmaWorld;
         if (@event.SourceId() != accessory.Data.Me) return;
         if (!CaptainMode) return;
@@ -372,9 +518,7 @@ public class TopPatch
         {
             var player = accessory.Data.PartyList[i];
             str += $"为{accessory.GetPlayerJobById(player)}标上{marker[i]}\n";
-            
-            // todo 测试完成后，删除该注释
-            // accessory.Method.Mark(player, marker[i]);
+            MarkPlayerByIdx(accessory, i, marker[i]);
         }
         str += "---------MarkAllPlayers----------\n";
         accessory.DebugMsg(str, DebugMode);
@@ -661,11 +805,10 @@ public class TopPatch
             accessory.DebugMsg(str, DebugMode);
         }
 
-        public void SetMarkerFromOut(uint id, MarkType marker)
+        public void SetMarkerFromOut(int idx, MarkType marker)
         {
-            var idx = accessory.GetPlayerIdIndex(id);
             Marker[idx] = marker;
-            accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobById(id)}为{marker}", DebugMode);
+            accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobByIndex(idx)}为{marker}", DebugMode);
         }
 
         public void SetMarkerBySelf(int idx, MarkType marker)
@@ -732,21 +875,44 @@ public class TopPatch
             return IsTargeted.Count(x => x) == 6;
         }
     }
+    
+    public class SigmaWorld
+    {
+        public ScriptAccessory accessory { get; set; } = null!;
+        private int OmegaFemalePos { get; set; } = 0;
+        private bool OmegaFemaleInsideSafe { get; set; } = false;
+        private List<int>? _dynamicBuffLevel;
+    
+        public void Init(ScriptAccessory _accessory)
+        {
+            accessory = _accessory;
+        }
+    
+        public void CalcMarker()
+        {
+            // GetDynamicBuffLevel(_dyn);
+        }
 
-    #endregion
+        private void GetDynamicBuffLevel(DynamicsPass dyn)
+        {
+            _dynamicBuffLevel = dyn.GetBuffLevelList();
+        }
+    }
+
+    #endregion P5 二运
     
     [ScriptMethod(name: "P5 三运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(32789)$"], userControl: false)]
     public void P5_RunMi_Omega_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
-        _phase = TopPhase.P5_Omega;
+        _phase = TopPhase.P5_OmegaVersion;
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
     
     private static bool IsInPhase5(TopPhase phase)
     {
-        return phase is TopPhase.P5_Delta or TopPhase.P5_DeltaWorld or 
-            TopPhase.P5_Sigma or TopPhase.P5_SigmaWorld or 
-            TopPhase.P5_Omega or TopPhase.P5_OmegaWorldA or TopPhase.P5_OmegaWorldB;
+        return phase is TopPhase.P5_DeltaVersion or TopPhase.P5_DeltaWorld or 
+            TopPhase.P5_SigmaVersion or TopPhase.P5_SigmaWorld or 
+            TopPhase.P5_OmegaVersion or TopPhase.P5_OmegaWorldA or TopPhase.P5_OmegaWorldB;
     }
 
     #region General Functions
@@ -756,85 +922,158 @@ public class TopPatch
         return unsortedList.OrderBy(x => accessory.Data.PartyList.IndexOf(x)).ToList();
     }
 
-    #endregion
-}
+    private static void LocalMarkClear(ScriptAccessory accessory)
+    {
+        accessory.Method.Mark(0xE000000, MarkType.Attack1, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack2, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack3, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack4, true);
+        accessory.Method.Mark(0xE000000, MarkType.Bind1, true);
+        accessory.Method.Mark(0xE000000, MarkType.Bind2, true);
+        accessory.Method.Mark(0xE000000, MarkType.Stop1, true);
+        accessory.Method.Mark(0xE000000, MarkType.Stop2, true);
+        accessory.Method.Mark(0xE000000, MarkType.Square, true);
+    }
 
-public class SigmaWorld
-{
-    public ScriptAccessory accessory { get; set; } = null!;
-    private int OmegaFemalePos { get; set; } = 0;
-    private bool OmegaFemaleInsideSafe { get; set; } = false;
-    private List<int>? _dynamicBuffLevel;
+    private static void MarkClear(ScriptAccessory accessory)
+    {
+        if (!CaptainMode)
+        {
+            accessory.DebugMsg($"未开启柯基模式，清除标点无效。", DebugMode);
+            return;
+        }
+        if (LocalTest)
+        {
+            accessory.DebugMsg($"本地测试删除标点。");
+            if (LocalStrTest) return;
+            LocalMarkClear(accessory);
+        }
+        else
+        {
+            accessory.Method.MarkClear();
+            accessory.DebugMsg($"全局测试删除标点。");
+        }
+    }
+
+    private static void MarkPlayerByIdx(ScriptAccessory accessory, int idx, MarkType marker)
+    {
+        if (!CaptainMode)
+        {
+            accessory.DebugMsg($"未开启柯基模式，标点无效。", DebugMode);
+            return;
+        }
+        if (LocalTest)
+        {
+            if (LocalStrTest) return;
+            accessory.Method.Mark(accessory.Data.PartyList[idx], marker, true);
+        }
+        else
+        {
+            accessory.Method.Mark(accessory.Data.PartyList[idx], marker);
+        }
+    }
     
-    public void Init(ScriptAccessory _accessory)
+    private static void MarkPlayerById(ScriptAccessory accessory, uint id, MarkType marker)
     {
-        accessory = _accessory;
+        if (!CaptainMode)
+        {
+            accessory.DebugMsg($"未开启柯基模式，标点无效。", DebugMode);
+            return;
+        }
+        if (LocalTest)
+        {
+            if (LocalStrTest) return;
+            accessory.Method.Mark(id, marker, true);
+        }
+        else
+        {
+            accessory.Method.Mark(id, marker);
+        }
     }
     
-    public void CalcMarker()
+    public class DynamicsPass
     {
-        // GetDynamicBuffLevel(_dyn);
-    }
-
-    private void GetDynamicBuffLevel(DynamicsPass dyn)
-    {
-        _dynamicBuffLevel = dyn.GetBuffLevelList();
-    }
-}
-
-public class DynamicsPass
-{
-    private int DynamicIdx { get; set; } = 0;
-    private List<int> BuffLevel { get; set; } = [0, 0, 0, 0, 0, 0, 0, 0];
-    private uint FarSource { get; set; } = 0;
-    private uint NearSource { get; set; } = 0;
-    private List<uint> FarTarget { get; set; } = [];
-    private List<uint> NearTarget { get; set; } = [];
-    private List<uint> FreeTarget { get; set; } = [];
+        public ScriptAccessory accessory { get; set; } = null!;
+        private int DynamicCount { get; set; } = 0;
+        private int WorldCount { get; set; } = 0;
+        private List<int> BuffLevel { get; set; } = Enumerable.Repeat(0, 8).ToList();
+        private List<int> FarSource { get; set; } = [];
+        private List<int> NearSource { get; set; } = [];
+        private List<int> FarTarget { get; set; } = [];
+        private List<int> NearTarget { get; set; } = [];
+        private List<int> FreeTarget { get; set; } = [];
     
-    public void DynamicIdxAdd()
-    {
-        DynamicIdx++;
+        public void Init(ScriptAccessory _accessory)
+        {
+            accessory = _accessory;
+            DynamicCount = 0;
+            WorldCount = 0;
+            BuffLevel = Enumerable.Repeat(0, 8).ToList();
+        }
+        public void ClearWorldList()
+        {
+            FarSource.Clear();
+            NearSource.Clear();
+            FreeTarget.Clear();
+            FarTarget.Clear();
+            NearTarget.Clear();
+        }
+        public List<int> GetBuffLevelList()
+        {
+            return BuffLevel;
+        }
+        public void AddDynamicBuffLevel(int idx)
+        {
+            accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(idx)}的潜能量增加了，目前为{GetDynamicBuffLevelCount(idx)}",
+                DebugMode);
+            BuffLevel[idx]++;
+            DynamicCount++;
+        }
+        public int GetDynamicBuffLevelCount(int idx)
+        {
+            return BuffLevel[idx];
+        }
+        public void SetFarSource(int idx)
+        {
+            FarSource.Add(idx);
+            WorldCount++;
+        }
+        public void SetNearSource(int idx)
+        {
+            NearSource.Add(idx);
+            WorldCount++;
+        }
+        public List<int> GetFarSource()
+        {
+            return FarSource;
+        }
+        public List<int> GetNearSource()
+        {
+            return NearSource;
+        }
+        public bool WorldRecordComplete()
+        {
+            return _phase switch
+            {
+                TopPhase.P5_DeltaVersion => WorldCount == 2,
+                TopPhase.P5_SigmaVersion => WorldCount == 4,
+                TopPhase.P5_OmegaVersion => WorldCount == 8,
+                _ => true
+            };
+        }
     }
-
-    public void Reset()
-    {
-        FarSource = 0;
-        NearSource = 0;
-        FreeTarget.Clear();
-        FarTarget.Clear();
-        NearTarget.Clear();
-    }
-    public List<int> GetBuffLevelList()
-    {
-        return BuffLevel;
-    }
-    public void AddDynamicBuffLevel(int idx)
-    {
-        BuffLevel[idx]++;
-    }
-    public int GetDynamicBuffLevelCount(int idx)
-    {
-        return BuffLevel[idx];
-    }
-    public void SetFarSource(uint id)
-    {
-        FarSource = id;
-    }
-    public void SetNearSource(uint id)
-    {
-        NearSource = id;
-    }
+    
+    #endregion General Functions
 }
 
 public enum TopPhase : uint
 {
     Init,                   // 初始
-    P5_Delta,               // P5 一运
+    P5_DeltaVersion,        // P5 一运
     P5_DeltaWorld,          // P5 二传
-    P5_Sigma,               // P5 二运
+    P5_SigmaVersion,        // P5 二运
     P5_SigmaWorld,          // P5 二传
-    P5_Omega,               // P5 三运
+    P5_OmegaVersion,        // P5 三运
     P5_OmegaWorldA,         // P5 三传
     P5_OmegaWorldB,         // P5 四传
     P5_BlindFaith,          // P5 盲信
@@ -902,6 +1141,9 @@ public enum RecordedIdx : int
     SigmaSonyMarker = 0,
     SigmaSonyRecord = 1,
     SigmaTargetRecord = 2,
+    DeltaTetherRecord = 3,
+    WorldRecord = 4,
+    DeltaMarkerComplete = 5,
 }
 
 #region 函数集

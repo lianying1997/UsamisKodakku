@@ -25,24 +25,28 @@ using KodakkuAssist.Module.Script.Type;
 namespace UsamisKodakku.Scripts._06_EndWalker.DSR;
 
 [ScriptType(name: Name, territorys: [968, 1112], guid: "cc6fb606-ff7b-4739-81aa-4861b204ab1e", 
-    version: Version, author: "Usami", note: NoteStr)]
+    version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*$
 
 public class DsrPatch
 {
-    const string NoteStr =
-    """
-    基于K佬绝龙诗绘图的个人向补充，
-    请先按需求检查并设置“用户设置”栏目。
-    开启Debug模式，在忆罪宫输入"/e =TST"可以测试地火特殊跑法。
-    鸭门。
-    """;
-
+    private const string NoteStr =
+        """
+        基于K佬绝龙诗绘图的个人向补充，
+        请先按需求检查并设置“用户设置”栏目。
+        开启Debug模式，在忆罪宫输入"/e =TST"可以测试地火特殊跑法。
+        鸭门。
+        """;
+    
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.10";
-    private const string DebugVersion = "f";
-    private const string Note = "纯洁心灵、P4、P5";
+    private const string Version = "0.0.0.11";
+    private const string DebugVersion = "a";
+    
+    private const string UpdateInfo =
+        """
+        1. 修复P6冰火双T死刑指路的概率性电椅问题。
+        """;
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -136,7 +140,7 @@ public class DsrPatch
     
     public void Init(ScriptAccessory accessory)
     {
-        accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
+        accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}", DebugMode);
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
         
@@ -1406,6 +1410,7 @@ public class DsrPatch
         if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
         _dsrPhase = DsrPhase.Phase6IceAndFire1;
         _p6DragonsGlowAction = [false, false];
+        _recorded = new bool[20].ToList();
         accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
     }
 
@@ -1416,6 +1421,7 @@ public class DsrPatch
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
         _dsrPhase = DsrPhase.Phase6IceAndFire2;
         _p6DragonsGlowAction = [false, false];
+        _recorded = new bool[20].ToList();
         accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
     }
 
