@@ -24,7 +24,7 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.7", author: "Usami", note: noteStr)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.8", author: "Usami", note: noteStr)]
 
 public class p12s
 {
@@ -32,24 +32,6 @@ public class p12s
     """
     请先按需求检查并设置“用户设置”栏目。
     门神到超链后对话，本体到黑白塔。
-    v0.0.0.7
-    为了7.1编译成功的尝试。
-    
-    v0.0.0.6
-    1. 调整迭代次数随实际人数变更，避免报错弹出。
-
-    v0.0.0.5
-    1. 增加黑白塔指路（G8）。
-
-    v0.0.0.4:
-    1. 修复一风火可能不绘图的BUG。
-
-    v0.0.0.3:
-    1. 本体到一地火。
-
-    v0.0.0.2:
-    1. 一范添加“正攻/无敌改/无敌”打法，于用户设置中设置。
-    2. 修复超链黑白分摊位置提示错误Bug。
     鸭门。
     """;
 
@@ -2027,7 +2009,7 @@ public class p12s
 
     private void calcCaloricPriority()
     {
-        for (int i = 0; i < 8; i++)
+        for (var i = 0; i < 8; i++)
         {
             if (mb_Caloric_isWind[i])
             {
@@ -2061,8 +2043,10 @@ public class p12s
         var tid = @event.TargetId();
         var tidx = IndexHelper.getPlayerIdIndex(tid, accessory);
         // 二次火分摊一定在一次火中选
-        mb_Caloric_FirePriority[tidx] = mb_Caloric_FirePriority[tidx] + 10;
-
+        lock (mb_Caloric_FirePriority)
+        {
+            mb_Caloric_FirePriority[tidx] += 10;
+        }
     }
 
     [ScriptMethod(name: "本体：一风火，二次火分摊指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3590"])]
@@ -2106,7 +2090,8 @@ public class p12s
         bool needSwap = false;
         var fireTargets = mb_Caloric_FirePriority.Where(x => x > 10).Take(2).ToList();
 
-        if (fireTargets.Sum() % 2 == 0)
+        // 同左同右
+        if (fireTargets.Sum() % 10 == 5)
             needSwap = true;
 
         for (int i = 0; i < 8; i++)

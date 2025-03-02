@@ -15,12 +15,12 @@
   {
     "Name": "P12S [零式万魔殿 荒天之狱4]",
     "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
-    "Version": "0.0.0.7",
+    "Version": "0.0.0.8",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
-    "Note": "",
-    "UpdateInfo": "为了7.1编译成功的尝试。",
+    "Note": "请先按需求检查并设置“用户设置”栏目。\n门神到超链后对话，本体到黑白塔。\n鸭门。",
+    "UpdateInfo": "修复一风火最后一步无需换位却指路换位的bug。",
     "TerritoryIds": [
       1154
     ]
