@@ -990,6 +990,11 @@ public class TopPatch
             accessory.Method.Mark(id, marker);
         }
     }
+
+    private static int GetMarkedPlayerIndex(ScriptAccessory accessory, List<MarkType> markerList, MarkType marker)
+    {
+        return markerList.IndexOf(marker);
+    }
     
     public class DynamicsPass
     {
@@ -1051,6 +1056,34 @@ public class TopPatch
         {
             return NearSource;
         }
+
+        public void SetFarTarget(int idx)
+        {
+            FarTarget.Add(idx);
+        }
+
+        public void SetNearTarget(int idx)
+        {
+            NearTarget.Add(idx);
+        }
+
+        public void SetFreeTarget(int idx)
+        {
+            FreeTarget.Add(idx);
+        }
+        
+        public List<int> GetFarTarget()
+        {
+            return FarTarget;
+        }
+        public List<int> GetNearTarget()
+        {
+            return NearTarget;
+        }
+        public List<int> GetFreeTarget()
+        {
+            return FreeTarget;
+        }
         public bool WorldRecordComplete()
         {
             return _phase switch
@@ -1061,6 +1094,7 @@ public class TopPatch
                 _ => true
             };
         }
+        
     }
     
     #endregion General Functions
