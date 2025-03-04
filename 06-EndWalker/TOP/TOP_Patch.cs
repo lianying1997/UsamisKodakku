@@ -50,7 +50,7 @@ public class TopPatch
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
-    [UserSetting("是否开启柯基模式")]
+    [UserSetting("指挥模式")]
     public static bool CaptainMode { get; set; } = true;
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } = new() { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
@@ -141,12 +141,6 @@ public class TopPatch
     
     #region P5 一运
     
-    [ScriptMethod(name: "---- P5 一运 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
-        userControl: true)]
-    public void SplitLine_DeltaVersion(Event @event, ScriptAccessory accessory)
-    {
-    }
-    
     [ScriptMethod(name: "一运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
     public void P5_RunMi_Delta_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
@@ -190,58 +184,138 @@ public class TopPatch
         }
     }
     
-    [ScriptMethod(name: "一运 计算头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
-    public void P5_DeltaVersionMarker(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "一运 远近世界记录交换检查", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
+    public void P5_DeltaVersionSwapCheck(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_DeltaVersion) return;
         if (@event.TargetId() != accessory.Data.Me) return;
         lock (_events)
         {
-            // 接线与世界记录完毕，开始计算头标
+            // 接线与世界记录完毕后，检查是否交换
             _events[(int)RecordedIdx.DeltaTetherRecord].WaitOne();
             _events[(int)RecordedIdx.WorldRecord].WaitOne();
         }
 
         lock (_dv)
         {
-            if (CaptainMode)
-            {
-                // 远近世界组程序内交换检查
-                _dv.SwapCheck();
-                // 在指挥模式下，建立标点逻辑并标点
-                _dv.BuildDeltaMarker();
-                MarkAllPlayers(_dv.GetMarkers(), accessory);
-                // 标志Delta运动会标点完毕
-                _events[(int)RecordedIdx.DeltaMarkerComplete].Set();
-            }
+            _dv.SwapCheck();
             _events[(int)RecordedIdx.DeltaTetherRecord].Reset();
             _events[(int)RecordedIdx.WorldRecord].Reset();
+            _events[(int)RecordedIdx.DeltaSwapChecked].Set();
         }
     }
     
-    [ScriptMethod(name: "一运 定位光头", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"], userControl: false)]
+    [ScriptMethod(name: "一运 指挥模式计算头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
+    public void P5_DeltaVersionMarker(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        if (@event.TargetId() != accessory.Data.Me) return;
+        lock (_events)
+        {
+            _events[(int)RecordedIdx.DeltaSwapChecked].WaitOne();
+        }
+
+        lock (_dv)
+        {
+            if (CaptainMode)
+            {
+                // 在指挥模式下，建立标点逻辑
+                _dv.BuildDeltaMarker();
+                MarkAllPlayers(_dv.GetMarkers(), accessory);
+                
+                // 标志Delta运动会标点完毕
+                if (_dv.IsMarkedPlayerCountEqualsTo(8))
+                {
+                    _events[(int)RecordedIdx.DeltaSwapChecked].Reset();
+                    _events[(int)RecordedIdx.DeltaMarkerComplete].Set();
+                }
+            }
+        }
+    }
+    
+    [ScriptMethod(name: "一运 非指挥模式记录头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add"],
+        userControl: false)]
+    public void P5_DeltaVersionReceiveMarker(Event @event, ScriptAccessory accessory)
+    {
+        // TODO: eventCondition待修改
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        if (CaptainMode) return;
+        lock (_events)
+        {
+            _events[(int)RecordedIdx.DeltaSwapChecked].WaitOne();
+        }
+        lock (_dv)
+        {
+            var mark = @event.Id();
+            if ((MarkType)mark is MarkType.Stop1 or MarkType.Stop2) return;
+            
+            var tid = @event.TargetId();
+            var tidx = accessory.GetPlayerIdIndex(tid);
+            _dv.SetMarkerFromOut(tidx, (MarkType)mark);
+            if (!_dv.IsMarkedPlayerCountEqualsTo(6)) return;
+            
+            // 空闲的两个标记由自己标
+            _dv.BuildDeltaIdleMarker();
+            if (_dv.IsMarkedPlayerCountEqualsTo(8))
+            {
+                _events[(int)RecordedIdx.DeltaSwapChecked].Reset();
+                _events[(int)RecordedIdx.DeltaMarkerComplete].Set();
+            }
+        }
+    }
+    
+    [ScriptMethod(name: "一运 定位光头", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"],
+        userControl: false)]
     public void P5_DeltaVersionFindOmegaBald(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_DeltaVersion) return;
         var spos = @event.SourcePosition();
         var dir = spos.Position2Dirs(Center, 4);
         _dv.OmegaBaldDirection = dir;
+        _events[(int)RecordedIdx.OmegaBaldRecorded].Set();
     }
+    
+    [ScriptMethod(name: "一运 初始位置指路", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"],
+        userControl: true)]
+    public void P5_DeltaVersionFirstGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // TODO eventCondition无需修改 标点完成后指路
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        _events[(int)RecordedIdx.OmegaBaldRecorded].WaitOne();
+        _events[(int)RecordedIdx.DeltaMarkerComplete].WaitOne();
+
+        var myIndex = accessory.GetMyIndex();
+        
+        
+        // _dv.FirstGuidance();
+        _events[(int)RecordedIdx.OmegaBaldRecorded].Reset();
+        _events[(int)RecordedIdx.DeltaMarkerComplete].Reset();
+        
+    }
+    
+    [ScriptMethod(name: "一运 记录拳头", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"], userControl: false)]
+    public void P5_RocketPunchRecord(Event @event, ScriptAccessory accessory)
+    {
+        // TODO eventCondition待修改 记录每位玩家背后出现的拳头颜色
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+    }
+    
     
     public class DeltaVersion
     {
         public ScriptAccessory accessory { get; set; } = null!;
         // 数大在外，锁2近世界
-        private List<int> RemoteTetherInside { get; set; } = [];
-        private List<int> RemoteTetherOutside { get; set; } = [];
-        private List<int> LocalTetherInside { get; set; } = [];
-        private List<int> LocalTetherOutside { get; set; } = [];
+        public List<int> RemoteTetherInside { get; set; } = [];
+        public List<int> RemoteTetherOutside { get; set; } = [];
+        public List<int> LocalTetherInside { get; set; } = [];
+        public List<int> LocalTetherOutside { get; set; } = [];
         // 以光头为北的左，为场地北，A侧
         public List<int> TetherUp { get; set; } = [];
         public List<int> TetherDown { get; set; } = [];
         private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
         
         public int OmegaBaldDirection = 0;
+        private int MarkedPlayerCount { get; set; } = 0;
 
         public void Init(ScriptAccessory _accessory)
         {
@@ -320,6 +394,13 @@ public class TopPatch
             SetMarkerBySelf(LocalTetherOutside[0], MarkType.Attack3);
             SetMarkerBySelf(LocalTetherOutside[1], MarkType.Attack4);
             
+            BuildDeltaIdleMarker();
+        }
+        public void BuildDeltaIdleMarker()
+        {
+            var farSourceIdx = _dyn.GetFarSource()[0];
+            var nearSourceIdx = _dyn.GetNearSource()[0];
+            
             // 获取远世界搭档，标禁止1
             var farSourcePartnerIdx =
                 RemoteTetherInside[0] == farSourceIdx ? RemoteTetherInside[1] : RemoteTetherInside[0];
@@ -334,13 +415,20 @@ public class TopPatch
         public void SetMarkerFromOut(int idx, MarkType marker)
         {
             Marker[idx] = marker;
+            MarkedPlayerCount++;
             accessory.DebugMsg($"从外部获得{accessory.GetPlayerJobByIndex(idx)}为{marker}", DebugMode);
         }
 
         public void SetMarkerBySelf(int idx, MarkType marker)
         {
             Marker[idx] = marker;
+            MarkedPlayerCount++;
             accessory.DebugMsg($"于内部设置{accessory.GetPlayerJobByIndex(idx)}为{marker}", DebugMode);
+        }
+
+        public bool IsMarkedPlayerCountEqualsTo(int count)
+        {
+            return MarkedPlayerCount == count;
         }
         
         public List<MarkType> GetMarkers()
@@ -434,14 +522,14 @@ public class TopPatch
         lock (_sv)
         {
             // 找到未被点名的两人
-            _sv.BuildUntargetedGroup();
             if (CaptainMode)
             {
+                _sv.BuildUntargetedGroup();
                 // 在指挥模式下，为两人标点
                 // TODO：非指挥模式下，无需标点，可直接进行后续运算。但是算式逻辑待补充。
-                _sv.BuildMarker();
-                MarkAllPlayers(_sv.GetMarkers(), accessory);
+                _sv.BuildSimgaMarker();
             }
+            MarkAllPlayers(_sv.GetMarkers(), accessory);
             _sv.FindSpreadTarget();
             _sv.CalcSpreadPos(Center);
         }
@@ -513,15 +601,10 @@ public class TopPatch
     /// <param name="accessory"></param>
     private static void MarkAllPlayers(List<MarkType> marker, ScriptAccessory accessory)
     {
-        var str = "";
         for (var i = 0; i < 8; i++)
         {
-            var player = accessory.Data.PartyList[i];
-            str += $"为{accessory.GetPlayerJobById(player)}标上{marker[i]}\n";
             MarkPlayerByIdx(accessory, i, marker[i]);
         }
-        str += "---------MarkAllPlayers----------\n";
-        accessory.DebugMsg(str, DebugMode);
     }
     
     /// <summary>
@@ -718,7 +801,7 @@ public class TopPatch
             return chosenGroup.FirstOrDefault(player => player != idx);
         }
 
-        public void BuildMarker()
+        public void BuildSimgaMarker()
         {
             // 无点名二人
             var playerAttack1 = UntargetedGroup[0];
@@ -928,20 +1011,24 @@ public class TopPatch
         accessory.Method.Mark(0xE000000, MarkType.Attack2, true);
         accessory.Method.Mark(0xE000000, MarkType.Attack3, true);
         accessory.Method.Mark(0xE000000, MarkType.Attack4, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack5, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack6, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack7, true);
+        accessory.Method.Mark(0xE000000, MarkType.Attack8, true);
         accessory.Method.Mark(0xE000000, MarkType.Bind1, true);
         accessory.Method.Mark(0xE000000, MarkType.Bind2, true);
+        accessory.Method.Mark(0xE000000, MarkType.Bind3, true);
         accessory.Method.Mark(0xE000000, MarkType.Stop1, true);
         accessory.Method.Mark(0xE000000, MarkType.Stop2, true);
         accessory.Method.Mark(0xE000000, MarkType.Square, true);
+        accessory.Method.Mark(0xE000000, MarkType.Circle, true);
+        accessory.Method.Mark(0xE000000, MarkType.Cross, true);
+        accessory.Method.Mark(0xE000000, MarkType.Triangle, true);
     }
 
     private static void MarkClear(ScriptAccessory accessory)
     {
-        if (!CaptainMode)
-        {
-            accessory.DebugMsg($"未开启柯基模式，清除标点无效。", DebugMode);
-            return;
-        }
+        if (!CaptainMode) return;
         if (LocalTest)
         {
             accessory.DebugMsg($"本地测试删除标点。");
@@ -949,46 +1036,24 @@ public class TopPatch
             LocalMarkClear(accessory);
         }
         else
-        {
             accessory.Method.MarkClear();
-            accessory.DebugMsg($"全局测试删除标点。");
-        }
     }
 
     private static void MarkPlayerByIdx(ScriptAccessory accessory, int idx, MarkType marker)
     {
-        if (!CaptainMode)
-        {
-            accessory.DebugMsg($"未开启柯基模式，标点无效。", DebugMode);
-            return;
-        }
-        if (LocalTest)
-        {
-            if (LocalStrTest) return;
-            accessory.Method.Mark(accessory.Data.PartyList[idx], marker, true);
-        }
-        else
-        {
-            accessory.Method.Mark(accessory.Data.PartyList[idx], marker);
-        }
+        if (!CaptainMode) return;
+        accessory.DebugMsg($"为{idx}({accessory.GetPlayerJobByIndex(idx)})标上{marker}。", DebugMode && LocalStrTest);
+        if (LocalStrTest) return;
+        accessory.Method.Mark(accessory.Data.PartyList[idx], marker, LocalTest);
     }
     
     private static void MarkPlayerById(ScriptAccessory accessory, uint id, MarkType marker)
     {
-        if (!CaptainMode)
-        {
-            accessory.DebugMsg($"未开启柯基模式，标点无效。", DebugMode);
-            return;
-        }
-        if (LocalTest)
-        {
-            if (LocalStrTest) return;
-            accessory.Method.Mark(id, marker, true);
-        }
-        else
-        {
-            accessory.Method.Mark(id, marker);
-        }
+        if (!CaptainMode) return;
+        accessory.DebugMsg($"为{accessory.GetPlayerIdIndex(id)}({accessory.GetPlayerJobById(id)})标上{marker}。",
+            DebugMode && LocalStrTest);
+        if (LocalStrTest) return;
+        accessory.Method.Mark(id, marker, LocalTest);
     }
 
     private static int GetMarkedPlayerIndex(ScriptAccessory accessory, List<MarkType> markerList, MarkType marker)
@@ -1178,6 +1243,8 @@ public enum RecordedIdx : int
     DeltaTetherRecord = 3,
     WorldRecord = 4,
     DeltaMarkerComplete = 5,
+    DeltaSwapChecked = 6,
+    OmegaBaldRecorded = 7,
 }
 
 #region 函数集
