@@ -15,6 +15,7 @@ using Dalamud.Utility.Numerics;
 using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Module.Draw.Manager;
 using KodakkuAssist.Module.GameOperate;
 
@@ -82,25 +83,34 @@ public class TopPatch
         accessory.Method.RemoveDraw(".*");
     }
 
-    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
+    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo"], userControl: false)]
     public void EchoDebugActive(Event @event, ScriptAccessory accessory)
     {
         if (!DebugMode) return;
-        // ---- DEBUG CODE ----
-        accessory.DebugMsg($"Debug操作。", DebugMode);
-        // -- DEBUG CODE END --
+        var msg = @event.Message();
+        switch (msg)
+        {
+            case "=TST":
+                
+            {
+                
+                
+            }
+                
+                accessory.DebugMsg($"Debug操作。", DebugMode);
+                break;
+            
+            case "=CLEAR":
+                accessory.DebugMsg($"删除绘图与标点 Local。", DebugMode);
+                LocalMarkClear(accessory);
+                accessory.Method.RemoveDraw(".*");
+                break;
+            
+            case "=DeltaVersion":
+                _dv.PrintDeltaVersion();
+                break;
+        }
     }
-    [ScriptMethod(name: "随时DEBUG用 删除本地标点", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=CLEAR"], userControl: false)]
-    public void EchoDebugClearLocal(Event @event, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-        // ---- DEBUG CODE ----
-        accessory.DebugMsg($"删除绘图与标点 Local。", DebugMode);
-        LocalMarkClear(accessory);
-        accessory.Method.RemoveDraw(".*");
-        // -- DEBUG CODE END --
-    }
-
     #region P5 全局
     
     [ScriptMethod(name: "潜能量层数记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3444"], userControl: false)]
@@ -141,6 +151,12 @@ public class TopPatch
     
     #region P5 一运
     
+    [ScriptMethod(name: "----《P5 一运》----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
+        userControl: true)]
+    public void SplitLine_DeltaVersion(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
     [ScriptMethod(name: "一运 阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
     public void P5_RunMi_Delta_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
@@ -149,6 +165,7 @@ public class TopPatch
         _dyn.Init(accessory);
         _dv = new DeltaVersion();
         _dv.Init(accessory);
+        MarkClear(accessory);
         
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
     }
@@ -233,11 +250,11 @@ public class TopPatch
         }
     }
     
-    [ScriptMethod(name: "一运 非指挥模式记录头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add"],
+    [ScriptMethod(name: "一运 非指挥模式记录头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[123467])$"],
         userControl: false)]
     public void P5_DeltaVersionReceiveMarker(Event @event, ScriptAccessory accessory)
     {
-        // TODO: eventCondition待修改
+        // 只取攻击1234与锁链12
         if (_phase != TopPhase.P5_DeltaVersion) return;
         if (CaptainMode) return;
         lock (_events)
@@ -247,8 +264,6 @@ public class TopPatch
         lock (_dv)
         {
             var mark = @event.Id();
-            if ((MarkType)mark is MarkType.Stop1 or MarkType.Stop2) return;
-            
             var tid = @event.TargetId();
             var tidx = accessory.GetPlayerIdIndex(tid);
             _dv.SetMarkerFromOut(tidx, (MarkType)mark);
@@ -279,25 +294,166 @@ public class TopPatch
         userControl: true)]
     public void P5_DeltaVersionFirstGuidance(Event @event, ScriptAccessory accessory)
     {
-        // TODO eventCondition无需修改 标点完成后指路
         if (_phase != TopPhase.P5_DeltaVersion) return;
         _events[(int)RecordedIdx.OmegaBaldRecorded].WaitOne();
         _events[(int)RecordedIdx.DeltaMarkerComplete].WaitOne();
 
         var myIndex = accessory.GetMyIndex();
+        var marker = _dv.GetMarkers()[myIndex];
+        var omegaBaldDirection = _dv.OmegaBaldDirection;
         
+        Vector3 tpos1 = new(90f, 0, 94f);
+        Vector3 tpos2 = new(110f, 0, 94f);
+
+        tpos1 = marker switch
+        {
+            MarkType.Attack1 => tpos1.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack2 => tpos1.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack3 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack4 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                ((omegaBaldDirection + 2) % 4)),
+            MarkType.Bind1 => tpos1.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+            MarkType.Stop1 => tpos1.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+            MarkType.Bind2 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+            MarkType.Stop2 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+        };
         
-        // _dv.FirstGuidance();
+        tpos2 = marker switch
+        {
+            MarkType.Attack1 => tpos2.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack2 => tpos2.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack3 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack4 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                ((omegaBaldDirection + 2) % 4)),
+            MarkType.Bind1 => tpos2.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+            MarkType.Stop1 => tpos2.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+            MarkType.Bind2 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+            MarkType.Stop2 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+        };
+
+        var dp = accessory.DrawGuidance(tpos1, 0, 5000, $"一运待命地点1");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        dp = accessory.DrawGuidance(tpos2, 0, 5000, $"一运待命地点2");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        
         _events[(int)RecordedIdx.OmegaBaldRecorded].Reset();
         _events[(int)RecordedIdx.DeltaMarkerComplete].Reset();
-        
     }
     
-    [ScriptMethod(name: "一运 记录拳头", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"], userControl: false)]
+    [ScriptMethod(name: "一运 记录拳头", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(157(09|10))$"], userControl: false)]
     public void P5_RocketPunchRecord(Event @event, ScriptAccessory accessory)
     {
-        // TODO eventCondition待修改 记录每位玩家背后出现的拳头颜色
         if (_phase != TopPhase.P5_DeltaVersion) return;
+        const uint blue = 15709;
+        var dataid = @event.DataId();
+        var spos = @event.SourcePosition();
+        _dv.PunchCount++;
+        
+        // 找到自己的四分之一半场
+        if (_dv.MyQuadrant == -1)
+            _dv.MyQuadrant = (IbcHelper.GetMe()?.Position ?? new Vector3(110, 0, 110)).Position2Dirs(Center, 4, false);
+        if (spos.Position2Dirs(Center, 4, false) == _dv.MyQuadrant)
+        {
+            _dv.PunchCountAtMyQuadrant++;
+            _dv.PunchColorAtMyQuadrant += dataid == blue ? 1 : -1;
+        }
+
+        if (_dv.PunchCount == 8)
+        {
+            _events[(int)RecordedIdx.PunchCountComplete].Set();
+            accessory.Method.RemoveDraw($"一运待命地点.*");
+        }
+    }
+    
+    [ScriptMethod(name: "一运 拳头待命指路", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(157(09|10))$"],
+        userControl: true, suppress: 10000)]
+    public void P5_RocketPunchGuidance(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        _events[(int)RecordedIdx.PunchCountComplete].WaitOne();
+        
+        // var isOutside = false;                       // 标点是否是数字大的
+        // var myMarker = _dv.GetMarkers()[myIndex];    // 我的头标
+        //
+        // _dv.MyQuadrant = 2;                 // 我在待命时的象限
+        // _dv.PunchCountAtMyQuadrant = 2;     // 我在待命时，象限内拳头数量
+        // _dv.PunchColorAtMyQuadrant = 0;     // 0代表象限内拳头异色，2或-2代表象限内拳头同色
+        // _dv.OmegaBaldDirection = 0;         // 大光头的方位
+        
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+
+        var isOutside = myMarker is MarkType.Attack3 or MarkType.Attack4 or MarkType.Bind2 or MarkType.Stop2;
+        var isRemoteTetherOutside = myMarker is MarkType.Bind2 or MarkType.Stop2;
+        
+        // 找到第0象限内，标点靠内。会随着boss位置的变化而出现偏移。
+        var tposOut = new Vector3(108.7f, 0f, 90f).RotatePoint(new Vector3(109.9f, 0f, 90.1f),
+            _dv.OmegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);
+        var tposIn = new Vector3(102.7f, 0f, 90f).RotatePoint(new Vector3(109.9f, 0f, 90.1f),
+            _dv.OmegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);;  // 外锁链
+
+        var tposBase = isRemoteTetherOutside ? tposIn : tposOut;
+        
+        if (!isOutside)
+        {
+            // 此处的Outside是指标点是否偏大，靠场外。
+            // 若玩家靠场内，无脑站象限点。
+            var tpos = tposBase.RotatePoint(Center, _dv.MyQuadrant * 90f.DegToRad());
+            var dp = accessory.DrawGuidance(tpos, 0, 5000, $"一运拳头");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            accessory.DebugMsg($"玩家靠场内，站第{_dv.MyQuadrant}象限点。", DebugMode);
+        }
+        else
+        {
+            // 若玩家为外场
+            // 玩家所在象限拳头数量不为2，有人没预占位（可能有武士画家），需要自己观察，不作指路
+            if (_dv.PunchCountAtMyQuadrant != 2)
+            {
+                accessory.Method.TextInfo($"观察同组拳头颜色是否交换。", 4000, true);
+                accessory.DebugMsg($"第{_dv.MyQuadrant}象限内拳头数量错误，需自己观察。", DebugMode);
+            }
+            // 玩家所在象限拳头数量为2，且颜色值不为0，则拳头同色，需要换位。
+            else if (_dv.PunchColorAtMyQuadrant != 0)
+            {
+                var tpos = tposBase.RotatePoint(Center, _dv.MyQuadrant * 90f.DegToRad());
+                tpos = _dv.OmegaBaldDirection % 2 == 1
+                    ? tpos.FoldPointVertical(Center.Z)
+                    : tpos.FoldPointHorizon(Center.X);
+                var dp = accessory.DrawGuidance(tpos, 0, 5000, $"一运拳头");
+                accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+                accessory.DebugMsg($"玩家{_dv.MyQuadrant}象限内拳头同色，需要换位。", DebugMode);
+            }
+            else
+            {
+                // 无需换位，直接根据_dv.myQuadrant指向对应位置
+                var tpos = tposBase.RotatePoint(Center, _dv.MyQuadrant * 90f.DegToRad());
+                var dp = accessory.DrawGuidance(tpos, 0, 5000, $"一运拳头");
+                accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+                accessory.DebugMsg($"玩家无需换位，站第{_dv.MyQuadrant}象限点。", DebugMode);
+            }
+        }
+        
+        _events[(int)RecordedIdx.PunchCountComplete].Reset();
+    }
+    
+    [ScriptMethod(name: "一运 拳头旋转引导位置", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(009[CD])$"], userControl: true)]
+    public void P5_ArmUnitRotate(Event @event, ScriptAccessory accessory)
+    {
+        // uint id = 0x009C;
+        // uint tid = 0x4000C420;
+        // var tpos = IbcHelper.GetById(tid)?.Position ?? Center;
+        
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        var id = @event.Id();
+        var tid = @event.TargetId();
+        var tpos = IbcHelper.GetById(tid)?.Position ?? Center;
+        
+        tpos = tpos.PointInOutside(Center, 1f);
+        var baitPos = tpos.RotatePoint(Center, id == (uint)IconId.RotateCW ? -5f.DegToRad() : 5f.DegToRad());
+        var dp = accessory.DrawStaticCircle(baitPos, accessory.Data.DefaultSafeColor.WithW(3f), 0, 5000, $"手臂单元转转", 1f);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
     
     
@@ -313,9 +469,14 @@ public class TopPatch
         public List<int> TetherUp { get; set; } = [];
         public List<int> TetherDown { get; set; } = [];
         private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
-        
-        public int OmegaBaldDirection = 0;
+        public int OmegaBaldDirection { get; set; } = 0;
         private int MarkedPlayerCount { get; set; } = 0;
+        
+        // 拳头计算
+        public int PunchCount { get; set; } = 0;
+        public int PunchCountAtMyQuadrant { get; set; } = 0;
+        public int PunchColorAtMyQuadrant { get; set; } = 0;
+        public int MyQuadrant { get; set; } = -1;
 
         public void Init(ScriptAccessory _accessory)
         {
@@ -434,6 +595,21 @@ public class TopPatch
         public List<MarkType> GetMarkers()
         {
             return Marker;
+        }
+
+        public void PrintDeltaVersion()
+        {
+            var str = "";
+            str += "远线靠内: " + accessory.BuildListStr(RemoteTetherInside) + "\n";
+            str += "远线靠外: " + accessory.BuildListStr(RemoteTetherOutside) + "\n";
+            str += "近线靠内: " + accessory.BuildListStr(LocalTetherInside) + "\n";
+            str += "近线靠外: " + accessory.BuildListStr(LocalTetherOutside) + "\n";
+            str += "A侧半场连线玩家: " + accessory.BuildListStr(TetherUp) + "\n";
+            str += "C侧半场连线玩家: " + accessory.BuildListStr(TetherDown) + "\n";
+            str += "队伍标点: " + accessory.BuildListStr(Marker) + "\n";
+            str += "光头位置: " + OmegaBaldDirection.ToString() + "\n";
+            str += "记录已标点玩家数量: " + MarkedPlayerCount.ToString() + "\n";
+            accessory.DebugMsg(str, DebugMode);
         }
     }
     
@@ -1245,6 +1421,7 @@ public enum RecordedIdx : int
     DeltaMarkerComplete = 5,
     DeltaSwapChecked = 6,
     OmegaBaldRecorded = 7,
+    PunchCountComplete = 8,
 }
 
 #region 函数集
@@ -1368,6 +1545,11 @@ public static class EventExtensions
     public static uint Param(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["Param"]);
+    }
+
+    public static string Message(this Event @event)
+    {
+        return @event["Message"];
     }
 }
 
