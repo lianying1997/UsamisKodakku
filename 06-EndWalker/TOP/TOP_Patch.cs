@@ -343,7 +343,7 @@ public class TopPatch
     }
     
     [ScriptMethod(name: "一运 记录拳头", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(157(09|10))$"], userControl: false)]
-    public void P5_RocketPunchRecord(Event @event, ScriptAccessory accessory)
+    public void P5_DeltaRocketPunchRecord(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_DeltaVersion) return;
         const uint blue = 15709;
@@ -369,7 +369,7 @@ public class TopPatch
     
     [ScriptMethod(name: "一运 拳头待命指路", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(157(09|10))$"],
         userControl: true, suppress: 10000)]
-    public void P5_RocketPunchGuidance(Event @event, ScriptAccessory accessory)
+    public void P5_DeltaRocketPunchGuidance(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_DeltaVersion) return;
         _events[(int)RecordedIdx.PunchCountComplete].WaitOne();
@@ -439,7 +439,7 @@ public class TopPatch
     }
     
     [ScriptMethod(name: "一运 拳头旋转引导位置", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(009[CD])$"], userControl: true)]
-    public void P5_ArmUnitRotate(Event @event, ScriptAccessory accessory)
+    public void P5_DeltaArmUnitRotate(Event @event, ScriptAccessory accessory)
     {
         // uint id = 0x009C;
         // uint tid = 0x4000C420;
@@ -452,10 +452,239 @@ public class TopPatch
         
         tpos = tpos.PointInOutside(Center, 1f);
         var baitPos = tpos.RotatePoint(Center, id == (uint)IconId.RotateCW ? -5f.DegToRad() : 5f.DegToRad());
-        var dp = accessory.DrawStaticCircle(baitPos, accessory.Data.DefaultSafeColor.WithW(3f), 0, 5000, $"手臂单元转转", 1f);
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        var dp = accessory.DrawStaticCircle(baitPos, accessory.Data.DefaultSafeColor.WithW(3f), 0, 5000, $"手臂单元转转", 0.5f);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
     }
     
+    [ScriptMethod(name: "一运 玩家引导拳头指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31587"],
+        userControl: true)]
+    public void P5_DeltaMyArmUnitBiasGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // var myIndex = accessory.GetMyIndex();
+        // var myMarker = MarkType.Attack1;
+        // var myPos = new Vector3(90f, 0, 90f);
+        // _dv.OmegaBaldDirection = 2;
+        
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        if (@event.TargetId() != accessory.Data.Me) return;
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+        var myPos = @event.TargetPosition();
+        
+        var omegaBaldDirection12 = _dv.OmegaBaldDirection * 3;
+        var omegaBaldPos = new Vector3(100, 0, 80).RotatePoint(Center, omegaBaldDirection12 * 30f.DegToRad());
+        
+        var isShieldTarget = myMarker is MarkType.Bind1 or MarkType.Stop1;
+        var isOutside = myMarker is MarkType.Attack3 or MarkType.Attack4 or MarkType.Bind2 or MarkType.Stop2;
+        var isAtRight = myPos.IsAtRight(omegaBaldPos, Center);
+        var isBind = myMarker is MarkType.Bind1 or MarkType.Bind2 or MarkType.Stop1 or MarkType.Stop2;
+        
+        var val = 100 * (isOutside ? 1 : 0) + 10 * (isAtRight ? 1 : 0) + 1 * (isBind ? 1 : 0);
+        
+        _dv.MyArmUnit = val switch
+        {
+            111 => (omegaBaldDirection12 + 1) % 12,
+            110 => (omegaBaldDirection12 + 5) % 12,
+            101 => (omegaBaldDirection12 + 11) % 12,
+            100 => (omegaBaldDirection12 + 7) % 12,
+            10 => (omegaBaldDirection12 + 3) % 12,
+            0 => (omegaBaldDirection12 + 9) % 12,
+            
+            11 => (omegaBaldDirection12 + 3) % 12,
+            1 => (omegaBaldDirection12 + 9) % 12,
+            
+            _ => -1
+        };
+
+        accessory.DebugMsg(!isShieldTarget ? $"玩家所需引导手臂单元位于方位{_dv.MyArmUnit}" : $"玩家需前往场中偏方位{_dv.MyArmUnit}",
+            DebugMode);
+        accessory.Method.TextInfo($"同组靠内集合，等待黄圈", 2000);
+
+        if (!isShieldTarget)
+        {
+            var armUnitPos = new Vector3(100, 0, 84).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
+            var dp = accessory.DrawGuidance(armUnitPos, 2000, 3000, $"引导拳头指引", isSafe: false);
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        }
+        else
+        {
+            var armUnitPos = new Vector3(100, 0, 95).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
+            var dp = accessory.DrawGuidance(armUnitPos, 2000, 3000, $"场中引导指引", isSafe: false);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "一运 玩家引导拳头指路删除", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
+        userControl: false, suppress: 10000)]
+    public void P5_DeltaMyArmUnitBiasRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        accessory.Method.RemoveDraw($"引导拳头指引");
+        accessory.Method.RemoveDraw($"场中引导指引");
+    }
+    
+    [ScriptMethod(name: "一运 玩家场中盾引导指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
+        userControl: true, suppress: 10000)]
+    public void P5_DeltaOmegaCenterShieldBias(Event @event, ScriptAccessory accessory)
+    {
+        // var myIndex = accessory.GetMyIndex();
+        // var myMarker = MarkType.Bind1;
+        // _dv.MyArmUnit = 3;  // only 0, 3, 6, 9
+        
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+        
+        if (myMarker is not MarkType.Bind1 and not MarkType.Stop1) return;
+        
+        var centerBiasPos = new Vector3(100, 0, 95).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
+        var dp = accessory.DrawGuidance(centerBiasPos, 0, 3000, $"场中盾连击引导");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+    
+    [ScriptMethod(name: "一运 转转手引导后近线待命指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31600"],
+        userControl: true, suppress: 10000)]
+    public void P5_DeltaAfterArmUnitBiasGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // var myIndex = accessory.GetMyIndex();
+        // var myMarker = MarkType.Bind1;   // Atk1-4
+        // _dv.MyArmUnit = 3;   // 0-12
+        
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+
+        if (myMarker is not MarkType.Attack1 and not MarkType.Attack2 
+            and not MarkType.Attack3 and not MarkType.Attack4) return;
+        
+        var standByPos = new Vector3(100, 0, 86).
+            RotatePoint(Center, MathF.Round((float)_dv.MyArmUnit * 2 / 3) * 45f.DegToRad());
+        var dp = accessory.DrawGuidance(standByPos, 0, 3000, $"攻击头标标点待命");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+    
+    [ScriptMethod(name: "一运 光头左右扫描记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[89])$"],
+        userControl: false)]
+    public void P5_DeltaOmegaBaldCannonRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        const uint right = 31638;
+        _dv.OmegaBaldCannonType = @event.ActionId() == right ? 1 : 2;
+    }
+    
+    [ScriptMethod(name: "一运 玩家小电视Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(345[23])$"],
+        userControl: false)]
+    public void P5_DeltaPlayerCannonRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        var tidx = accessory.GetPlayerIdIndex(@event.TargetId());
+        _dv.PlayerCannonSource = tidx;
+        const uint right = 3452;
+        _dv.PlayerCannonType = @event.ActionId() == right ? 1 : 2;
+    }
+    
+    [ScriptMethod(name: "一运 盾连击目标记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31528"],
+        userControl: false)]
+    public void P5_DeltaShieldTargetRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        if (@event.TargetIndex() != 1) return;
+        accessory.Method.RemoveDraw($"场中盾连击引导");
+        
+        var tidx = accessory.GetPlayerIdIndex(@event.TargetId());
+        _dv.ShieldTarget = tidx;
+        // 盾连击是一运流程的最后一环
+        _events[(int)RecordedIdx.ShieldTargetRecorded].Set();
+    }
+    
+    [ScriptMethod(name: "一运 分摊与小电视指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31528"],
+        userControl: true)]
+    public void P5_DeltaStackAndCannonGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // var myIndex = accessory.GetMyIndex();
+        // var myMarker = MarkType.Bind2;
+        // _dv.PlayerCannonSource = myIndex + 1;    // 小电视玩家Idx
+        // _dv.ShieldTarget = myIndex + 1;          // 盾连击玩家Idx
+        // _dv.OmegaBaldDirection = 0;              // 光头位置
+        // _dv.OmegaBaldCannonType = 2;             // 光头电视1右2左
+        
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        _events[(int)RecordedIdx.ShieldTargetRecorded].WaitOne();
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+        
+        if (myMarker is MarkType.Attack1 or MarkType.Attack2 or MarkType.Attack3 or MarkType.Attack4)
+        {
+            // 近线组不参与讨论
+            _events[(int)RecordedIdx.ShieldTargetRecorded].Reset();
+            return;
+        }
+        
+        // 盾连击目标是否等于小电视目标，玩家是否为小电视目标
+        // 以光头在A，光头电视打右为基准，以光头为12点做旋转。
+        var isSameTarget = _dv.PlayerCannonSource == _dv.ShieldTarget;
+        
+        // 如果盾连击目标与小电视目标相同，盾连击目标需往外一步，分摊目标需往内一步
+        var shieldTargetPos = new Vector3(101, 0, 85) + (isSameTarget ? new Vector3(3.5f, 0, 0) : new Vector3(0, 0, 0));
+        var stackPos = new Vector3(101, 0, 100) + (isSameTarget ? new Vector3(0, 0, 0) : new Vector3(3.5f, 0, 0));
+
+        // _dv.OmegaBaldCannonType 1右2左
+        if (_dv.OmegaBaldCannonType == 2)
+        {
+            // 左刀则折叠后再旋转
+            shieldTargetPos = shieldTargetPos.FoldPointHorizon(Center.X);
+            stackPos = stackPos.FoldPointHorizon(Center.X);
+        }
+        var rotateRad = _dv.OmegaBaldDirection * 90f.DegToRad();
+        shieldTargetPos = shieldTargetPos.RotatePoint(Center, rotateRad);
+        stackPos = stackPos.RotatePoint(Center, rotateRad);
+
+        if (myIndex == _dv.ShieldTarget)
+        {
+            var dp = accessory.DrawGuidance(shieldTargetPos, 0, 5000, $"一运盾连击指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+        else
+        {
+            var dp = accessory.DrawGuidance(stackPos, 0, 5000, $"一运分摊指路");
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+
+        if (myIndex == _dv.PlayerCannonSource)
+        {
+            // TODO 确认箭头方向是否正确
+            var faceDir = (_dv.OmegaBaldDirection + (_dv.OmegaBaldCannonType != _dv.PlayerCannonType ? 2 : 0)) % 4;
+            var dp = accessory.DrawStatic(accessory.Data.Me, null, 0, faceDir * 90f.DegToRad(),
+                4.5f, 4.8f, PosColorPlayer.V4, 0, 5000, $"小电视面向辅助");
+            dp.FixRotation = true;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            accessory.Method.TextInfo($"小电视，站在外侧", 3000, true);
+        }
+        else
+            accessory.Method.TextInfo($"躲避小电视，站在内侧", 3000, true);
+        
+        _events[(int)RecordedIdx.ShieldTargetRecorded].Reset();
+    }
+    
+    [ScriptMethod(name: "一运 绘图删除，准备一传", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31529)$"],
+        userControl: false)]
+    public void P5_DeltaVersionComplete(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        _phase = TopPhase.P5_DeltaWorld;
+        accessory.Method.RemoveDraw(".*");
+    }
+    
+    [ScriptMethod(name: "一运 蟑螂左右刀记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+        userControl: false)]
+    public void P5_DeltaBeetleSwipeRecord(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        const uint right = 31636;
+        _dv.BeetleSwipe = @event.ActionId() == right ? 1 : 2;
+    }
+    
+    // TODO 写一传站位
     
     public class DeltaVersion
     {
@@ -465,18 +694,21 @@ public class TopPatch
         public List<int> RemoteTetherOutside { get; set; } = [];
         public List<int> LocalTetherInside { get; set; } = [];
         public List<int> LocalTetherOutside { get; set; } = [];
-        // 以光头为北的左，为场地北，A侧
-        public List<int> TetherUp { get; set; } = [];
-        public List<int> TetherDown { get; set; } = [];
         private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
-        public int OmegaBaldDirection { get; set; } = 0;
         private int MarkedPlayerCount { get; set; } = 0;
-        
+        public int OmegaBaldDirection { get; set; } = 0;
         // 拳头计算
         public int PunchCount { get; set; } = 0;
         public int PunchCountAtMyQuadrant { get; set; } = 0;
         public int PunchColorAtMyQuadrant { get; set; } = 0;
         public int MyQuadrant { get; set; } = -1;
+        public int MyArmUnit { get; set; } = -1;
+        // 一运行动计算
+        public int OmegaBaldCannonType { get; set; } = 0;
+        public int PlayerCannonType { get; set; } = 0;
+        public int PlayerCannonSource { get; set; } = 0;
+        public int ShieldTarget { get; set; } = -1;
+        public int BeetleSwipe { get; set; } = 0;
 
         public void Init(ScriptAccessory _accessory)
         {
@@ -600,15 +832,26 @@ public class TopPatch
         public void PrintDeltaVersion()
         {
             var str = "";
-            str += "远线靠内: " + accessory.BuildListStr(RemoteTetherInside) + "\n";
-            str += "远线靠外: " + accessory.BuildListStr(RemoteTetherOutside) + "\n";
-            str += "近线靠内: " + accessory.BuildListStr(LocalTetherInside) + "\n";
-            str += "近线靠外: " + accessory.BuildListStr(LocalTetherOutside) + "\n";
-            str += "A侧半场连线玩家: " + accessory.BuildListStr(TetherUp) + "\n";
-            str += "C侧半场连线玩家: " + accessory.BuildListStr(TetherDown) + "\n";
-            str += "队伍标点: " + accessory.BuildListStr(Marker) + "\n";
-            str += "光头位置: " + OmegaBaldDirection.ToString() + "\n";
-            str += "记录已标点玩家数量: " + MarkedPlayerCount.ToString() + "\n";
+            str += $"远线靠内: {accessory.BuildListStr(RemoteTetherInside, true)}\n";
+            str += $"远线靠外: {accessory.BuildListStr(RemoteTetherOutside, true)}\n";
+            str += $"近线靠内: {accessory.BuildListStr(LocalTetherInside, true)}\n";
+            str += $"近线靠外: {accessory.BuildListStr(LocalTetherOutside, true)}\n";
+            str += $"队伍标点: {accessory.BuildListStr(Marker)}\n";
+            str += $"光头位置: {OmegaBaldDirection}\n";
+            str += $"记录已标点玩家数量: {MarkedPlayerCount}\n";
+            str += "-----预站位时事件-----\n";
+            str += $"场上拳头数量: {PunchCount}\n";
+            str += $"玩家待命时，所在象限{PunchColorAtMyQuadrant}\n";
+            str += $"玩家待命时，象限内拳头数量: {PunchCountAtMyQuadrant}\n";
+            str += $"玩家待命时，象限内拳头颜色: {PunchColorAtMyQuadrant}\n";
+            str += "-----线变为实体后事件-----\n";
+            str += $"玩家需引导的手臂单元所在方位(12)：{MyArmUnit}\n";
+            str += $"被盾连击的攻击目标是：{ShieldTarget}({accessory.GetPlayerJobByIndex(ShieldTarget)})\n";
+            str += $"光头的小电视是（1右2左，光头视角）：{OmegaBaldCannonType}\n";
+            str += $"玩家小电视目标是：{PlayerCannonSource}({accessory.GetPlayerJobByIndex(PlayerCannonSource)})\n";
+            str += $"玩家的小电视类型是（1右2左，玩家视角）：{PlayerCannonType}\n";
+            str += $"蟑螂的左右刀是（1右2左，蟑螂视角）：{BeetleSwipe}\n";
+            
             accessory.DebugMsg(str, DebugMode);
         }
     }
@@ -1354,14 +1597,6 @@ public enum TopPhase : uint
     P5_BlindFaith,          // P5 盲信
 }
 
-public enum ActionId : uint
-{
-    RunDeltaVersion = 31624,
-    RunSigmaVersion = 32788,
-    RunOmegaVersion = 32789,
-    BlindFaith = 31623,
-}
-
 public enum IconId : uint
 {
     None = 0,
@@ -1422,6 +1657,7 @@ public enum RecordedIdx : int
     DeltaSwapChecked = 6,
     OmegaBaldRecorded = 7,
     PunchCountComplete = 8,
+    ShieldTargetRecorded = 9,
 }
 
 #region 函数集
@@ -2634,11 +2870,17 @@ public static class AssignDp
     /// </summary>
     /// <param name="accessory"></param>
     /// <param name="myList"></param>
+    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
-    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList)
+    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList, bool isJob = false)
     {
-        return string.Join(", ", myList.Select(item => item?.ToString() ?? ""));
+        return string.Join(", ", myList.Select(item =>
+        {
+            if (isJob && item != null && item is int i)
+                return accessory.GetPlayerJobByIndex(i);
+            return item?.ToString() ?? "";
+        }));
     }
 }
 
