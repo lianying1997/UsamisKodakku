@@ -72,8 +72,15 @@ public class Amr
     private static Vector3 _centerBoss3 = new Vector3(-200, -195, 0);
     private List<bool> _drawn = new bool[20].ToList(); // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList(); // 被记录flag
-    private List<AutoResetEvent> _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList(); // 自动线程
-    private List<ManualResetEvent> _manualEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList(); // 手动线程
+    private List<AutoResetEvent> _autoEvents = Enumerable
+        .Range(0, 20)
+        .Select(_ => new AutoResetEvent(false))
+        .ToList();
+    private List<ManualResetEvent> _manualEvents = Enumerable
+        .Range(0, 20)
+        .Select(_ => new ManualResetEvent(false))
+        .ToList();
+    
     DateTime _timeLock = new();
 
     /* 事件记录 _drawn
@@ -112,8 +119,14 @@ public class Amr
         _phase = AmrPhase.Init;
         _drawn = new bool[20].ToList();
         _recorded = new bool[20].ToList();
-        _autoEvents = Enumerable.Repeat(new AutoResetEvent(false), 20).ToList();
-        _manualEvents = Enumerable.Repeat(new ManualResetEvent(false), 20).ToList(); // 手动线程
+        _autoEvents = Enumerable
+            .Range(0, 20)
+            .Select(_ => new AutoResetEvent(false))
+            .ToList();
+        _manualEvents = Enumerable
+            .Range(0, 20)
+            .Select(_ => new ManualResetEvent(false))
+            .ToList();
 
         _superJumpId = [0, 0, 0, 0];
         _superJumpCount = 0;

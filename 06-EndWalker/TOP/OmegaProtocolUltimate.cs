@@ -1343,6 +1343,7 @@ namespace MyScriptNamespace
             dp.Color = accessory.Data.DefaultDangerColor;
             dp.DestoryAt = 10000;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp);
+            
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P3_小电视_面向辅助_自身2";
             dp.Scale = new(5, 1.5f);
