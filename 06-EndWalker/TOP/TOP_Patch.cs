@@ -18,7 +18,6 @@ using ECommons.GameFunctions;
 using ECommons.MathHelpers;
 using KodakkuAssist.Module.Draw.Manager;
 using KodakkuAssist.Module.GameOperate;
-using Lumina.Excel.Sheets;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.TOP;
 
@@ -69,7 +68,6 @@ public class TopPatch
 
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
     private static TopPhase _phase = TopPhase.Init;
-    private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private static DeltaVersion _dv = new();
     private static SigmaVersion _sv = new();
@@ -80,8 +78,6 @@ public class TopPatch
         .Range(0, 20)
         .Select(_ => new ManualResetEvent(false))
         .ToList();
-    
-    // private ManualResetEvent _deltaMarkerSetEvent = new(false);
     
     public void Init(ScriptAccessory accessory)
     {
@@ -120,8 +116,12 @@ public class TopPatch
                 accessory.Method.RemoveDraw(".*");
                 break;
             
-            case "=DeltaVersion":
+            case "=dv":
                 _dv.PrintDeltaVersion();
+                break;
+            
+            case "=dyn":
+                _dyn.PrintDynamicPass();
                 break;
         }
     }
@@ -230,17 +230,14 @@ public class TopPatch
         if (@event.TargetId() != accessory.Data.Me) return;
         
         // 接线与世界记录完毕后，检查是否交换
-        _events[(int)RecordedIdx.DeltaTetherRecord].WaitOne();
-        _events[(int)RecordedIdx.WorldRecord].WaitOne();
+        _events[(int)RecordedIdx.DeltaTetherRecord].WaitOne(5000);
+        _events[(int)RecordedIdx.WorldRecord].WaitOne(5000);
 
-        lock (_dv)
-        {
-            _dv.SwapCheck();
-            _events[(int)RecordedIdx.DeltaTetherRecord].Reset();
-            _events[(int)RecordedIdx.WorldRecord].Reset();
-            _events[(int)RecordedIdx.DeltaSwapChecked].Set();
-            accessory.DebugMsg($"EventSet: DeltaSwap操作完毕", DebugMode);
-        }
+        _dv.SwapCheck();
+        _events[(int)RecordedIdx.DeltaTetherRecord].Reset();
+        _events[(int)RecordedIdx.WorldRecord].Reset();
+        _events[(int)RecordedIdx.DeltaSwapChecked].Set();
+        accessory.DebugMsg($"EventSet: DeltaSwap操作完毕", DebugMode);
     }
     
     [ScriptMethod(name: "一运 指挥模式计算头标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31624)$"], userControl: false)]
@@ -249,7 +246,7 @@ public class TopPatch
         if (_phase != TopPhase.P5_DeltaVersion) return;
         if (@event.TargetId() != accessory.Data.Me) return;
         if (!CaptainMode) return;
-        _events[(int)RecordedIdx.DeltaSwapChecked].WaitOne();
+        _events[(int)RecordedIdx.DeltaSwapChecked].WaitOne(5000);
         
         lock (_dv)
         {
@@ -275,7 +272,7 @@ public class TopPatch
         if (_phase != TopPhase.P5_DeltaVersion) return;
         if (CaptainMode) return;
         
-        _events[(int)RecordedIdx.DeltaSwapChecked].WaitOne();
+        _events[(int)RecordedIdx.DeltaSwapChecked].WaitOne(5000);
         
         lock (_dv)
         {
@@ -307,6 +304,7 @@ public class TopPatch
         var spos = @event.SourcePosition();
         var dir = spos.Position2Dirs(Center, 4);
         _dv.OmegaBaldDirection = dir;
+        _dv.BeetleDirection = (dir + 2) % 4;
         
         _events[(int)RecordedIdx.OmegaBaldRecorded].Set();
         accessory.DebugMsg($"EventSet: OmegaBald记录完毕", DebugMode);
@@ -321,46 +319,49 @@ public class TopPatch
         // var omegaBaldDirection = 2;
         
         if (_phase != TopPhase.P5_DeltaVersion) return;
-        _events[(int)RecordedIdx.OmegaBaldRecorded].WaitOne();
-        _events[(int)RecordedIdx.DeltaMarkerComplete].WaitOne();
+        _events[(int)RecordedIdx.OmegaBaldRecorded].WaitOne(5000);
+        _events[(int)RecordedIdx.DeltaMarkerComplete].WaitOne(2000);
         
         var myIndex = accessory.GetMyIndex();
         var marker = _dv.GetMarkers()[myIndex];
         var omegaBaldDirection = _dv.OmegaBaldDirection;
+        var beetleDirection = _dv.BeetleDirection;
 
         Vector3 tpos1 = new(90f, 0, 94f);
         Vector3 tpos2 = new(110f, 0, 94f);
 
         tpos1 = marker switch
         {
-            MarkType.Attack1 => tpos1.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
-            MarkType.Attack2 => tpos1.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack1 => tpos1.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
+            MarkType.Attack2 => tpos1.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
             MarkType.Attack3 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
-                ((omegaBaldDirection + 2) % 4)),
+                beetleDirection),
             MarkType.Attack4 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
-                ((omegaBaldDirection + 2) % 4)),
+                beetleDirection),
             MarkType.Bind1 => tpos1.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
             MarkType.Stop1 => tpos1.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
             MarkType.Bind2 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center,
                 90f.DegToRad() * omegaBaldDirection),
             MarkType.Stop2 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center,
                 90f.DegToRad() * omegaBaldDirection),
+            _ => new Vector3(100f, 0, 100f),
         };
 
         tpos2 = marker switch
         {
-            MarkType.Attack1 => tpos2.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
-            MarkType.Attack2 => tpos2.RotatePoint(Center, 90f.DegToRad() * ((omegaBaldDirection + 2) % 4)),
+            MarkType.Attack1 => tpos2.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
+            MarkType.Attack2 => tpos2.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
             MarkType.Attack3 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
-                ((omegaBaldDirection + 2) % 4)),
+                beetleDirection),
             MarkType.Attack4 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
-                ((omegaBaldDirection + 2) % 4)),
+                beetleDirection),
             MarkType.Bind1 => tpos2.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
             MarkType.Stop1 => tpos2.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
             MarkType.Bind2 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center,
                 90f.DegToRad() * omegaBaldDirection),
             MarkType.Stop2 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center,
                 90f.DegToRad() * omegaBaldDirection),
+            _ => new Vector3(100f, 0, 100f),
         };
 
         var dp = accessory.DrawGuidance(tpos1, 0, 5000, $"一运待命地点1");
@@ -413,7 +414,7 @@ public class TopPatch
         // _dv.OmegaBaldDirection = 2;         // 大光头的方位
         
         if (_phase != TopPhase.P5_DeltaVersion) return;
-        _events[(int)RecordedIdx.PunchCountComplete].WaitOne();
+        _events[(int)RecordedIdx.PunchCountComplete].WaitOne(2000);
         var myIndex = accessory.GetMyIndex();
         var myMarker = _dv.GetMarkers()[myIndex];
 
@@ -424,17 +425,24 @@ public class TopPatch
         var tposOut = new Vector3(108.7f, 0f, 90f).RotatePoint(new Vector3(109.9f, 0f, 90.1f),
             _dv.OmegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);
         var tposIn = new Vector3(102.7f, 0f, 90f).RotatePoint(new Vector3(109.9f, 0f, 90.1f),
-            _dv.OmegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);;  // 外锁链
+            _dv.OmegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);  // 外锁链
 
         var tposBase = isRemoteTetherOutside ? tposIn : tposOut;
         
-        // TODO 此处旋转有问题。
+        tposBase = _dv.MyQuadrant switch
+        {
+            1 => tposBase.FoldPointVertical(Center.Z),
+            2 => tposBase.FoldPointVertical(Center.Z).FoldPointHorizon(Center.X),
+            3 => tposBase.FoldPointHorizon(Center.X),
+            _ => tposBase,
+        };
+        
         if (!isOutside)
         {
             // 此处的Outside是指标点是否偏大，靠场外。
             // 若玩家靠场内，无脑站象限点。
-            var tpos = tposBase.RotatePoint(Center, _dv.MyQuadrant * 90f.DegToRad());
-            var dp = accessory.DrawGuidance(tpos, 0, 5000, $"一运拳头");
+            
+            var dp = accessory.DrawGuidance(tposBase, 0, 5000, $"一运拳头");
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
             accessory.DebugMsg($"玩家靠场内，站第{_dv.MyQuadrant}象限点。", DebugMode);
         }
@@ -450,10 +458,9 @@ public class TopPatch
             // 玩家所在象限拳头数量为2，且颜色值不为0，则拳头同色，需要换位。
             else if (_dv.PunchColorAtMyQuadrant != 0)
             {
-                var tpos = tposBase.RotatePoint(Center, _dv.MyQuadrant * 90f.DegToRad());
-                tpos = _dv.OmegaBaldDirection % 2 == 1
-                    ? tpos.FoldPointVertical(Center.Z)
-                    : tpos.FoldPointHorizon(Center.X);
+                var tpos = _dv.OmegaBaldDirection % 2 == 1
+                    ? tposBase.FoldPointVertical(Center.Z)
+                    : tposBase.FoldPointHorizon(Center.X);
                 var dp = accessory.DrawGuidance(tpos, 0, 5000, $"一运拳头");
                 accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
                 accessory.DebugMsg($"玩家{_dv.MyQuadrant}象限内拳头同色，需要换位。", DebugMode);
@@ -461,8 +468,7 @@ public class TopPatch
             else
             {
                 // 无需换位，直接根据_dv.myQuadrant指向对应位置
-                var tpos = tposBase.RotatePoint(Center, _dv.MyQuadrant * 90f.DegToRad());
-                var dp = accessory.DrawGuidance(tpos, 0, 5000, $"一运拳头");
+                var dp = accessory.DrawGuidance(tposBase, 0, 5000, $"一运拳头");
                 accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
                 accessory.DebugMsg($"玩家无需换位，站第{_dv.MyQuadrant}象限点。", DebugMode);
             }
@@ -639,7 +645,7 @@ public class TopPatch
         // _dv.PlayerCannonType = 1;                // 玩家电视1右2左
         
         if (_phase != TopPhase.P5_DeltaVersion) return;
-        _events[(int)RecordedIdx.ShieldTargetRecorded].WaitOne();
+        _events[(int)RecordedIdx.ShieldTargetRecorded].WaitOne(1000);
         var myIndex = accessory.GetMyIndex();
         var myMarker = _dv.GetMarkers()[myIndex];
         
@@ -708,18 +714,138 @@ public class TopPatch
         if (_phase != TopPhase.P5_DeltaVersion) return;
         _phase = TopPhase.P5_DeltaWorld;
         accessory.Method.RemoveDraw(".*");
+        
+        // 初始化_events
+        _events = Enumerable
+            .Range(0, 20)
+            .Select(_ => new ManualResetEvent(false))
+            .ToList();
+        
+        // 根据标点补充DynamicPass
+        var markerList = _dv.GetMarkers();
+        _dyn.FarTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Attack1));
+        _dyn.FarTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Attack2));
+        _dyn.NearTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Attack3));
+        _dyn.NearTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Attack4));
+        _dyn.IdleTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Stop1));
+        _dyn.IdleTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Stop2));
     }
     
-    [ScriptMethod(name: "一运 蟑螂左右刀记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+    #endregion P5 一运
+    
+    #region P5 一传
+    
+    [ScriptMethod(name: "----《P5 一传》----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
+        userControl: true)]
+    public void SplitLine_DeltaWorld(Event @event, ScriptAccessory accessory)
+    {
+    }
+    
+    [ScriptMethod(name: "一传 蟑螂左右刀记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
         userControl: false)]
     public void P5_DeltaBeetleSwipeRecord(Event @event, ScriptAccessory accessory)
     {
-        if (_phase != TopPhase.P5_DeltaVersion) return;
+        if (_phase != TopPhase.P5_DeltaWorld) return;
         const uint right = 31636;
         _dv.BeetleSwipe = @event.ActionId() == right ? 1 : 2;
+        _events[(int)RecordedIdx.BeetleSwipeRecorded].Set();
     }
     
-    // TODO 写一传站位
+    [ScriptMethod(name: "一传 指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+        userControl: true)]
+    public void P5_DeltaWorldGuidance(Event @event, ScriptAccessory accessory)
+    {
+        // var myMarker = MarkType.Attack1;
+        // _dv.BeetleSwipe = 1;    // 1右2左
+        // _dv.BeetleDirection = 0;
+        
+        if (_phase != TopPhase.P5_DeltaWorld) return;
+        _events[(int)RecordedIdx.BeetleSwipeRecorded].WaitOne();
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+        
+        // 以蟑螂右刀，蟑螂在A为基准
+        List<Vector3> posList =
+        [
+            new(101f, 0, 81f),          // Atk1 - FarTarget
+            new(110.6f, 0, 116.2f),     // Atk2 - FarTarget
+            new(109.19f, 0, 90.81f),    // Atk3 - NearTarget
+            new(113.7f, 0, 86.3f),      // Atk4 - NearTarget
+            new(119.5f, 0, 100f),       // Bind1 - FarSource
+            new(106f, 0, 100f),         // Bind2 - NearSource
+            new(113.7f, 0, 86.3f),      // Stop1 - Idle
+            new(117f, 0, 109.19f)       // Stop2 - Idle
+        ];
+
+        var myPosIdx = myMarker switch
+        {
+            MarkType.Attack1 => 0,
+            MarkType.Attack2 => 1,
+            MarkType.Attack3 => 2,
+            MarkType.Attack4 => 3,
+            MarkType.Bind1 => 4,
+            MarkType.Bind2 => 5,
+            MarkType.Stop1 => 6,
+            MarkType.Stop2 => 7,
+            _ => -1,
+        };
+        
+        if (myPosIdx == -1)
+        {
+            accessory.DebugMsg($"玩家标点{myMarker}读取错误", DebugMode);
+            return;
+        }
+
+        // 根据蟑螂左右刀与所在方位旋转折叠
+        var myPos = posList[myPosIdx];
+        var isRightSwipe = _dv.BeetleSwipe == 1;
+        if (!isRightSwipe)
+            myPos.FoldPointHorizon(Center.X);
+        myPos = myPos.RotatePoint(Center, _dv.BeetleDirection * 90f.DegToRad());
+
+        var dp = accessory.DrawGuidance(myPos, 0, 5000, $"一传指路");
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        _events[(int)RecordedIdx.BeetleSwipeRecorded].Reset();
+    }
+    
+    [ScriptMethod(name: "一传 指路移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(3163[67])$"],
+        userControl: false)]
+    public void P5_DeltaWorldGuidanceRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaWorld) return;
+        accessory.Method.RemoveDraw("一传指路");
+    }
+    
+    [ScriptMethod(name: "一传 近线拉线提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3529"],
+        userControl: true)]
+    public void P5_DeltaWorldLocalTetherBreakHint(Event @event, ScriptAccessory accessory)
+    {
+        // 在DeltaVersion期间建立了近线
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+
+        // 在线变为实线前，标点已取好
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+        if (myMarker is not MarkType.Attack1 and not MarkType.Attack2) return;
+        var myPartner = GetMarkedPlayerIndex(accessory, _dv.GetMarkers(),
+            myMarker is MarkType.Attack1 ? MarkType.Attack2 : MarkType.Attack1);
+        
+        var dur = (int)@event.DurationMilliseconds();
+        // 在还剩10秒时，DeltaWorld正在执行，需在最后2秒拉断。
+
+        var delay1 = dur - 8000;
+        var destroy1 = 6000;
+        var delay2 = dur - 2000;
+        var destroy2 = 2000;
+
+        var dp1 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 4, delay1, destroy1, $"近线别拉断");
+        dp1.Color = accessory.Data.DefaultDangerColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+        
+        var dp2 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 4, delay2, destroy2, $"近线拉断");
+        dp2.Color = accessory.Data.DefaultSafeColor;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
+    }
     
     public class DeltaVersion
     {
@@ -732,6 +858,7 @@ public class TopPatch
         private List<MarkType> Marker { get; set; } = Enumerable.Repeat(MarkType.None, 8).ToList();
         private int MarkedPlayerCount { get; set; } = 0;
         public int OmegaBaldDirection { get; set; } = 0;
+        public int BeetleDirection { get; set; } = 0;
         // 拳头计算
         public int PunchCount { get; set; } = 0;
         public int PunchCountAtMyQuadrant { get; set; } = 0;
@@ -796,7 +923,7 @@ public class TopPatch
         {
             // 检查是否需Swap
             // 远世界被标锁链1，若远世界目标处于RemoteTetherOutside内，需要交换。
-            var farSourceIdx = _dyn.GetFarSource()[0];
+            var farSourceIdx = _dyn.FarSource[0];
             var needSwap = RemoteTetherOutside.Contains(farSourceIdx);
             if (needSwap)
             {
@@ -811,9 +938,9 @@ public class TopPatch
         public void BuildDeltaMarker()
         {
             // 先获取近远世界idx，标锁链1、2
-            var farSourceIdx = _dyn.GetFarSource()[0];
+            var farSourceIdx = _dyn.FarSource[0];
             SetMarkerBySelf(farSourceIdx, MarkType.Bind1);
-            var nearSourceIdx = _dyn.GetNearSource()[0];
+            var nearSourceIdx = _dyn.NearSource[0];
             SetMarkerBySelf(nearSourceIdx, MarkType.Bind2);
             
             // 获取近线玩家，标攻击1、2、3、4
@@ -826,8 +953,8 @@ public class TopPatch
         }
         public void BuildDeltaIdleMarker()
         {
-            var farSourceIdx = _dyn.GetFarSource()[0];
-            var nearSourceIdx = _dyn.GetNearSource()[0];
+            var farSourceIdx = _dyn.FarSource[0];
+            var nearSourceIdx = _dyn.NearSource[0];
             
             // 获取远世界搭档，标禁止1
             var farSourcePartnerIdx =
@@ -891,6 +1018,7 @@ public class TopPatch
             str += $"近线靠外: {accessory.BuildListStr(LocalTetherOutside, true)}\n";
             str += $"队伍标点: {accessory.BuildListStr(Marker)}\n";
             str += $"光头位置: {OmegaBaldDirection}\n";
+            str += $"蟑螂位置: {BeetleDirection}\n";
             str += $"记录已标点玩家数量: {MarkedPlayerCount}\n";
             accessory.DebugMsg(str, DebugMode);
             
@@ -914,7 +1042,7 @@ public class TopPatch
         }
     }
     
-    #endregion P5 一运
+    #endregion P5 一传
 
     #region P5 二运
     
@@ -1539,14 +1667,14 @@ public class TopPatch
     public class DynamicsPass
     {
         public ScriptAccessory accessory { get; set; } = null!;
-        private int DynamicCount { get; set; } = 0;
-        private int WorldCount { get; set; } = 0;
-        private List<int> BuffLevel { get; set; } = Enumerable.Repeat(0, 8).ToList();
-        private List<int> FarSource { get; set; } = [];
-        private List<int> NearSource { get; set; } = [];
-        private List<int> FarTarget { get; set; } = [];
-        private List<int> NearTarget { get; set; } = [];
-        private List<int> FreeTarget { get; set; } = [];
+        public int DynamicCount { get; set; } = 0;
+        public int WorldCount { get; set; } = 0;
+        public List<int> BuffLevel { get; set; } = Enumerable.Repeat(0, 8).ToList();
+        public List<int> FarSource { get; set; } = [];
+        public List<int> NearSource { get; set; } = [];
+        public List<int> FarTarget { get; set; } = [];
+        public List<int> NearTarget { get; set; } = [];
+        public List<int> IdleTarget { get; set; } = [];
     
         public void Init(ScriptAccessory _accessory)
         {
@@ -1559,7 +1687,7 @@ public class TopPatch
         {
             FarSource.Clear();
             NearSource.Clear();
-            FreeTarget.Clear();
+            IdleTarget.Clear();
             FarTarget.Clear();
             NearTarget.Clear();
         }
@@ -1569,14 +1697,10 @@ public class TopPatch
         }
         public void AddDynamicBuffLevel(int idx)
         {
-            accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(idx)}的潜能量增加了，目前为{GetDynamicBuffLevelCount(idx)}",
+            accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(idx)}的潜能量增加了，目前为{BuffLevel[idx]}",
                 DebugMode);
             BuffLevel[idx]++;
             DynamicCount++;
-        }
-        public int GetDynamicBuffLevelCount(int idx)
-        {
-            return BuffLevel[idx];
         }
         public void SetFarSource(int idx)
         {
@@ -1588,42 +1712,6 @@ public class TopPatch
             NearSource.Add(idx);
             WorldCount++;
         }
-        public List<int> GetFarSource()
-        {
-            return FarSource;
-        }
-        public List<int> GetNearSource()
-        {
-            return NearSource;
-        }
-
-        public void SetFarTarget(int idx)
-        {
-            FarTarget.Add(idx);
-        }
-
-        public void SetNearTarget(int idx)
-        {
-            NearTarget.Add(idx);
-        }
-
-        public void SetFreeTarget(int idx)
-        {
-            FreeTarget.Add(idx);
-        }
-        
-        public List<int> GetFarTarget()
-        {
-            return FarTarget;
-        }
-        public List<int> GetNearTarget()
-        {
-            return NearTarget;
-        }
-        public List<int> GetFreeTarget()
-        {
-            return FreeTarget;
-        }
         public bool WorldRecordComplete()
         {
             return _phase switch
@@ -1633,6 +1721,25 @@ public class TopPatch
                 TopPhase.P5_OmegaVersion => WorldCount == 8,
                 _ => true
             };
+        }
+        
+        public void PrintDynamicPass()
+        {
+            var str = "";
+            str += "-----基本事件-----\n";
+            str += $"现有潜能量总层数: {DynamicCount}\n";
+            str += $"现有你好世界数: {WorldCount}\n";
+            str += $"各玩家潜能量: {accessory.BuildListStr(BuffLevel)}\n";
+            accessory.DebugMsg(str, DebugMode);
+            
+            str = "";
+            str += "-----世界事件-----\n";
+            str += $"远世界：{accessory.BuildListStr(FarSource, true)}\n";
+            str += $"远世界目标：{accessory.BuildListStr(FarTarget, true)}\n";
+            str += $"近世界：{accessory.BuildListStr(NearSource, true)}\n";
+            str += $"近世界目标：{accessory.BuildListStr(NearTarget, true)}\n";
+            str += $"闲人：{accessory.BuildListStr(IdleTarget, true)}\n";
+            accessory.DebugMsg(str, DebugMode);
         }
         
     }
@@ -1707,6 +1814,7 @@ public enum RecordedIdx : int
     SigmaSonyMarker = 0,
     SigmaSonyRecord = 1,
     SigmaTargetRecord = 2,
+    
     DeltaTetherRecord = 3,
     WorldRecord = 4,
     DeltaMarkerComplete = 5,
@@ -1714,6 +1822,8 @@ public enum RecordedIdx : int
     OmegaBaldRecorded = 7,
     PunchCountComplete = 8,
     ShieldTargetRecorded = 9,
+    
+    BeetleSwipeRecorded = 0,
 }
 
 #region 函数集
