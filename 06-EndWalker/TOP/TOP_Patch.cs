@@ -496,7 +496,7 @@ public class TopPatch
     }
     
     [ScriptMethod(name: "一运 玩家引导拳头指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31587"],
-        userControl: true, suppress: 10000)]
+        userControl: true)]
     public void P5_DeltaMyArmUnitBiasGuidance(Event @event, ScriptAccessory accessory)
     {
         // var myIndex = accessory.GetMyIndex();
@@ -505,7 +505,11 @@ public class TopPatch
         // _dv.OmegaBaldDirection = 2;
         
         if (_phase != TopPhase.P5_DeltaVersion) return;
+        // 这一条判断会因为suppress被return回去，所以suppress的使用场景需注意，事件确认可被触发。否则就用bool。
         if (@event.TargetId() != accessory.Data.Me) return;
+        if (_recorded[(int)RecordedIdx.ArmUnitGuidance]) return;
+        _recorded[(int)RecordedIdx.ArmUnitGuidance] = true;
+        
         var myIndex = accessory.GetMyIndex();
         var myMarker = _dv.GetMarkers()[myIndex];
         var myPos = @event.TargetPosition();
@@ -535,20 +539,24 @@ public class TopPatch
             _ => -1
         };
 
+        // TODO 目前这一条同组靠内集合会触发，但指路未触发，需要研究一下是有什么bug。
+        
         accessory.DebugMsg(!isShieldTarget ? $"玩家所需引导手臂单元位于方位{_dv.MyArmUnit}" : $"玩家需前往场中偏方位{_dv.MyArmUnit}",
             DebugMode);
         accessory.Method.TextInfo($"同组靠内集合，等待黄圈", 2000);
 
         if (!isShieldTarget)
         {
+            accessory.DebugMsg($"向引导拳头位置绘图", DebugMode);
             var armUnitPos = new Vector3(100, 0, 84).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
-            var dp = accessory.DrawGuidance(armUnitPos, 2000, 3000, $"引导拳头指引", isSafe: false);
+            var dp = accessory.DrawGuidance(armUnitPos, 1000, 3000, $"引导拳头指引", isSafe: false);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
         }
         else
         {
+            accessory.DebugMsg($"向场中引导位置绘图", DebugMode);
             var armUnitPos = new Vector3(100, 0, 95).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
-            var dp = accessory.DrawGuidance(armUnitPos, 2000, 3000, $"场中引导指引", isSafe: false);
+            var dp = accessory.DrawGuidance(armUnitPos, 1000, 3000, $"场中引导指引", isSafe: false);
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
     }
@@ -721,6 +729,9 @@ public class TopPatch
             .Select(_ => new ManualResetEvent(false))
             .ToList();
         
+        // 初始化_recorded
+        _recorded = new bool[20].ToList();
+        
         // 根据标点补充DynamicPass
         var markerList = _dv.GetMarkers();
         _dyn.FarTarget.Add(GetMarkedPlayerIndex(accessory, markerList, MarkType.Attack1));
@@ -751,13 +762,13 @@ public class TopPatch
         _events[(int)RecordedIdx.BeetleSwipeRecorded].Set();
     }
     
-    [ScriptMethod(name: "一传 指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+    [ScriptMethod(name: "一传 指路 *", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
         userControl: true)]
     public void P5_DeltaWorldGuidance(Event @event, ScriptAccessory accessory)
     {
-        // var myMarker = MarkType.Attack1;
-        // _dv.BeetleSwipe = 1;    // 1右2左
-        // _dv.BeetleDirection = 0;
+        // var myMarker = MarkType.Bind2;
+        // _dv.BeetleSwipe = 2;    // 1右2左
+        // _dv.BeetleDirection = 1;
         
         if (_phase != TopPhase.P5_DeltaWorld) return;
         _events[(int)RecordedIdx.BeetleSwipeRecorded].WaitOne();
@@ -767,14 +778,14 @@ public class TopPatch
         // 以蟑螂右刀，蟑螂在A为基准
         List<Vector3> posList =
         [
-            new(101f, 0, 81f),          // Atk1 - FarTarget
+            new(102f, 0, 81f),          // Atk1 - FarTarget
             new(110.6f, 0, 116.2f),     // Atk2 - FarTarget
-            new(109.19f, 0, 90.81f),    // Atk3 - NearTarget
+            new(108.9f, 0, 88.9f),      // Atk3 - NearTarget
             new(113.7f, 0, 86.3f),      // Atk4 - NearTarget
             new(119.5f, 0, 100f),       // Bind1 - FarSource
-            new(106f, 0, 100f),         // Bind2 - NearSource
+            new(106.5f, 0, 100f),         // Bind2 - NearSource
             new(113.7f, 0, 86.3f),      // Stop1 - Idle
-            new(117f, 0, 109.19f)       // Stop2 - Idle
+            new(116.2f, 0, 111f)       // Stop2 - Idle
         ];
 
         var myPosIdx = myMarker switch
@@ -800,7 +811,7 @@ public class TopPatch
         var myPos = posList[myPosIdx];
         var isRightSwipe = _dv.BeetleSwipe == 1;
         if (!isRightSwipe)
-            myPos.FoldPointHorizon(Center.X);
+            myPos = myPos.FoldPointHorizon(Center.X);
         myPos = myPos.RotatePoint(Center, _dv.BeetleDirection * 90f.DegToRad());
 
         var dp = accessory.DrawGuidance(myPos, 0, 5000, $"一传指路");
@@ -838,11 +849,12 @@ public class TopPatch
         var delay2 = dur - 2000;
         var destroy2 = 2000;
 
-        var dp1 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 4, delay1, destroy1, $"近线别拉断");
+        // 近线实际距离约为10，取11
+        var dp1 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 11, delay1, destroy1, $"近线别拉断");
         dp1.Color = accessory.Data.DefaultDangerColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
         
-        var dp2 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 4, delay2, destroy2, $"近线拉断");
+        var dp2 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 11, delay2, destroy2, $"近线拉断");
         dp2.Color = accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
     }
@@ -1697,10 +1709,10 @@ public class TopPatch
         }
         public void AddDynamicBuffLevel(int idx)
         {
-            accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(idx)}的潜能量增加了，目前为{BuffLevel[idx]}",
-                DebugMode);
             BuffLevel[idx]++;
             DynamicCount++;
+            accessory.DebugMsg($"{accessory.GetPlayerJobByIndex(idx)}的潜能量增加了，目前为{BuffLevel[idx]}",
+                DebugMode);
         }
         public void SetFarSource(int idx)
         {
@@ -1811,6 +1823,7 @@ public enum DataId : uint
 
 public enum RecordedIdx : int
 { 
+    // _events
     SigmaSonyMarker = 0,
     SigmaSonyRecord = 1,
     SigmaTargetRecord = 2,
@@ -1824,6 +1837,9 @@ public enum RecordedIdx : int
     ShieldTargetRecorded = 9,
     
     BeetleSwipeRecorded = 0,
+    
+    // _recorded
+    ArmUnitGuidance = 0,
 }
 
 #region 函数集
@@ -2376,15 +2392,6 @@ public static class AssignDp
     public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory, 
         object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
     => accessory.DrawGuidance(accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale, isSafe);
-    
-    // {
-    //     return targetObj switch
-    //     {
-    //         uint uintTarget => accessory.DrawGuidance(accessory.Data.Me, uintTarget, delay, destroy, name, rotation, scale),
-    //         Vector3 vectorTarget => accessory.DrawGuidance(accessory.Data.Me, vectorTarget, delay, destroy, name, rotation, scale),
-    //         _ => throw new ArgumentException("targetObj 的类型必须是 uint 或 Vector3")
-    //     };
-    // }
     
     /// <summary>
     /// 返回扇形左右刀

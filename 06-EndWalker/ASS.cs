@@ -29,18 +29,20 @@ using ECommons.MathHelpers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.0", author: "Usami", note: NoteStr)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.1", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class ASS
 {
-    const string NoteStr =
+    private const string NoteStr =
     """
     请先按需求检查并设置“用户设置”栏目，
-    并在/KTeam中设置 T>H>近>远
-    v0.0.1.0
-    1. 初版完成，包含机制绘图与指路，适配异闻与异闻零式。
-    鸭门。
+    并在/KTeam中设置 T>H>近>远。
     """;
+    
+    private const string UpdateInfo =
+        """
+        试图修正Boss3绘图失败的问题。
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -119,7 +121,7 @@ public class ASS
     {
         phase = ASS_Phase.Init;
         Drawn = new bool[20].ToList();
-        // phase = ASS_Phase.BOSS3_P3;
+        
         Boss1_BubbleProperty = 0;                           // BOSS1 鼠鼠的泡泡属性
         Boss1_P2_FieldBubbleProperty = [0, 0, 0];           // BOSS1 P2一染，场地泡泡属性记录
         Boss1_P2_FieldBubbleSid = [0, 0, 0];                // BOSS1 P2一染，场地泡泡ID记录
@@ -1152,7 +1154,7 @@ public class ASS
 
     #region BOSS3 键山雏
 
-    [ScriptMethod(name: "Boss3：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29841|37098)$"], userControl: false)]
+    [ScriptMethod(name: "Boss3：阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29841)$"], userControl: false)]
     public void Boss3_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         phase = phase switch
@@ -1433,17 +1435,16 @@ public class ASS
         Vector3 CENTER_RIGHT = new(297f, 533, CENTER_BOSS3.Z);
         Vector3 _part_center = spos.X > CENTER_BOSS3.X ? CENTER_RIGHT : CENTER_LEFT;
 
-        var _pos = spos.PositionRoundToDirs(new Vector3(_part_center.X, 533, spos.Z), 4);
         var _rot_radian = id1 switch
         {
             CLOCKWISE => float.Pi / 2,
             COUNTER_CLOCKWISE => -float.Pi / 2,
             _ => float.Pi / 2
         };
-        drawRotPortal(spos, _pos, _rot_radian, _part_center, true, 0, 10000, accessory);
+        drawRotPortal(spos, _rot_radian, _part_center, true, 0, 10000, accessory);
     }
 
-    private DrawPropertiesEdit drawRotPortal(Vector3 spos, int pos, float rot_radian, Vector3 center, bool draw, int delay, int destory, ScriptAccessory accessory)
+    private DrawPropertiesEdit drawRotPortal(Vector3 spos, float rot_radian, Vector3 center, bool draw, int delay, int destory, ScriptAccessory accessory)
     {
         // 先找到对面
         var _mirror_pos = spos.FoldPointLR(center.X);
