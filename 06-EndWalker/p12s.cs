@@ -24,7 +24,7 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.8", author: "Usami", note: noteStr)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.9", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 
 public class p12s
 {
@@ -34,6 +34,11 @@ public class p12s
     门神到超链后对话，本体到黑白塔。
     鸭门。
     """;
+    
+    private const string UpdateInfo =
+        """
+        修复了小世界一（水平）分散位置指路错误问题。
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -1362,8 +1367,8 @@ public class p12s
 
     private static void drawHorizonSpreadPos(int myIndex, ScriptAccessory accessory)
     {
-        List<int> spreadDirUD = [-1, 1, -1, 1, -1, 1, -1, 1];
-        List<int> spreadDirLR = [-3, -3, -1, -1, 3, 3, 1, 1];
+        List<int> spreadDirUD = [-1, -1, -1, -1, 1, 1, 1, 1];
+        List<int> spreadDirLR = [-1, 1, -3, 3, -1, 1, -3, 3];
 
         // 84 88 92 96
 

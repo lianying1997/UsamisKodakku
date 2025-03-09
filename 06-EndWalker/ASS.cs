@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Enums;
@@ -12,24 +13,17 @@ using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
-using System.Security.AccessControl;
-using ECommons.ExcelServices.TerritoryEnumeration;
-using System.Drawing;
-using System.Security.Cryptography.X509Certificates;
-using System.Diagnostics;
-using Dalamud.Utility;
-using System.Timers;
-using ECommons.MathHelpers;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.1", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.2", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class ASS
 {
@@ -41,9 +35,9 @@ public class ASS
     
     private const string UpdateInfo =
         """
-        试图修正Boss3绘图失败的问题。
+        修复了Boss3绘图失败的问题。
         """;
-
+    
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
 
@@ -66,6 +60,9 @@ public class ASS
     public static ScriptColor Boss3_SetDangerColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0.0f, 1.0f) };
     public enum ASS_Phase
     {
+        // TODO：存在的问题是，团灭后，副本不会重置！Init函数不奏效！
+        // TODO：需要找到一个方法，检测到团灭，然后重新执行Init
+        
         Init,                   // 初始
         BOSS1_P2,               // BOSS1 一染
         BOSS1_P3,               // BOSS1 一拉
