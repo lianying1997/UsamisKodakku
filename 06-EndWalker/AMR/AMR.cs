@@ -24,7 +24,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 namespace UsamisKodakku.Scripts._06_EndWalker.AMR;
 
 [ScriptType(name: Name, territorys: [1155, 1156], guid: "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45",
-    version: Version, author: "Usami", note: NoteStr)]
+    version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
 
@@ -32,15 +32,18 @@ public class Amr
 {
     const string NoteStr =
         """
-        v0.0.0.1
+        v0.0.0.2
         Boss2 不含踩塔运动会2
         Boss3 不含青帝天箭
         """;
 
     private const string Name = "AMR [异闻六根山]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
-    private const string Note = "";
+    private const string UpdateInfo =
+        """
+        修复了因团灭导致初始化失败，继而引发的绘图Bug。
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")] public static bool DebugMode { get; set; } = false;
 
@@ -114,8 +117,13 @@ public class Amr
 
     public void Init(ScriptAccessory accessory)
     {
-        // accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{Note}", DebugMode);
+        // accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}", DebugMode);
 
+        ParamsInit(accessory);
+    }
+    
+    public void ParamsInit(ScriptAccessory accessory)
+    {
         _phase = AmrPhase.Init;
         _drawn = new bool[20].ToList();
         _recorded = new bool[20].ToList();
@@ -130,7 +138,7 @@ public class Amr
 
         _superJumpId = [0, 0, 0, 0];
         _superJumpCount = 0;
-
+        
         accessory.Method.MarkClear();
         accessory.Method.RemoveDraw(".*");
     }
@@ -148,6 +156,32 @@ public class Amr
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
 
         // -- DEBUG CODE END --
+    }
+    
+    [ScriptMethod(name: "团灭初始化", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:regex:^(1620[05]|1622[57]|16265|16270)$"], userControl: false, suppress: 3000)]
+    public void WipeInit(Event @event, ScriptAccessory accessory)
+    {
+        var bossId = @event.DataId();
+        const uint nShishio = 16200;
+        const uint sShishio = 16205;
+        const uint nGorai = 16225;
+        const uint sGorai = 16227;
+        const uint nMoko = 16265;
+        const uint sMoko = 16270;
+
+        var bossName = bossId switch
+        {
+            nShishio => "Boss1 狮子王",
+            sShishio => "Boss1 零式狮子王",
+            nGorai => "Boss2 铁鼠",
+            sGorai => "Boss2 零式铁鼠",
+            nMoko => "Boss3 武士",
+            sMoko => "Boss3 零式武士",
+            _ => "未知"
+        };
+        
+        ParamsInit(accessory);
+        accessory.DebugMsg($"检测到{bossName}的刷新，参数初始化。", DebugMode);
     }
 
     #region Boss1 舞狮

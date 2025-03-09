@@ -132,12 +132,12 @@
   {
     "Name": "ASS [异闻希拉狄哈水道]",
     "Guid": "bdd73dbd-2a93-4232-9324-0c9093d4a646",
-    "Version": "0.0.1.1",
+    "Version": "0.0.1.2",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
     "Note": "请先按需求检查并设置“用户设置”栏目，\r\n并在/KTeam中设置 T>H>近>远。",
-    "UpdateInfo": "试图修正Boss3绘图失败的问题。",
+    "UpdateInfo": "修复了因团灭导致初始化失败，继而引发的绘图Bug。",
     "TerritoryIds": [
       1075,
       1076
@@ -146,12 +146,12 @@
   {
     "Name": "AMR [异闻六根山]",
     "Guid": "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45",
-    "Version": "0.0.0.1",
+    "Version": "0.0.0.2",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/AMR/AMR.cs",
-    "Note": "",
-    "UpdateInfo": "1. 初版完成。\n鸭门。",
+    "Note": "v0.0.0.2\r\nBoss2 不含踩塔运动会2\r\nBoss3 不含青帝天箭",
+    "UpdateInfo": "修复了因团灭导致初始化失败，继而引发的绘图Bug。",
     "TerritoryIds": [
       1155,
       1156

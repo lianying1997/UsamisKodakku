@@ -35,7 +35,7 @@ public class ASS
     
     private const string UpdateInfo =
         """
-        修复了Boss3绘图失败的问题。
+        修复了因团灭导致初始化失败，继而引发的绘图Bug。
         """;
     
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -116,6 +116,11 @@ public class ASS
 
     public void Init(ScriptAccessory accessory)
     {
+        ParamsInit(accessory);
+    }
+
+    public void ParamsInit(ScriptAccessory accessory)
+    {
         phase = ASS_Phase.Init;
         Drawn = new bool[20].ToList();
         
@@ -173,6 +178,32 @@ public class ASS
             dp.Scale = new(2f);
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
         }
+    }
+    
+    [ScriptMethod(name: "团灭初始化", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:regex:^(1483[47]|14757|14864|14762|14817)$"], userControl: false, suppress: 3000)]
+    public void WipeInit(Event @event, ScriptAccessory accessory)
+    {
+        var bossId = @event.DataId();
+        const uint nSilkie = 14834;
+        const uint sSilkie = 14837;
+        const uint nGladiator = 14757;
+        const uint sGladiator = 14864;
+        const uint nShadowCaster = 14762;
+        const uint sShadowCaster = 14817;
+
+        var bossName = bossId switch
+        {
+            nSilkie => "Boss1 鼠鼠",
+            sSilkie => "Boss1 零式鼠鼠",
+            nGladiator => "Boss2 守护者",
+            sGladiator => "Boss2 零式守护者",
+            nShadowCaster => "Boss3 影火",
+            sShadowCaster => "Boss3 零式影火",
+            _ => "未知"
+        };
+        
+        ParamsInit(accessory);
+        DebugMsg($"检测到{bossName}的刷新，参数初始化。", accessory);
     }
 
     #region Mob1
@@ -1748,6 +1779,12 @@ public static class EventExtensions
     {
         return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
     }
+    
+    public static uint DataId(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["DataId"]);
+    }
+    
     public static uint Id(this Event @event)
     {
         return ParseHexId(@event["Id"], out var id) ? id : 0;
