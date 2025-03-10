@@ -198,6 +198,7 @@ public class TopPatch
         _dyn.Init(accessory);
         _dv = new DeltaVersion();
         _dv.Init(accessory);
+        myArmUnitBiasEnable = false;
         MarkClear(accessory);
         
         accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
@@ -506,11 +507,12 @@ public class TopPatch
         
         tpos = tpos.PointInOutside(Center, 1f);
         var baitPos = tpos.RotatePoint(Center, id == (uint)IconId.RotateCW ? -5f.DegToRad() : 5f.DegToRad());
-        var dp = accessory.DrawStaticCircle(baitPos, accessory.Data.DefaultSafeColor.WithW(3f), 0, 5000, $"手臂单元转转", 0.5f);
+        var dp = accessory.DrawStaticCircle(baitPos, accessory.Data.DefaultSafeColor.WithW(3f), 0, 10000, $"手臂单元转转", 0.5f);
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
     }
-    
-    [ScriptMethod(name: "一运 玩家引导拳头指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31587"],
+
+    private bool myArmUnitBiasEnable = false;
+    [ScriptMethod(name: "一运 玩家引导拳头指路 *", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31587"],
         userControl: true)]
     public void P5_DeltaMyArmUnitBiasGuidance(Event @event, ScriptAccessory accessory)
     {
@@ -524,7 +526,7 @@ public class TopPatch
         if (@event.TargetId() != accessory.Data.Me) return;
         if (_recorded[(int)RecordedIdx.ArmUnitGuidance]) return;
         _recorded[(int)RecordedIdx.ArmUnitGuidance] = true;
-        
+        myArmUnitBiasEnable = true;
         var myIndex = accessory.GetMyIndex();
         var myMarker = _dv.GetMarkers()[myIndex];
         var myPos = @event.TargetPosition();
@@ -553,8 +555,6 @@ public class TopPatch
             
             _ => -1
         };
-
-        // TODO 目前这一条同组靠内集合会触发，但指路未触发，需要研究一下是有什么bug。
         
         accessory.DebugMsg(!isShieldTarget ? $"玩家所需引导手臂单元位于方位{_dv.MyArmUnit}" : $"玩家需前往场中偏方位{_dv.MyArmUnit}",
             DebugMode);
@@ -564,25 +564,45 @@ public class TopPatch
         {
             accessory.DebugMsg($"向引导拳头位置绘图", DebugMode);
             var armUnitPos = new Vector3(100, 0, 84).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
-            var dp = accessory.DrawGuidance(armUnitPos, 1000, 3000, $"引导拳头指引", isSafe: false);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+            var dp = accessory.DrawGuidance(armUnitPos, 0, 4000, $"引导拳头指引", isSafe: false);
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
         else
         {
             accessory.DebugMsg($"向场中引导位置绘图", DebugMode);
             var armUnitPos = new Vector3(100, 0, 95).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
-            var dp = accessory.DrawGuidance(armUnitPos, 1000, 3000, $"场中引导指引", isSafe: false);
+            var dp = accessory.DrawGuidance(armUnitPos, 0, 4000, $"场中引导指引", isSafe: false);
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
     }
     
-    [ScriptMethod(name: "一运 玩家引导拳头指路删除", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
+    [ScriptMethod(name: "一运 玩家引导拳头指路刷新", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
         userControl: false, suppress: 10000)]
-    public void P5_DeltaMyArmUnitBiasRemove(Event @event, ScriptAccessory accessory)
+    public void P5_DeltaMyArmUnitBiasRefresh(Event @event, ScriptAccessory accessory)
     {
         if (_phase != TopPhase.P5_DeltaVersion) return;
         accessory.Method.RemoveDraw($"引导拳头指引");
         accessory.Method.RemoveDraw($"场中引导指引");
+        
+        if (!myArmUnitBiasEnable) return;
+        
+        var myIndex = accessory.GetMyIndex();
+        var myMarker = _dv.GetMarkers()[myIndex];
+        var isShieldTarget = myMarker is MarkType.Bind1 or MarkType.Stop1;
+        if (isShieldTarget) return;
+        
+        accessory.DebugMsg($"去引导拳头", DebugMode);
+        var armUnitPos = new Vector3(100, 0, 84).RotatePoint(Center, _dv.MyArmUnit * 30f.DegToRad());
+        var dp = accessory.DrawGuidance(armUnitPos, 0, 4000, $"引导拳头", isSafe: true);
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+    
+    [ScriptMethod(name: "一运 转转手引导指路删除", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31600"],
+        userControl: false, suppress: 10000)]
+    public void P5_DeltaMyArmUnitBiasRemove(Event @event, ScriptAccessory accessory)
+    {
+        if (_phase != TopPhase.P5_DeltaVersion) return;
+        accessory.Method.RemoveDraw($"引导拳头");
     }
     
     [ScriptMethod(name: "一运 玩家场中盾引导指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
@@ -617,7 +637,7 @@ public class TopPatch
         
         var standByPos = new Vector3(100, 0, 86).
             RotatePoint(Center, MathF.Round((float)_dv.MyArmUnit * 2 / 3) * 45f.DegToRad());
-        var dp = accessory.DrawGuidance(standByPos, 0, 3000, $"攻击头标标点待命");
+        var dp = accessory.DrawGuidance(standByPos, 0, 6000, $"攻击头标标点待命");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
     
@@ -736,7 +756,8 @@ public class TopPatch
     {
         if (_phase != TopPhase.P5_DeltaVersion) return;
         _phase = TopPhase.P5_DeltaWorld;
-        accessory.Method.RemoveDraw(".*");
+        accessory.Method.RemoveDraw("小电视.*");
+        accessory.Method.RemoveDraw("一运.*");
         
         // 初始化_events
         _events = Enumerable
@@ -744,8 +765,9 @@ public class TopPatch
             .Select(_ => new ManualResetEvent(false))
             .ToList();
         
-        // 初始化_recorded
-        _recorded = new bool[20].ToList();
+        // 不能初始化_recorded，至少不能在这里初始化，不然丫给你画两遍近线拉断。
+        // // 初始化_recorded
+        // _recorded = new bool[20].ToList();
         
         // 根据标点补充DynamicPass
         var markerList = _dv.GetMarkers();
@@ -842,7 +864,7 @@ public class TopPatch
         accessory.Method.RemoveDraw("一传指路");
     }
     
-    [ScriptMethod(name: "一传 近线拉线提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:3529"],
+    [ScriptMethod(name: "一传 近线拉线提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:1672"],
         userControl: true)]
     public void P5_DeltaWorldLocalTetherBreakHint(Event @event, ScriptAccessory accessory)
     {
@@ -853,16 +875,22 @@ public class TopPatch
         var myIndex = accessory.GetMyIndex();
         var myMarker = _dv.GetMarkers()[myIndex];
         if (myMarker is not MarkType.Attack1 and not MarkType.Attack2) return;
+        
+        if (_recorded[(int)RecordedIdx.BreakLocalTether]) return;
+        _recorded[(int)RecordedIdx.BreakLocalTether] = true;
+        
         var myPartner = GetMarkedPlayerIndex(accessory, _dv.GetMarkers(),
             myMarker is MarkType.Attack1 ? MarkType.Attack2 : MarkType.Attack1);
         
         var dur = (int)@event.DurationMilliseconds();
+        accessory.DebugMsg($"我的标点是Attack1或Attack2，将画拉线提示。{dur}", DebugMode);
+        
         // 在还剩10秒时，DeltaWorld正在执行，需在最后2秒拉断。
 
         var delay1 = dur - 8000;
         var destroy1 = 6000;
-        var delay2 = dur - 2000;
-        var destroy2 = 2000;
+        var delay2 = dur - 3000;
+        var destroy2 = 3000;
 
         // 近线实际距离约为10，取11
         var dp1 = accessory.DrawCircle(accessory.Data.PartyList[myPartner], 11, delay1, destroy1, $"近线别拉断");
@@ -1855,6 +1883,7 @@ public enum RecordedIdx : int
     
     // _recorded
     ArmUnitGuidance = 0,
+    BreakLocalTether = 1,
 }
 
 #region 函数集
