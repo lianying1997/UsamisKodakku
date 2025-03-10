@@ -35,13 +35,28 @@ public class TopPatch
     请先按需求检查并设置“用户设置”栏目。
     
     v0.0.0.0
-    [ ] P5 一运
-    [ ] P5 一传
-    [x] P5 二运
-    [ ] P5 二传
-    [ ] P5 三运
-    [ ] P5 三传
-    [ ] P5 四传
+    集成功能：
+    指挥模式  非指挥模式  经本地标点测试
+    [o-o] P1 线塔
+    [o-o] P1 全能
+    [o-o] P2 索尼
+    [o-o] P2 分摊换位
+    [o-o] P3 TV
+    [ooo] P4 分摊换位
+    [xxo] P5 一运
+    [xxo] P5 一传
+    [xoo] P5 二运
+    [ooo] P5 二传
+    [ooo] P5 三运
+    [ooo] P5 三传
+    [ooo] P5 四传
+    
+    补丁功能：
+    [o] P1 线塔 线大圈延迟出现
+    [o] P2 找男人
+    [o] P3 HW 不能贴贴的玩家
+    [o] P3 HW 搭档提示
+    [o] P3 HW 站位提示
     """;
 
     private const string Name = "TOP_Patch [欧米茄绝境验证战 补丁]";
@@ -783,9 +798,9 @@ public class TopPatch
             new(108.9f, 0, 88.9f),      // Atk3 - NearTarget
             new(113.7f, 0, 86.3f),      // Atk4 - NearTarget
             new(119.5f, 0, 100f),       // Bind1 - FarSource
-            new(106.5f, 0, 100f),         // Bind2 - NearSource
-            new(113.7f, 0, 86.3f),      // Stop1 - Idle
-            new(116.2f, 0, 111f)       // Stop2 - Idle
+            new(106.5f, 0, 100f),       // Bind2 - NearSource
+            new(116.2f, 0, 111f),       // Stop1 - Idle
+            new(116.2f, 0, 111f)        // Stop2 - Idle
         ];
 
         var myPosIdx = myMarker switch
