@@ -58,6 +58,9 @@ public class FruPatch
     [UserSetting("指挥模式（总开关）")]
     public static bool CaptainMode { get; set; } = false;
 
+    [UserSetting("指挥模式 - 开启【P1乐园绝技】指挥")]
+    public static bool UosCaptainMode { get; set; } = false;
+
     [UserSetting("指挥模式 - 开启【P1罪壤堕（DB闲固）】指挥")]
     public static bool FofCaptainMode { get; set; } = false;
 
@@ -222,8 +225,8 @@ public class FruPatch
             var upTetherTarget = _pd.SelectSpecificPriorityIndex(6);
             var downTetherTarget = _pd.SelectSpecificPriorityIndex(7);
             // 标点
-            MarkPlayerByIdx(accessory, upTetherTarget.Key, MarkType.Attack1);
-            MarkPlayerByIdx(accessory, downTetherTarget.Key, MarkType.Attack2);
+            MarkPlayerByIdx(accessory, upTetherTarget.Key, MarkType.Attack1, UosCaptainMode);
+            MarkPlayerByIdx(accessory, downTetherTarget.Key, MarkType.Attack2, UosCaptainMode);
             // 发送Debug信息
             var str = "\n";
             str += $"上：{upTetherTarget.Key} ({accessory.GetPlayerJobByIndex(upTetherTarget.Key)})\n";
@@ -238,7 +241,7 @@ public class FruPatch
             // 满足该条件，代表D1在上。
             var str = $"玩家{remainPlayers[2].Key} ({accessory.GetPlayerJobByIndex(remainPlayers[2].Key)}需交换。)";
             accessory.DebugMsg(str, DebugMode);
-            MarkPlayerByIdx(accessory, remainPlayers[2].Key, MarkType.Stop1);
+            MarkPlayerByIdx(accessory, remainPlayers[2].Key, MarkType.Stop1, UosCaptainMode);
         }
 
         if (remainPlayers[3].Key == Mt)
@@ -246,7 +249,7 @@ public class FruPatch
             // 满足该条件，代表MT在下。
             var str = $"玩家{remainPlayers[3].Key} ({accessory.GetPlayerJobByIndex(remainPlayers[3].Key)}需交换。)";
             accessory.DebugMsg(str, DebugMode);
-            MarkPlayerByIdx(accessory, remainPlayers[3].Key, MarkType.Stop2);
+            MarkPlayerByIdx(accessory, remainPlayers[3].Key, MarkType.Stop2, UosCaptainMode);
         }
 
         // 若想后续应用指路可直接调用remainPlayers，Key代表职业位置，Value为优先级。
