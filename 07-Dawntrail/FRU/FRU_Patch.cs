@@ -89,7 +89,7 @@ public class FruPatch
         CrowdFirst_人群车头,
         CrownFirst_MTD1皇帝车头,
     }
-    private const bool Debugging = true;
+    private const bool Debugging = false;
     private static readonly bool LocalTest = false;
     private static readonly bool LocalStrTest = false;      // 本地不标点，仅用字符串表示。
     private static readonly Random Random = new();          // 随机测试用
