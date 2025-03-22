@@ -32,19 +32,18 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.1
+        v0.0.0.2
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。
         不论MT或ST引导，都默认MT与D1为车头。双T都会收到引导提示。
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        P1罪壤刺增加DB闲固指路与对应指挥模式。
-        P3启示录标出玩家分散点与对应指挥模式。
+        修复P3启示录精确标点模式下指路错误问题。
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -90,7 +89,7 @@ public class FruPatch
         CrowdFirst_人群车头,
         CrownFirst_MTD1皇帝车头,
     }
-    private const bool Debugging = false;
+    private const bool Debugging = true;
     private static readonly bool LocalTest = false;
     private static readonly bool LocalStrTest = false;      // 本地不标点，仅用字符串表示。
     private static readonly Random Random = new();          // 随机测试用
@@ -684,7 +683,7 @@ public class FruPatch
             if (_pd.ActionCount == 6)
             {
                 _apo.Grouping();
-                _events[(int)EventIdx.ApoGrouping].Set();
+                
             }
         }
     }
@@ -699,7 +698,6 @@ public class FruPatch
 
         lock (_apo)
         {
-            sa.DebugMsg($"检测到外部标点，若标满8人则覆盖_apo.Group分组逻辑。", DebugMode);
             _ct.AddCounter();
             var mark = @ev.Id();
             var tid = @ev.TargetId();
@@ -707,16 +705,18 @@ public class FruPatch
 
             var groupIdx = mark switch
             {
-                0 => 0,     // Atk1
-                1 => 2,     // Atk2
-                2 => 4,     // Atk3
-                3 => 6,     // Atk4
-                6 => 1,     // Bind1
-                7 => 3,     // Bind2
-                8 => 5,     // Bind3
-                11 => 7,    // Square
+                0x1 => 0,     // Atk1
+                0x2 => 2,     // Atk2
+                0x3 => 4,     // Atk3
+                0x4 => 6,     // Atk4
+                0x6 => 1,     // Bind1
+                0x7 => 3,     // Bind2
+                0x8 => 5,     // Bind3
+                0x11 => 7,    // Square
                 _ => 0,
             };
+
+            sa.DebugMsg($"检测到外部标点{mark}给玩家{sa.GetPlayerJobByIndex(tidx)}", DebugMode);
 
             // 直接修改定义，此时优先值已无意义
             _apo.TempGroup[groupIdx] = new KeyValuePair<int, int>(tidx, 0);
@@ -791,7 +791,8 @@ public class FruPatch
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
 
         var myIndex = sa.GetMyIndex();
-        var myGroupSafePosIdx = myIndex is Mt or D1 ? 0 : -1;   // 在精确分组情况下，玩家处于地火安全区的哪一个idx。皇帝可提前确定。
+        var myGroupSafePosIdx = _apo.IsInCrowd(myIndex) ? -1 : 0;
+        // var myGroupSafePosIdx = myIndex is Mt or D1 ? 0 : -1;   // 在精确分组情况下，玩家处于地火安全区的哪一个idx。皇帝可提前确定。
         int mySafeDir;
         // 根据玩家所属位置，选择人群安全区位置。
         if (ApoStg == ApoStgEnum.CrownFirst_MTD1皇帝车头)
@@ -799,7 +800,7 @@ public class FruPatch
             // 若玩家在左组，找位于北的皇帝安全区；否则找位于南的皇帝安全区
             int safeDir = (_apo.SafePoints[1] + 3) % 8;
             int mySafeDirIdx = _apo.IsInLeftGroup(myIndex) ? (safeDir < 4 ? 1 : 3) : (safeDir >= 4 ? 1 : 3);
-            if (!(myIndex is Mt or D1))
+            if (_apo.IsInCrowd(myIndex))
                 mySafeDirIdx -= 1;
             mySafeDir = _apo.SafePoints[mySafeDirIdx];
         }
@@ -809,12 +810,12 @@ public class FruPatch
             // 若玩家在左组，找位于北的人群安全区；否则找位于南的人群安全区
             int safeDir = (_apo.SafePoints[0] + 3) % 8;
             int mySafeDirIdx = _apo.IsInLeftGroup(myIndex) ? (safeDir < 4 ? 0 : 2) : (safeDir >= 4 ? 0 : 2);
-            if (myIndex is Mt or D1)
+            if (!_apo.IsInCrowd(myIndex))
                 mySafeDirIdx += 1;
             mySafeDir = _apo.SafePoints[mySafeDirIdx];
         }
 
-        if (_apo.GroupingFixed && !(myIndex is Mt or D1))
+        if (_apo.GroupingFixed && _apo.IsInCrowd(myIndex))
             myGroupSafePosIdx = _apo.GetMyGroupIdx() / 2 - 1;
 
         sa.DebugMsg($"玩家的安全方位为{mySafeDir}, 具体分散位置序列为{myGroupSafePosIdx}。", DebugMode);
@@ -826,7 +827,7 @@ public class FruPatch
             {
                 bool isSafe = mySafeDir == _apo.SafePoints[i];
 
-                if (_apo.GroupingFixed && !(myIndex is Mt or D1))
+                if (_apo.GroupingFixed && _apo.IsInCrowd(myIndex))
                     isSafe &= myGroupSafePosIdx == j;
 
                 var dp = sa.DrawStaticCircle(safePos[j], isSafe ? sa.Data.DefaultSafeColor.WithW(3f) : sa.Data.DefaultDangerColor.WithW(3f), 0, 10000, $"Usami-分散位dir{i}-idx{j}", 0.5f);
@@ -1025,6 +1026,8 @@ public class FruPatch
             var strLeft = $"{accessory.GetPlayerJobByIndex(Group[0].Key)},{accessory.GetPlayerJobByIndex(Group[2].Key)},{accessory.GetPlayerJobByIndex(Group[4].Key)},{accessory.GetPlayerJobByIndex(Group[6].Key)}";
             var strRight = $"{accessory.GetPlayerJobByIndex(Group[1].Key)},{accessory.GetPlayerJobByIndex(Group[3].Key)},{accessory.GetPlayerJobByIndex(Group[5].Key)},{accessory.GetPlayerJobByIndex(Group[7].Key)}";
             accessory.DebugMsg($"\n启示录分摊分组{(GroupingFixed ? "(Fixed)" : "")}：\n左组：{strLeft}\n右组：{strRight}", DebugMode);
+
+            _events[(int)EventIdx.ApoGrouping].Set();
         }
 
         public void GetSafeDirs()
@@ -1075,6 +1078,10 @@ public class FruPatch
         public bool IsInRightGroup(int idx)
         {
             return GetPlayerGroupIdx(idx) % 2 == 1;
+        }
+        public bool IsInCrowd(int idx)
+        {
+            return GetPlayerGroupIdx(idx) % 4 > 0;
         }
 
         public List<Vector3> GetSafePos(int dir)
