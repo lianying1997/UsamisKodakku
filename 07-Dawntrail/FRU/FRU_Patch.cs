@@ -46,6 +46,9 @@ public class FruPatch
         """
         新增“P3 - 启示录MT/ST优先级互换”选项，以适配ST引导超级跳，优先级与MT互换的情况。
         """;
+    private const bool Debugging = false;
+    private static readonly bool LocalTest = false;
+    private static readonly bool LocalStrTest = false;      // 本地不标点，仅用字符串表示。
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -54,18 +57,6 @@ public class FruPatch
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
     public static ScriptColor PosColorPlayer { get; set; } = new ScriptColor { V4 = new Vector4(0.0f, 1.0f, 1.0f, 1.0f) };
-
-    [UserSetting("指挥模式（总开关）")]
-    public static bool CaptainMode { get; set; } = false;
-
-    [UserSetting("指挥模式 - 开启【P1乐园绝技】指挥")]
-    public static bool UosCaptainMode { get; set; } = false;
-
-    [UserSetting("指挥模式 - 开启【P1罪壤堕（DB闲固）】指挥")]
-    public static bool FofCaptainMode { get; set; } = false;
-
-    [UserSetting("指挥模式 - 开启【P3二运启示录分组】指挥")]
-    public static bool ApoCaptainMode { get; set; } = false;
 
     [UserSetting("P1 - 罪壤堕优先级")]
     public static FallOfFaithPriorityEnum FallOfFaithPriority { get; set; } = FallOfFaithPriorityEnum.H_T_D_H;
@@ -93,9 +84,19 @@ public class FruPatch
         CrowdFirst_人群车头,
         CrownFirst_MTD1皇帝车头,
     }
-    private const bool Debugging = false;
-    private static readonly bool LocalTest = false;
-    private static readonly bool LocalStrTest = false;      // 本地不标点，仅用字符串表示。
+
+    [UserSetting("指挥模式（总开关）")]
+    public static bool CaptainMode { get; set; } = false;
+
+    [UserSetting("指挥模式 - 开启【P1乐园绝技】指挥")]
+    public static bool UosCaptainMode { get; set; } = false;
+
+    [UserSetting("指挥模式 - 开启【P1罪壤堕（DB闲固）】指挥")]
+    public static bool FofCaptainMode { get; set; } = false;
+
+    [UserSetting("指挥模式 - 开启【P3二运启示录分组】指挥")]
+    public static bool ApoCaptainMode { get; set; } = false;
+
     private static readonly Random Random = new();          // 随机测试用
     private int rdTarget = -1;                              // 随机测试用
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
@@ -148,6 +149,7 @@ public class FruPatch
             .Range(0, 20)
             .Select(_ => new ManualResetEvent(false))
             .ToList();
+        _recorded = new bool[20].ToList();
 
         accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}", DebugMode);
         accessory.Method.MarkClear();
@@ -754,8 +756,8 @@ public class FruPatch
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
-    [ScriptMethod(name: "分组交换提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2461"],
-     userControl: true, suppress: 10000)]
+    [ScriptMethod(name: "分组交换提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:40270"],
+     userControl: true)]
     public void DarkWaterSwapHint(Event @ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
@@ -766,13 +768,12 @@ public class FruPatch
         var myIndex = sa.GetMyIndex();
         var myPreviousGroup = myIndex < 4 ? 0 : 1;     // 0 左 1 右
         var myCurrentGroup = _apo.GetMyGroup();
-        if (myPreviousGroup == myCurrentGroup) return;
 
-        var dp = sa.DrawGuidance(_apo.IsInLeftGroup(myIndex) ? new Vector3(93, 0, 0) : new Vector3(107, 0, 0), 0, 3000, $"Usami-狂水交换");
+        var dp = sa.DrawGuidance(_apo.IsInLeftGroup(myIndex) ? new Vector3(93, 0, 100) : new Vector3(107, 0, 100), 0, 3000, $"Usami-狂水位置");
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        var str = _apo.GroupingFixed ? "依照头标" :
-        ApoTankPriorSwap ? "依照优先级低换" : "依照优先级(ST>MT)低换";
-        sa.Method.TextInfo($"交换({str})", 3000, true);
+        var str = _apo.GroupingFixed ? "依照头标" : ApoTankPriorSwap ? "依照优先级低换" : "依照优先级(ST>MT)低换";
+        sa.Method.TextInfo($"{(myPreviousGroup == myCurrentGroup ? "不换" : "交换")}({str})", 3000, true);
+        sa.DebugMsg($"{(myPreviousGroup == myCurrentGroup ? "不换" : "交换")}({str})", DebugMode);
     }
 
     [ScriptMethod(name: "碎灵一击范围与分散提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:40288"], userControl: true)]
@@ -965,6 +966,7 @@ public class FruPatch
             NorthStartPoint = -1;
             SafePoints = [-1, -1, -1, -1];
             RotationDir = 0;
+            GroupingFixed = false;
         }
 
         public void AddActionCount()
@@ -1099,8 +1101,7 @@ public class FruPatch
         public bool IsInRightGroup(int idx) => GetPlayerGroupIdx(idx) % 2 == 1;
         public bool IsInCrowd(int idx)
         {
-            // 两个皇帝位不在人群中
-            return (GetPlayerGroupIdx(idx) != (ApoTankPriorSwap ? St : Mt)) && (GetPlayerGroupIdx(idx) != D1);
+            return (idx != D1) && (idx != (ApoTankPriorSwap ? St : Mt)) ;
         }
 
         public List<Vector3> GetSafePos(int dir)
@@ -1143,6 +1144,11 @@ public class FruPatch
     public void DarklitDragonsongPhaseChange(Event @event, ScriptAccessory accessory)
     {
         _fruPhase = FruPhase.P4A_DarklitDragonsong;
+        _events = Enumerable
+            .Range(0, 20)
+            .Select(_ => new ManualResetEvent(false))
+            .ToList();
+        _recorded = new bool[20].ToList();
         accessory.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
     }
 
