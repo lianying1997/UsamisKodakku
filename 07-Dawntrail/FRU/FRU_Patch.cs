@@ -32,18 +32,19 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.2
+        v0.0.0.3
         指挥模式对P3二运有效。
-        若开启指挥模式，将执行近战优化标点。
-        不论MT或ST引导，都默认MT与D1为车头。双T都会收到引导提示。
+        若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
+        不论MT或ST引导，双T都会收到引导方向提示。
+        
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        修复P3启示录精确标点模式下指路错误问题。
+        新增“P3 - 启示录MT/ST优先级互换”选项，以适配ST引导超级跳，优先级与MT互换的情况。
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -82,6 +83,9 @@ public class FruPatch
         Grey9_灰9式,
     }
 
+    [UserSetting("P3 - 启示录MT/ST优先级互换")]
+    public static bool ApoTankPriorSwap { get; set; } = false;
+
     [UserSetting("P3 - 启示录策略")]
     public static ApoStgEnum ApoStg { get; set; } = ApoStgEnum.CrowdFirst_人群车头;
     public enum ApoStgEnum
@@ -93,7 +97,7 @@ public class FruPatch
     private static readonly bool LocalTest = false;
     private static readonly bool LocalStrTest = false;      // 本地不标点，仅用字符串表示。
     private static readonly Random Random = new();          // 随机测试用
-    private int rdTarget = -1;                               // 随机测试用
+    private int rdTarget = -1;                              // 随机测试用
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
     private static List<ManualResetEvent> _events = Enumerable
         .Range(0, 20)
@@ -654,7 +658,8 @@ public class FruPatch
         _ct.Init(sa, "启示录外部标点");
         MarkClear(sa);
         _apo.Init(sa, _pd);
-        _pd.AddPriorities([0, 1, 2, 3, 7, 6, 5, 4]);    // 初始THD优先级，这总没有什么HTDH的幺蛾子吧？数大右，数小左
+        // ST引导超级跳的话，建议开启
+        _pd.AddPriorities(ApoTankPriorSwap ? [1, 0, 2, 3, 7, 6, 5, 4]: [0, 1, 2, 3, 7, 6, 5, 4]);    // 初始THD优先级
         sa.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
     }
 
@@ -736,17 +741,39 @@ public class FruPatch
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
         // 程序内部确定分组 -> 检测是否完成精确分组 -> 范围提示
         _events[(int)EventIdx.ApoGrouping].WaitOne();
-        _events[(int)EventIdx.ApoPreciseGrouping].WaitOne(1500);
+        _events[(int)EventIdx.ApoPreciseGrouping].WaitOne(1000);
 
         var tid = @ev.TargetId();
         var tidx = sa.GetPlayerIdIndex(tid);
         var dur = @ev.DurationMilliseconds();
 
         var isSameGroup = _apo.GetMyGroup() == _apo.GetPlayerGroup(tidx);
+        var delayed = !_apo.GroupingFixed;
 
-        var dp = sa.DrawCircle(tid, 6, (int)dur - 3000, 3000, $"Usami-狂水{tidx}", true);
+        var dp = sa.DrawCircle(tid, 6, (int)dur - 3000 - (delayed ? 1000 : 0), 3000, $"Usami-狂水{tidx}", true);
         dp.Color = isSameGroup ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor;
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    [ScriptMethod(name: "分组交换提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2461"],
+     userControl: true, suppress: 10000)]
+    public void DarkWaterSwapHint(Event @ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P3B_Apocalypse) return;
+        // 程序内部确定分组 -> 检测是否完成精确分组 -> 交换提示
+        _events[(int)EventIdx.ApoGrouping].WaitOne();
+        _events[(int)EventIdx.ApoPreciseGrouping].WaitOne(1000);
+
+        var myIndex = sa.GetMyIndex();
+        var myPreviousGroup = myIndex < 4 ? 0 : 1;     // 0 左 1 右
+        var myCurrentGroup = _apo.GetMyGroup();
+        if (myPreviousGroup == myCurrentGroup) return;
+
+        var dp = sa.DrawGuidance(_apo.IsInLeftGroup(myIndex) ? new Vector3(93, 0, 0) : new Vector3(107, 0, 0), 0, 3000, $"Usami-狂水交换");
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        var str = _apo.GroupingFixed ? "依照头标" :
+        ApoTankPriorSwap ? "依照优先级低换" : "依照优先级(ST>MT)低换";
+        sa.Method.TextInfo($"交换({str})", 3000, true);
     }
 
     [ScriptMethod(name: "碎灵一击范围与分散提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:40288"], userControl: true)]
@@ -792,7 +819,6 @@ public class FruPatch
 
         var myIndex = sa.GetMyIndex();
         var myGroupSafePosIdx = _apo.IsInCrowd(myIndex) ? -1 : 0;
-        // var myGroupSafePosIdx = myIndex is Mt or D1 ? 0 : -1;   // 在精确分组情况下，玩家处于地火安全区的哪一个idx。皇帝可提前确定。
         int mySafeDir;
         // 根据玩家所属位置，选择人群安全区位置。
         if (ApoStg == ApoStgEnum.CrownFirst_MTD1皇帝车头)
@@ -850,10 +876,8 @@ public class FruPatch
         lock (_apo)
         {
             if (_apo.ActionCount >= 2) return;
-            // ----- 正体 -----
             var northApoDir = @ev.SourcePosition().Position2Dirs(Center, 8);
             var rot = @ev.Id2();
-            // ----- ---- -----
             _apo.AddActionCount();
 
             // 记录北方开始点与旋转方向
@@ -961,18 +985,20 @@ public class FruPatch
             if (CaptainMode && ApoCaptainMode)
             {
                 // 近战优待调整方式：若ST去右，D2无脑去左；若D2去左，ST无脑去右。
+                // 因为加入优先级互换，后续注释中的"St"可被认为成"闲T（非引导T）"
                 // const int groupLeft = 0;
                 const int groupRight = 1;
-                var stGroup = Priorities.FindPriorityIndexOfKey(St) % 2;
+                var freeTank = ApoTankPriorSwap ? Mt : St;
+                var freeTankGroup = Priorities.FindPriorityIndexOfKey(freeTank) % 2;
                 var d2Group = Priorities.FindPriorityIndexOfKey(D2) % 2;
 
-                if (stGroup == d2Group)
+                if (freeTankGroup == d2Group)
                 {
                     // 当St与D2在同一组，三近战，需要换位
                     // St在右组时，说明被Mt排挤，D2需与同Buff再次换位。此时D2的idx在后，D2搭档的idx在前。
                     // St在左组时，说明D2被Mt排挤，St需与同Buff再次换位。此时St的idx在前，St搭档的idx在后。
-                    var targetIdx = stGroup == groupRight ? Priorities.FindPriorityIndexOfKey(D2) : Priorities.FindPriorityIndexOfKey(St);
-                    var offset = stGroup == groupRight ? -1 : 1;
+                    var targetIdx = freeTankGroup == groupRight ? Priorities.FindPriorityIndexOfKey(D2) : Priorities.FindPriorityIndexOfKey(freeTank);
+                    var offset = freeTankGroup == groupRight ? -1 : 1;
                     (TempGroup[targetIdx + offset], TempGroup[targetIdx]) = (TempGroup[targetIdx], TempGroup[targetIdx + offset]);
                 }
 
@@ -988,7 +1014,7 @@ public class FruPatch
                 for (int i = 0; i < 8; i++)
                     Priorities.Priorities[i] = inRightGroup[i] ? 10 : 0;
 
-                Priorities.AddPriorities([0, 1, 4, 5, 2, 3, 6, 7]);
+                Priorities.AddPriorities(ApoTankPriorSwap ? [1, 0, 4, 5, 2, 3, 6, 7] : [0, 1, 4, 5, 2, 3, 6, 7]);
                 // 队长模式安排后
                 Priorities.ShowPriorities();
 
@@ -1070,18 +1096,12 @@ public class FruPatch
         public int GetMyGroupIdx() => GetPlayerGroupIdx(accessory.GetMyIndex());
         public int GetPlayerGroup(int idx) => GetPlayerGroupIdx(idx) % 2;
         public int GetMyGroup() => GetPlayerGroup(accessory.GetMyIndex());
-
-        public bool IsInLeftGroup(int idx)
-        {
-            return GetPlayerGroupIdx(idx) % 2 == 0;
-        }
-        public bool IsInRightGroup(int idx)
-        {
-            return GetPlayerGroupIdx(idx) % 2 == 1;
-        }
+        public bool IsInLeftGroup(int idx) => GetPlayerGroupIdx(idx) % 2 == 0;
+        public bool IsInRightGroup(int idx) => GetPlayerGroupIdx(idx) % 2 == 1;
         public bool IsInCrowd(int idx)
         {
-            return GetPlayerGroupIdx(idx) % 4 > 0;
+            // 两个皇帝位不在人群中
+            return (GetPlayerGroupIdx(idx) != (ApoTankPriorSwap ? St : Mt)) && (GetPlayerGroupIdx(idx) != D1);
         }
 
         public List<Vector3> GetSafePos(int dir)
