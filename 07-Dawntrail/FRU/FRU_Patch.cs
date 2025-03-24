@@ -659,7 +659,7 @@ public class FruPatch
         MarkClear(sa);
         _apo.Init(sa, _pd);
         // ST引导超级跳的话，建议开启
-        _pd.AddPriorities(ApoTankPriorSwap ? [1, 0, 2, 3, 7, 6, 5, 4]: [0, 1, 2, 3, 7, 6, 5, 4]);    // 初始THD优先级
+        _pd.AddPriorities(ApoTankPriorSwap ? [1, 0, 2, 3, 7, 6, 5, 4] : [0, 1, 2, 3, 7, 6, 5, 4]);    // 初始THD优先级
         sa.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
     }
 
@@ -688,7 +688,6 @@ public class FruPatch
             if (_pd.ActionCount == 6)
             {
                 _apo.Grouping();
-                
             }
         }
     }
@@ -1502,6 +1501,7 @@ public class FruPatch
     }
 
     #endregion
+
 }
 
 #region 函数集
