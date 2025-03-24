@@ -5,6 +5,7 @@ using KodakkuAssist.Module.GameEvent.Struct;
 using KodakkuAssist.Module.Draw;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using ECommons;
 using System.Numerics;
 using Newtonsoft.Json;
@@ -32,7 +33,7 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.3
+        v0.0.0.4
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
         不论MT或ST引导，双T都会收到引导方向提示。
@@ -40,11 +41,11 @@ public class FruPatch
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.3";
+    private const string Version = "0.0.0.4";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        新增“P3 - 启示录MT/ST优先级互换”选项，以适配ST引导超级跳，优先级与MT互换的情况。
+        新增“P2.5 - 暗水晶不可选中”功能。
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -617,6 +618,16 @@ public class FruPatch
         accessory.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
     }
 
+    [ScriptMethod(name: "暗水晶不可选中", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:17828"],
+        userControl: true)]
+    public async void DarkCrystalUntargetable(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P2D_AbsoluteZero) return;
+        var sid = ev.SourceId();
+        await Task.Delay(500);
+        DisTargetable(sid, sa);
+    }
+
     #endregion P2.4 绝对零度
 
     #endregion P2 希瓦
@@ -1101,7 +1112,7 @@ public class FruPatch
         public bool IsInRightGroup(int idx) => GetPlayerGroupIdx(idx) % 2 == 1;
         public bool IsInCrowd(int idx)
         {
-            return (idx != D1) && (idx != (ApoTankPriorSwap ? St : Mt)) ;
+            return (idx != D1) && (idx != (ApoTankPriorSwap ? St : Mt));
         }
 
         public List<Vector3> GetSafePos(int dir)
@@ -1508,6 +1519,33 @@ public class FruPatch
 
     #endregion
 
+    #region 特殊函数
+
+    private void SetTargetable(uint id, ScriptAccessory accessory)
+    {
+        IGameObject? tObj = IbcHelper.GetById(id);
+        if (tObj == null || tObj.IsDead || tObj.IsTargetable) return;
+        unsafe
+        {
+            FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject* tStruct = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)tObj.Address;
+            tStruct->TargetableStatus |= FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectTargetableFlags.IsTargetable;
+        }
+        accessory.Log.Debug($"Set Targetable => {tObj}");
+    }
+    private void DisTargetable(uint id, ScriptAccessory accessory)
+    {
+        IGameObject? tObj = IbcHelper.GetById(id);
+        if (tObj == null || !tObj.IsTargetable) return;
+        unsafe
+        {
+            FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject* tStruct = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)tObj.Address;
+            tStruct->TargetableStatus &= ~FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectTargetableFlags.IsTargetable;
+        }
+        accessory.Log.Debug($"Dis Targetable => {tObj}");
+    }
+
+    #endregion 特殊函数
+    
 }
 
 #region 函数集

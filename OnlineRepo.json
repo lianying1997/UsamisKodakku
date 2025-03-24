@@ -173,12 +173,12 @@
   {
     "Name": "FRU_Patch [光暗未来绝境战 补丁]",
     "Guid": "3076a62b-127e-468e-96d3-4f1d559857ec",
-    "Version": "0.0.0.3",
+    "Version": "0.0.0.4",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/FRU/FRU_Patch.cs",
-    "Note": "v0.0.0.3\r\n指挥模式对P3二运有效。\r\n若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）\r\n不论MT或ST引导，双T都会收到引导方向提示。\r\n",
-    "UpdateInfo": "新增“P3 - 启示录MT/ST优先级互换”选项，以适配ST引导超级跳，优先级与MT互换的情况。",
+    "Note": "v0.0.0.4\r\n指挥模式对P3二运有效。\r\n若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）\r\n不论MT或ST引导，双T都会收到引导方向提示。\r\n",
+    "UpdateInfo": "新增“P2.5 - 暗水晶不可选中”功能。",
     "TerritoryIds": [
       1238
     ]
