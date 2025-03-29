@@ -3,6 +3,9 @@ using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent.Struct;
 using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Data;
+using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Module.GameOperate;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,13 +16,13 @@ using System.Linq;
 using System.ComponentModel;
 using System.Xml.Linq;
 using Dalamud.Utility.Numerics;
-using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
-using KodakkuAssist.Module.Draw.Manager;
-using KodakkuAssist.Module.GameOperate;
 using ImGuiNET;
 using ECommons.MathHelpers;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using Lumina.Excel.Sheets;
 
 namespace UsamisKodakku.Script._07_DawnTrail.FRU;
 
@@ -33,19 +36,19 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.5
+        v0.0.0.6
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
         不论MT或ST引导，双T都会收到引导方向提示。
-        
+        若发生问题请携ARR反馈。
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.5";
+    private const string Version = "0.0.0.6";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        修复P3启示录换位提示信息错误的Bug。
+        适配新版鸭鸭做了代码修正。
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -625,7 +628,7 @@ public class FruPatch
         if (_fruPhase != FruPhase.P2D_AbsoluteZero) return;
         var sid = ev.SourceId();
         await Task.Delay(500);
-        DisTargetable(sid, sa);
+        sa.SetTargetable(sid, false);
     }
 
     #endregion P2.4 绝对零度
@@ -913,7 +916,7 @@ public class FruPatch
         var tpos1 = new Vector3(100, 0, 80).RotatePoint(Center, (_apo.SafePoints[1] * 45f).DegToRad());
         var tpos2 = new Vector3(100, 0, 80).RotatePoint(Center, (_apo.SafePoints[3] * 45f).DegToRad());
 
-        var isTank = IbcHelper.IsTank(sa.Data.Me);
+        var isTank = sa.IsTank(sa.Data.Me);
 
         sa.Method.TextInfo(isTank ? $"准备引导" : $"避开引导", 3000, true);
 
@@ -1518,34 +1521,7 @@ public class FruPatch
     }
 
     #endregion
-
-    #region 特殊函数
-
-    private void SetTargetable(uint id, ScriptAccessory accessory)
-    {
-        IGameObject? tObj = IbcHelper.GetById(id);
-        if (tObj == null || tObj.IsDead || tObj.IsTargetable) return;
-        unsafe
-        {
-            FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject* tStruct = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)tObj.Address;
-            tStruct->TargetableStatus |= FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectTargetableFlags.IsTargetable;
-        }
-        accessory.Log.Debug($"Set Targetable => {tObj}");
-    }
-    private void DisTargetable(uint id, ScriptAccessory accessory)
-    {
-        IGameObject? tObj = IbcHelper.GetById(id);
-        if (tObj == null || !tObj.IsTargetable) return;
-        unsafe
-        {
-            FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject* tStruct = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)tObj.Address;
-            tStruct->TargetableStatus &= ~FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectTargetableFlags.IsTargetable;
-        }
-        accessory.Log.Debug($"Dis Targetable => {tObj}");
-    }
-
-    #endregion 特殊函数
-    
+   
 }
 
 #region 函数集
@@ -1684,70 +1660,157 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, uint id)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchByEntityId(id);
     }
 
-    public static IBattleChara? GetMe()
+    public static IGameObject? GetMe(this ScriptAccessory sa)
     {
-        return Svc.ClientState.LocalPlayer;
+        return sa.Data.Objects.LocalPlayer;
     }
 
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
+    public static IEnumerable<IGameObject?> GetByDataId(this ScriptAccessory sa, uint dataId)
     {
-        return Svc.Objects.Where(x => x.DataId == dataId);
+        return sa.Data.Objects.Where(x => x.DataId == dataId);
     }
 
-    public static uint GetCharHpcur(uint id)
+    public static string GetCharJob(this ScriptAccessory sa, uint id, bool fullName = false)
     {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
+        if (chara == null) return "None";
+        return fullName ? chara.ClassJob.Value.Name.ToString() : chara.ClassJob.Value.Abbreviation.ToString();
+    }
+    public static CombatRole GetRole(this ICharacter c)
+    {
+        ClassJob? valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local1 = ref valueNullable;
+        ClassJob valueOrDefault;
+        byte? nullable1;
+        if (!local1.HasValue)
+        {
+            nullable1 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local1.GetValueOrDefault();
+            nullable1 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable2 = nullable1;
+        if ((nullable2.HasValue ? new int?((int)nullable2.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 1)
+            return CombatRole.Tank;
+        valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local2 = ref valueNullable;
+        byte? nullable3;
+        if (!local2.HasValue)
+        {
+            nullable3 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local2.GetValueOrDefault();
+            nullable3 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable4 = nullable3;
+        if ((nullable4.HasValue ? new int?((int)nullable4.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 2)
+            return CombatRole.DPS;
+        valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local3 = ref valueNullable;
+        byte? nullable5;
+        if (!local3.HasValue)
+        {
+            nullable5 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local3.GetValueOrDefault();
+            nullable5 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable6 = nullable5;
+        if ((nullable6.HasValue ? new int?((int)nullable6.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 3)
+            return CombatRole.DPS;
+        valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local4 = ref valueNullable;
+        byte? nullable7;
+        if (!local4.HasValue)
+        {
+            nullable7 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local4.GetValueOrDefault();
+            nullable7 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable8 = nullable7;
+        return (nullable8.HasValue ? new int?((int)nullable8.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 4 ? CombatRole.Healer : CombatRole.NonCombat;
     }
 
-    public static bool IsTank(uint id)
+    public static bool IsTank(this ScriptAccessory sa, uint id)
     {
-        var chara = GetById(id);
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.Tank;
     }
-    public static bool IsHealer(uint id)
+    public static bool IsHealer(this ScriptAccessory sa, uint id)
     {
-        var chara = GetById(id);
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.Healer;
     }
-    public static bool IsDps(uint id)
+    public static bool IsDps(this ScriptAccessory sa, uint id)
     {
-        var chara = GetById(id);
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.DPS;
     }
-    public static bool AtNorth(uint id, float centerZ)
+    public static bool AtNorth(this ScriptAccessory sa, uint id, float centerZ)
     {
-        var chara = GetById(id);
+        var chara = sa.GetById(id);
         if (chara == null) return false;
         return chara.Position.Z <= centerZ;
     }
-    public static bool AtSouth(uint id, float centerZ)
+    public static bool AtSouth(this ScriptAccessory sa, uint id, float centerZ)
     {
-        var chara = GetById(id);
+        var chara = sa.GetById(id);
         if (chara == null) return false;
         return chara.Position.Z > centerZ;
     }
-    public static bool AtWest(uint id, float centerX)
+    public static bool AtWest(this ScriptAccessory sa, uint id, float centerX)
     {
-        var chara = GetById(id);
+        var chara = sa.GetById(id);
         if (chara == null) return false;
         return chara.Position.X <= centerX;
     }
-    public static bool AtEast(uint id, float centerX)
+    public static bool AtEast(this ScriptAccessory sa, uint id, float centerX)
     {
-        var chara = GetById(id);
+        var chara = sa.GetById(id);
         if (chara == null) return false;
         return chara.Position.X > centerX;
     }
+
+    public static bool HasStatus(this ScriptAccessory sa, uint id, uint statusId)
+    {
+        IGameObject? chara = sa.GetById(id);
+        if (chara == null || !chara.IsValid()) return false;
+        unsafe
+        {
+            BattleChara* charaStruct = (BattleChara*)chara.Address;
+            return charaStruct->GetStatusManager()->HasStatus(statusId, id);
+        }
+    }
+    
+    public static float GetStatusRemainingTime(this ScriptAccessory sa, uint id, uint statusId)
+    {
+        IGameObject? chara = sa.GetById(id);
+        if (chara == null || !chara.IsValid()) return 0;
+        unsafe
+        {
+            BattleChara* charaStruct = (BattleChara*)chara.Address;
+            var statusIdx = charaStruct->GetStatusManager()->GetStatusIndex(statusId, id);
+            return charaStruct->GetStatusManager()->GetRemainingTime(statusIdx);
+        }
+    }
+    
 }
 
 public static class DirectionCalc
@@ -2801,5 +2864,32 @@ public static class AssignDp
         return string.Join(", ", myList.Select(item => item?.ToString() ?? ""));
     }
 }
+
+#region 特殊函数
+public static class SpecialFunction
+{
+    public static void SetTargetable(this ScriptAccessory sa, uint id, bool targetable)
+    {
+        IGameObject? chara = sa.GetById(id);
+        if (chara == null) return;
+        unsafe
+        {
+            GameObject* charaStruct = (GameObject*)chara.Address;
+            if (targetable)
+            {
+                if (chara.IsDead || chara.IsTargetable) return;
+                charaStruct->TargetableStatus |= ObjectTargetableFlags.IsTargetable;
+            }
+            else
+            {
+                if (!chara.IsTargetable) return;
+                charaStruct->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
+            }
+        }
+        sa.Log.Debug($"SetTargetable {targetable} => {chara.Name} {chara}");
+    }
+}
+
+#endregion 特殊函数
 
 #endregion 函数集
