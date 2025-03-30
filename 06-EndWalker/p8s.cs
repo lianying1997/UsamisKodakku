@@ -1947,31 +1947,6 @@ public static class EventExtensions
     }
 }
 
-public static class IbcHelper
-{
-    public static IBattleChara? GetById(uint id)
-    {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
-    }
-
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
-    {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
-}
-
 public static class DirectionCalc
 {
     // 以北为0建立list

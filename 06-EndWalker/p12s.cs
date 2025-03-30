@@ -5,9 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
 using ECommons;
@@ -18,13 +15,14 @@ using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Data;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.9", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.10", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 
 public class p12s
 {
@@ -37,7 +35,7 @@ public class p12s
     
     private const string UpdateInfo =
         """
-        修复了小世界一（水平）分散位置指路错误问题。
+        适配新版鸭鸭(4.0.0.0)做了代码修正。
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -762,11 +760,11 @@ public class p12s
                 db_SC1_round1_drawn = true;
                 DebugMsg($"进入超链I第一组绘图。", accessory);
 
-                IBattleChara? destTheory = null;    // 目标点 超链元素
+                IGameObject? destTheory = null;    // 目标点 超链元素
 
                 for (int i = 0; i < 3; i++)
                 {
-                    var theoryObject = IbcHelper.GetById(db_SC1_theories[i]);
+                    var theoryObject = accessory.GetById(db_SC1_theories[i]);
                     if (theoryObject == null) return;
                     switch (theoryObject.DataId)
                     {
@@ -898,7 +896,7 @@ public class p12s
     [ScriptMethod(name: "门神：超链I第二组绘图", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(16176|16177|16178|16179|16180)$"])]
     public void DB_SuperChain_I_SecondRound(Event @event, ScriptAccessory accessory)
     {
-        IBattleChara? destDonutChar = null;
+        IGameObject? destDonutChar = null;
         Task.Delay(100).ContinueWith(t =>
         {
             lock (db_SC1_lockObject)
@@ -912,15 +910,15 @@ public class p12s
                 // 取出后4个元素，两个终点，一钢铁一月环
                 List<uint> SC1_SubList = db_SC1_theories.GetRange(3, 4);
 
-                IBattleChara? dest1Theory = null;
-                IBattleChara? dest2Theory = null;
-                IBattleChara? inTheory = null;
-                IBattleChara? outTheory = null;
+                IGameObject? dest1Theory = null;
+                IGameObject? dest2Theory = null;
+                IGameObject? inTheory = null;
+                IGameObject? outTheory = null;
 
                 // 判断终点位置
                 for (int i = 0; i < 4; i++)
                 {
-                    var theoryObject = IbcHelper.GetById(SC1_SubList[i]);
+                    var theoryObject = accessory.GetById(SC1_SubList[i]);
                     if (theoryObject == null) return;
 
                     switch (theoryObject.DataId)
@@ -953,7 +951,7 @@ public class p12s
         });
     }
 
-    private static IBattleChara? GetDonutChar(IBattleChara? dest1Theory, IBattleChara? dest2Theory, IBattleChara? inTheory, IBattleChara? outTheory)
+    private static IGameObject? GetDonutChar(IGameObject? dest1Theory, IGameObject? dest2Theory, IGameObject? inTheory, IGameObject? outTheory)
     {
         if (dest1Theory == null || dest2Theory == null || inTheory == null || outTheory == null) return null;
         float dest1ToDonut = new Vector2(dest1Theory.Position.X - inTheory.Position.X,
@@ -967,7 +965,7 @@ public class p12s
 
         if (dest1ToDonut < dest1ToCircle && dest2ToDonut > dest2ToCircle)
             return dest1Theory;
-        else if (dest1ToDonut > dest1ToCircle && dest2ToDonut < dest2ToCircle)
+        if (dest1ToDonut > dest1ToCircle && dest2ToDonut < dest2ToCircle)
             return dest2Theory;
 
         return null;
@@ -1008,13 +1006,13 @@ public class p12s
                 List<uint> SC1_SubList = db_SC1_theories.GetRange(7, 3);
 
                 // 判断终点位置
-                IBattleChara? destTheory = null;
-                IBattleChara? inTheory = null;
-                IBattleChara? outTheory = null;
+                IGameObject? destTheory = null;
+                IGameObject? inTheory = null;
+                IGameObject? outTheory = null;
 
                 for (int i = 0; i < 3; i++)
                 {
-                    var theoryObject = IbcHelper.GetById(SC1_SubList[i]);
+                    var theoryObject = accessory.GetById(SC1_SubList[i]);
                     if (theoryObject == null) return;
 
                     switch (theoryObject.DataId)
@@ -1034,13 +1032,11 @@ public class p12s
                 if (destTheory == null || inTheory == null || outTheory == null) return;
 
                 float destToDonut = new Vector2(destTheory.Position.X - inTheory.Position.X,
-                                                destTheory.Position.Z - inTheory.Position.Z).Length();
+                    destTheory.Position.Z - inTheory.Position.Z).Length();
                 float destToCircle = new Vector2(destTheory.Position.X - outTheory.Position.X,
-                                                destTheory.Position.Z - outTheory.Position.Z).Length();
+                    destTheory.Position.Z - outTheory.Position.Z).Length();
 
-                var isDonutFirst = false;
-                if (destToDonut < destToCircle)
-                    isDonutFirst = true;
+                bool isDonutFirst = destToDonut < destToCircle;
 
                 // 画钢铁月环范围
                 drawCircleDonutAtPos(destTheory.Position, 10000, 4800, !isDonutFirst, accessory);
@@ -1722,8 +1718,8 @@ public class p12s
 
         if (!isMatched) return;
 
-        IBattleChara? water = IbcHelper.GetById(e.TargetSid);
-        IBattleChara? fe = IbcHelper.GetById(e.Sid);
+        IGameObject? water = accessory.GetById(e.TargetSid);
+        IGameObject? fe = accessory.GetById(e.Sid);
         if (water == null || fe == null) return;
 
         Vector3 tpos = (fe.Position - water.Position) / 8 * 3f + water.Position;
@@ -2815,26 +2811,9 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, uint id)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
-    }
-
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
-    {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
+        return sa.Data.Objects.SearchByEntityId(id);
     }
 }
 

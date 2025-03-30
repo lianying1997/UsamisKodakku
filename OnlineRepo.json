@@ -6,8 +6,8 @@
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
-    "Note": "",
-    "UpdateInfo": "为了7.1编译成功的尝试。",
+    "Note": "v0.0.0.5\r\n为了7.1编译成功的尝试。\r\n\r\nv0.0.0.4\r\n1. 调整迭代次数随实际人数变更，避免报错弹出。\r\n\r\nv0.0.0.3:\r\n1. 增加万象踩塔指引。\r\n\r\nv0.0.0.2:\r\n1. 重构了部分代码（白费工夫。\r\n2. 增加了门神一车指路。\r\n3. 增加了本体分散位置指路。\r\n4. 加快了本体一冰火指路的出现时间。\r\n\r\nv0.0.0.1:\r\n初版完成，门神一分身结束，本体万象结束。\r\n鸭门。",
+    "UpdateInfo": "",
     "TerritoryIds": [
       1088
     ]
@@ -15,12 +15,12 @@
   {
     "Name": "P12S [零式万魔殿 荒天之狱4]",
     "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
-    "Version": "0.0.0.9",
+    "Version": "0.0.0.10",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
     "Note": "请先按需求检查并设置“用户设置”栏目。\r\n门神到超链后对话，本体到黑白塔。\r\n鸭门。",
-    "UpdateInfo": "修复了小世界一（水平）分散位置指路错误问题。",
+    "UpdateInfo": "适配新版鸭鸭(4.0.0.0)做了代码修正。",
     "TerritoryIds": [
       1154
     ]
@@ -32,8 +32,8 @@
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p4s.cs",
-    "Note": "",
-    "UpdateInfo": "为了7.1编译成功的尝试。",
+    "Note": "请先按需求检查并设置“用户设置”栏目。\r\n“逃课”即为黑糖荔枝攻略演示。\r\n门神仅线毒提示，本体到二运。\r\nv0.0.0.3\r\n为了7.1编译成功的尝试。\r\n\r\nv0.0.0.2\r\n1. 初版完成。\r\n鸭门。",
+    "UpdateInfo": "",
     "TerritoryIds": [
       1009
     ]
@@ -119,14 +119,15 @@
   {
     "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
     "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-    "Version": "0.0.0.11",
+    "Version": "0.0.0.12",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
-    "Note": "基于K佬绝龙诗绘图的个人向补充，\n请先按需求检查并设置“用户设置”栏目。\n开启Debug模式，在忆罪宫输入\"/e =TST\"可以测试地火特殊跑法。\n鸭门。",
-    "UpdateInfo": "1. 修复P6冰火双T死刑指路的概率性电椅问题。",
+    "Note": "基于K佬绝龙诗绘图的个人向补充，\r\n请先按需求检查并设置“用户设置”栏目。\r\n开启Debug模式，在忆罪宫输入\"/e =TST\"可以测试地火特殊跑法。\r\n鸭门。",
+    "UpdateInfo": "适配新版鸭鸭(4.0.0.0)做了代码修正。",
     "TerritoryIds": [
-      968
+      968,
+      1112
     ]
   },
   {

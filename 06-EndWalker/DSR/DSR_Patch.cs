@@ -5,9 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
 using ECommons;
@@ -15,6 +12,7 @@ using ECommons.DalamudServices;
 using ECommons.GameFunctions;
 using ECommons.MathHelpers;
 using KodakkuAssist.Script;
+using KodakkuAssist.Data;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
@@ -40,12 +38,12 @@ public class DsrPatch
         """;
     
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.11";
+    private const string Version = "0.0.0.12";
     private const string DebugVersion = "a";
     
     private const string UpdateInfo =
         """
-        1. 修复P6冰火双T死刑指路的概率性电椅问题。
+        适配新版鸭鸭(4.0.0.0)做了代码修正。
         """;
     
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -353,7 +351,7 @@ public class DsrPatch
 
             if (_p2TetherKnightId.Contains(0)) return;
             var targetKnightIdx = myIndex == 0 ? 0 : 1;
-            var chara = IbcHelper.GetById(_p2TetherKnightId[targetKnightIdx]);
+            var chara = accessory.GetById(_p2TetherKnightId[targetKnightIdx]);
             if (chara == null) return;
             
             var knightPos = chara.Position;
@@ -394,6 +392,7 @@ public class DsrPatch
     {
         _dsrPhase = DsrPhase.Phase3Nidhogg;
         _diveFromGrace = new DiveFromGrace();
+        _diveFromGrace.accessory = accessory;
         _p3LimitCutStep = 0;
         _p3MyTowerPartner = 0;
         accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
@@ -401,6 +400,7 @@ public class DsrPatch
 
     public class DiveFromGrace()
     {
+        public ScriptAccessory accessory { get; set; } = null;
         public List<uint> LimitCut1 { get; set; } = [];
         public List<uint> LimitCut2 { get; set; } = [];
         public List<uint> LimitCut3 { get; set; } = [];
@@ -567,7 +567,7 @@ public class DsrPatch
                 
                 var unaddedPlayers = GetLimitCutPlayers(idx);
                 var sortedPlayerIds = unaddedPlayers
-                    .OrderBy(playerId => IbcHelper.GetById(playerId).Position.X)
+                    .OrderBy(playerId => accessory.GetById(playerId).Position.X)
                     .ToList();
                 
                 if (idx == Middle)
@@ -938,7 +938,7 @@ public class DsrPatch
         const uint front = 26383;
         const uint behind = 26384;
         
-        var chara = IbcHelper.GetById(sid);
+        var chara = accessory.GetById(sid);
         var srot = chara.Rotation;
         var spos = chara.Position;
         
@@ -1780,7 +1780,7 @@ public class DsrPatch
         // 面相为前、左、右的扩散
         var spos = @event.SourcePosition();
         var srot = @event.SourceRotation();
-        var bossChara = IbcHelper.GetById(_p7BossId);
+        var bossChara = accessory.GetById(_p7BossId);
         var bossRot = bossChara?.Rotation ?? float.Pi;
         var bossPos = bossChara?.Position ?? Center;
         const int intervalTime = 1900;
@@ -1956,7 +1956,7 @@ public class DsrPatch
             Center.ExtendPoint(bossRotRad.Game2Logic() + 60f.DegToRad(), 8),
             Center.ExtendPoint(bossRotRad.Game2Logic() - 60f.DegToRad(), 8)
         ];
-        var bossChara = IbcHelper.GetById(_p7BossId);
+        var bossChara = accessory.GetById(_p7BossId);
         var bossRot = bossChara?.Rotation ?? bossRotRad;
         var bossPos = bossChara?.Position ?? Center;
         const int intervalTime = 1900;
@@ -2889,47 +2889,10 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, uint id)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchByEntityId(id);
     }
-
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
-    {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
-
-    public static bool IsTank(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Tank;
-    }
-    public static bool IsHealer(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Healer;
-    }
-    public static bool IsDps(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.DPS;
-    }
-
 }
 
 public static class DirectionCalc

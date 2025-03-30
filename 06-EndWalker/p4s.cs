@@ -4,15 +4,13 @@ using System.Numerics;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
 using KodakkuAssist.Script;
+using KodakkuAssist.Data;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
@@ -22,10 +20,11 @@ using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using System.Drawing;
 using System.Security.AccessControl;
 using System.ComponentModel;
+using Lumina.Excel.Sheets;
 
 namespace UsamisScript.EndWalker.p4s;
 
-[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.3", author: "Usami", note: noteStr)]
+[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.4", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 
 public class p4s
 {
@@ -34,13 +33,12 @@ public class p4s
     请先按需求检查并设置“用户设置”栏目。
     “逃课”即为黑糖荔枝攻略演示。
     门神仅线毒提示，本体到二运。
-    v0.0.0.3
-    为了7.1编译成功的尝试。
-
-    v0.0.0.2
-    1. 初版完成。
-    鸭门。
     """;
+    
+    private const string UpdateInfo =
+        """
+        适配新版鸭鸭(4.0.0.0)做了代码修正。
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -201,7 +199,7 @@ public class p4s
         // const uint FAR = 27175;
         var _isNear = aid == NEAR;
 
-        var me = IbcHelper.GetMe();
+        IPlayerCharacter? me = (IPlayerCharacter?)accessory.GetMe();
         if (me == null) return;
         var myRole = me.GetRole();
 
@@ -434,7 +432,7 @@ public class p4s
             isNorth = true;
         if (act2sol.FireTargets.Contains(myIndex))
         {
-            if (IbcHelper.isDps(accessory.Data.PartyList[myIndex]))
+            if (accessory.IsDps(accessory.Data.PartyList[myIndex]))
             {
                 isWestDown = true;
                 isEastDown = true;
@@ -515,7 +513,7 @@ public class p4s
         Vector3 UPLEFT = CENTER.ExtendPoint((act2sol.isLRSafeFirst ? 45f : -45f).angle2Rad(), 15);
         float _rot_radian;
         var _myid = accessory.Data.Me;
-        if (IbcHelper.isTank(_myid))
+        if (accessory.IsTank(_myid))
             _rot_radian = 0;
         else
             _rot_radian = float.Pi;
@@ -529,7 +527,7 @@ public class p4s
     {
         int _tower_idx;
         var _myid = accessory.Data.Me;
-        if (IbcHelper.isTank(_myid))
+        if (accessory.IsTank(_myid))
             _tower_idx = 0;
         else
             _tower_idx = 2;
@@ -546,9 +544,9 @@ public class p4s
         int _circle_idx;
         var _myid = accessory.Data.Me;
 
-        if (!IbcHelper.isDps(_myid))
+        if (!accessory.IsDps(_myid))
         {
-            if (IbcHelper.isTank(_myid))
+            if (accessory.IsTank(_myid))
                 _circle_idx = 0;
             else
                 _circle_idx = 2;
@@ -621,7 +619,7 @@ public class p4s
         if (act2sol.isLRSafeFirst)
             _pos_idx++;
 
-        var _target_pos = IbcHelper.isTank(_myid) ? act2sol.CirclePos[_pos_idx] : act2sol.TowerPos[_pos_idx];
+        var _target_pos = accessory.IsTank(_myid) ? act2sol.CirclePos[_pos_idx] : act2sol.TowerPos[_pos_idx];
         var dp = accessory.dirPos(_target_pos, 0, 10000, $"二运暗2{isPreparing}{myIndex}");
         dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
@@ -645,10 +643,10 @@ public class p4s
         int _pos_idx;
         var _myid = accessory.Data.Me;
 
-        if (!IbcHelper.isDps(_myid))
+        if (!accessory.IsDps(_myid))
         {
             // 火T在右侧分摊
-            if (IbcHelper.isTank(_myid))
+            if (accessory.IsTank(_myid))
                 _pos_idx = 1;
             // 火H在左侧踩塔
             else
@@ -666,7 +664,7 @@ public class p4s
         if (act2sol.isLRSafeFirst)
             _pos_idx = _pos_idx == 3 ? 0 : _pos_idx + 1;
 
-        var _target_pos = IbcHelper.isHealer(_myid) ? act2sol.TowerPos[_pos_idx] : act2sol.CirclePos[_pos_idx];
+        var _target_pos = accessory.IsHealer(_myid) ? act2sol.TowerPos[_pos_idx] : act2sol.CirclePos[_pos_idx];
         var dp = accessory.dirPos(_target_pos, 0, 10000, $"二运火2{isPreparing}{myIndex}");
         dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
@@ -835,47 +833,97 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, uint id)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchByEntityId(id);
     }
 
-    public static IBattleChara? GetMe()
+    public static IGameObject? GetMe(this ScriptAccessory sa)
     {
-        return Svc.ClientState.LocalPlayer;
+        return sa.Data.Objects.LocalPlayer;
     }
 
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
+    public static bool IsTank(this ScriptAccessory sa, uint id)
     {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
-
-    public static bool isTank(uint id)
-    {
-        var chara = GetById(id);
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.Tank;
     }
-    public static bool isHealer(uint id)
+    public static bool IsHealer(this ScriptAccessory sa, uint id)
     {
-        var chara = GetById(id);
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.Healer;
     }
-    public static bool isDps(uint id)
+    public static bool IsDps(this ScriptAccessory sa, uint id)
     {
-        var chara = GetById(id);
+        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
         if (chara == null) return false;
         return chara.GetRole() == CombatRole.DPS;
     }
-
+    public static CombatRole GetRole(this ICharacter c)
+    {
+        ClassJob? valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local1 = ref valueNullable;
+        ClassJob valueOrDefault;
+        byte? nullable1;
+        if (!local1.HasValue)
+        {
+            nullable1 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local1.GetValueOrDefault();
+            nullable1 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable2 = nullable1;
+        if ((nullable2.HasValue ? new int?((int)nullable2.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 1)
+            return CombatRole.Tank;
+        valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local2 = ref valueNullable;
+        byte? nullable3;
+        if (!local2.HasValue)
+        {
+            nullable3 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local2.GetValueOrDefault();
+            nullable3 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable4 = nullable3;
+        if ((nullable4.HasValue ? new int?((int)nullable4.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 2)
+            return CombatRole.DPS;
+        valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local3 = ref valueNullable;
+        byte? nullable5;
+        if (!local3.HasValue)
+        {
+            nullable5 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local3.GetValueOrDefault();
+            nullable5 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable6 = nullable5;
+        if ((nullable6.HasValue ? new int?((int)nullable6.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 3)
+            return CombatRole.DPS;
+        valueNullable = c.ClassJob.ValueNullable;
+        ref ClassJob? local4 = ref valueNullable;
+        byte? nullable7;
+        if (!local4.HasValue)
+        {
+            nullable7 = new byte?();
+        }
+        else
+        {
+            valueOrDefault = local4.GetValueOrDefault();
+            nullable7 = new byte?(valueOrDefault.Role);
+        }
+        byte? nullable8 = nullable7;
+        return (nullable8.HasValue ? new int?((int)nullable8.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 4 ? CombatRole.Healer : CombatRole.NonCombat;
+    }
 }
 
 public static class DirectionCalc
