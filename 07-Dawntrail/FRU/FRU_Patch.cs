@@ -6,6 +6,7 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Data;
 using KodakkuAssist.Module.Draw.Manager;
 using KodakkuAssist.Module.GameOperate;
+using KodakkuAssist.Extensions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
