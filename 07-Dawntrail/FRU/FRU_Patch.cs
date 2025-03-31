@@ -24,6 +24,7 @@ using ECommons.MathHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Lumina.Excel.Sheets;
+using Microsoft.Win32.SafeHandles;
 
 namespace UsamisKodakku.Script._07_DawnTrail.FRU;
 
