@@ -46,11 +46,12 @@ public class FruPatch
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.6";
+    private const string Version = "0.0.0.7";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        适配新版鸭鸭做了代码修正。
+        适配新版鸭鸭再次做了代码修正。
+        增加P4一运 光之锁 突出显示
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -135,6 +136,7 @@ public class FruPatch
     private static PriorityDict _pd = new PriorityDict();
     private static Counter _ct = new Counter();
     private static Apocalypse _apo = new Apocalypse();
+    private static UlRelativity _ulr = new UlRelativity();
 
     private const int Mt = 0;
     private const int St = 1;
@@ -155,7 +157,6 @@ public class FruPatch
             .Range(0, 20)
             .Select(_ => new ManualResetEvent(false))
             .ToList();
-        _recorded = new bool[20].ToList();
 
         accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}", DebugMode);
         accessory.Method.MarkClear();
@@ -210,7 +211,7 @@ public class FruPatch
 
     [ScriptMethod(name: "乐园绝技分摊头标", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(00F9)$"],
         userControl: true)]
-    public void UtopianSkyStackMark(Event @event, ScriptAccessory accessory)
+    public void UtopianSkyStackMark(Event ev, ScriptAccessory sa)
     {
         /*
          * 攻击1：被连线，上半场
@@ -221,8 +222,8 @@ public class FruPatch
          * 只要检测到目标被连线，对应优先级+10。
          */
         if (_fruPhase != FruPhase.P1A_UtopianSky) return;
-        var tid = @event.TargetId();
-        var tidx = accessory.GetPlayerIdIndex(tid);
+        var tid = ev.TargetId;
+        var tidx = sa.GetPlayerIdIndex(tid);
         lock (_pd)
         {
             _pd.Priorities[tidx] += 10;
@@ -236,13 +237,13 @@ public class FruPatch
             var upTetherTarget = _pd.SelectSpecificPriorityIndex(6);
             var downTetherTarget = _pd.SelectSpecificPriorityIndex(7);
             // 标点
-            MarkPlayerByIdx(accessory, upTetherTarget.Key, MarkType.Attack1, UosCaptainMode);
-            MarkPlayerByIdx(accessory, downTetherTarget.Key, MarkType.Attack2, UosCaptainMode);
+            MarkPlayerByIdx(sa, upTetherTarget.Key, MarkType.Attack1, UosCaptainMode);
+            MarkPlayerByIdx(sa, downTetherTarget.Key, MarkType.Attack2, UosCaptainMode);
             // 发送Debug信息
             var str = "\n";
-            str += $"上：{upTetherTarget.Key} ({accessory.GetPlayerJobByIndex(upTetherTarget.Key)})\n";
-            str += $"下：{downTetherTarget.Key} ({accessory.GetPlayerJobByIndex(downTetherTarget.Key)})\n";
-            accessory.DebugMsg(str, DebugMode);
+            str += $"上：{upTetherTarget.Key} ({sa.GetPlayerJobByIndex(upTetherTarget.Key)})\n";
+            str += $"下：{downTetherTarget.Key} ({sa.GetPlayerJobByIndex(downTetherTarget.Key)})\n";
+            sa.DebugMsg(str, DebugMode);
         }
 
         var remainPlayers = _pd.SelectSmallPriorityIndices(6);
@@ -250,17 +251,17 @@ public class FruPatch
         if (remainPlayers[2].Key == D1)
         {
             // 满足该条件，代表D1在上。
-            var str = $"玩家{remainPlayers[2].Key} ({accessory.GetPlayerJobByIndex(remainPlayers[2].Key)}需交换。)";
-            accessory.DebugMsg(str, DebugMode);
-            MarkPlayerByIdx(accessory, remainPlayers[2].Key, MarkType.Stop1, UosCaptainMode);
+            var str = $"玩家{remainPlayers[2].Key} ({sa.GetPlayerJobByIndex(remainPlayers[2].Key)}需交换。)";
+            sa.DebugMsg(str, DebugMode);
+            MarkPlayerByIdx(sa, remainPlayers[2].Key, MarkType.Stop1, UosCaptainMode);
         }
 
         if (remainPlayers[3].Key == Mt)
         {
             // 满足该条件，代表MT在下。
-            var str = $"玩家{remainPlayers[3].Key} ({accessory.GetPlayerJobByIndex(remainPlayers[3].Key)}需交换。)";
-            accessory.DebugMsg(str, DebugMode);
-            MarkPlayerByIdx(accessory, remainPlayers[3].Key, MarkType.Stop2, UosCaptainMode);
+            var str = $"玩家{remainPlayers[3].Key} ({sa.GetPlayerJobByIndex(remainPlayers[3].Key)}需交换。)";
+            sa.DebugMsg(str, DebugMode);
+            MarkPlayerByIdx(sa, remainPlayers[3].Key, MarkType.Stop2, UosCaptainMode);
         }
 
         // 若想后续应用指路可直接调用remainPlayers，Key代表职业位置，Value为优先级。
@@ -303,7 +304,7 @@ public class FruPatch
 
     [ScriptMethod(name: "罪壤堕头标与指路（DB闲固）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(00F9|011F)$"],
         userControl: true)]
-    public void FallOfFaithMarkAndGuidance(Event @event, ScriptAccessory accessory)
+    public void FallOfFaithMarkAndGuidance(Event ev, ScriptAccessory sa)
     {
         /*
          * 自用，DB闲固
@@ -318,12 +319,12 @@ public class FruPatch
         const uint lightning = 0x011F;
 
         if (_fruPhase != FruPhase.P1B_FallOfFaith) return;
-        var tid = @event.TargetId();
-        var tidx = accessory.GetPlayerIdIndex(tid);
-        var tetherType = @event.Id();
+        var tid = ev.TargetId;
+        var tidx = sa.GetPlayerIdIndex(tid);
+        var tetherType = ev.Id;
 
         // 后续可根据myIndex进行指路
-        var myIndex = accessory.GetMyIndex();
+        var myIndex = sa.GetMyIndex();
 
         lock (_pd)
         {
@@ -338,22 +339,22 @@ public class FruPatch
             switch (_pd.ActionCount)
             {
                 case 1:
-                    MarkPlayerByIdx(accessory, tidx, tetherType == lightning ? MarkType.Bind1 : MarkType.Stop1, FofCaptainMode);
-                    if (tidx == myIndex) FallOfFaithGuidance(accessory, tetherType == lightning ? 4 : 5);
+                    MarkPlayerByIdx(sa, tidx, tetherType == lightning ? MarkType.Bind1 : MarkType.Stop1, FofCaptainMode);
+                    if (tidx == myIndex) FallOfFaithGuidance(sa, tetherType == lightning ? 4 : 5);
                     break;
                 case 2:
-                    MarkPlayerByIdx(accessory, tidx, tetherType == lightning ? MarkType.Bind2 : MarkType.Stop2, FofCaptainMode);
-                    if (tidx == myIndex) FallOfFaithGuidance(accessory, tetherType == lightning ? 6 : 7);
+                    MarkPlayerByIdx(sa, tidx, tetherType == lightning ? MarkType.Bind2 : MarkType.Stop2, FofCaptainMode);
+                    if (tidx == myIndex) FallOfFaithGuidance(sa, tetherType == lightning ? 6 : 7);
                     break;
                 case 3:
                     // 因为此时有5个闲人，减1消除偏移
-                    MarkPlayerByIdx(accessory, tidx, (_pd.FindPriorityIndexOfKey(tidx) - 1) % 2 == 0 ? MarkType.Bind1 : MarkType.Stop1, FofCaptainMode);
-                    if (tidx == myIndex) FallOfFaithGuidance(accessory, (_pd.FindPriorityIndexOfKey(tidx) - 1) % 2 == 0 ? 4 : 5);
+                    MarkPlayerByIdx(sa, tidx, (_pd.FindPriorityIndexOfKey(tidx) - 1) % 2 == 0 ? MarkType.Bind1 : MarkType.Stop1, FofCaptainMode);
+                    if (tidx == myIndex) FallOfFaithGuidance(sa, (_pd.FindPriorityIndexOfKey(tidx) - 1) % 2 == 0 ? 4 : 5);
                     break;
                 case 4:
                     // 此时有4个闲人
-                    MarkPlayerByIdx(accessory, tidx, _pd.FindPriorityIndexOfKey(tidx) % 2 == 0 ? MarkType.Bind2 : MarkType.Stop2, FofCaptainMode);
-                    if (tidx == myIndex) FallOfFaithGuidance(accessory, _pd.FindPriorityIndexOfKey(tidx) % 2 == 0 ? 6 : 7);
+                    MarkPlayerByIdx(sa, tidx, _pd.FindPriorityIndexOfKey(tidx) % 2 == 0 ? MarkType.Bind2 : MarkType.Stop2, FofCaptainMode);
+                    if (tidx == myIndex) FallOfFaithGuidance(sa, _pd.FindPriorityIndexOfKey(tidx) % 2 == 0 ? 6 : 7);
                     break;
             }
         }
@@ -364,10 +365,10 @@ public class FruPatch
         Thread.MemoryBarrier();
 
         // index 0~3 闲人，index 4~7, 可标锁1、禁1、锁2、禁2（分别对应左、左上、右、右上）
-        MarkPlayerByIdx(accessory, _pd.SelectSpecificPriorityIndex(0).Key, MarkType.Attack1, FofCaptainMode);
-        MarkPlayerByIdx(accessory, _pd.SelectSpecificPriorityIndex(1).Key, MarkType.Attack2, FofCaptainMode);
-        MarkPlayerByIdx(accessory, _pd.SelectSpecificPriorityIndex(2).Key, MarkType.Attack3, FofCaptainMode);
-        MarkPlayerByIdx(accessory, _pd.SelectSpecificPriorityIndex(3).Key, MarkType.Attack4, FofCaptainMode);
+        MarkPlayerByIdx(sa, _pd.SelectSpecificPriorityIndex(0).Key, MarkType.Attack1, FofCaptainMode);
+        MarkPlayerByIdx(sa, _pd.SelectSpecificPriorityIndex(1).Key, MarkType.Attack2, FofCaptainMode);
+        MarkPlayerByIdx(sa, _pd.SelectSpecificPriorityIndex(2).Key, MarkType.Attack3, FofCaptainMode);
+        MarkPlayerByIdx(sa, _pd.SelectSpecificPriorityIndex(3).Key, MarkType.Attack4, FofCaptainMode);
 
         var myPriority = _pd.FindPriorityIndexOfKey(myIndex);
 
@@ -378,15 +379,15 @@ public class FruPatch
             var ptPriority = myPriority % 2 == 0 ? myPriority + 1 : myPriority - 1;
             var ptPriVal = _pd.SelectSpecificPriorityIndex(ptPriority).Value;
             var subtract = Math.Abs(myPriVal / 10 % 10 - ptPriVal / 10 % 10);
-            accessory.DebugMsg($"优先级 (({myPriority}){myPriVal} - ({ptPriority}){ptPriVal}) / 10 % 10 = {subtract}", DebugMode);
+            sa.DebugMsg($"优先级 (({myPriority}){myPriVal} - ({ptPriority}){ptPriVal}) / 10 % 10 = {subtract}", DebugMode);
             if (subtract != 2) return;
-            FallOfFaithGuidance(accessory, myPriority, true);
-            accessory.Method.TextInfo($"连线玩家准备交换", 3000, true);
+            FallOfFaithGuidance(sa, myPriority, true);
+            sa.Method.TextInfo($"连线玩家准备交换", 3000, true);
         }
         else
         {
             // 闲人指路
-            FallOfFaithGuidance(accessory, myPriority);
+            FallOfFaithGuidance(sa, myPriority);
         }
     }
 
@@ -534,7 +535,7 @@ public class FruPatch
         if (_fruPhase != FruPhase.P2C_LightRampant) return;
         lock (_pd)
         {
-            var tid = @event.TargetId();
+            var tid = @event.TargetId;
             var tidx = accessory.GetPlayerIdIndex(tid);
             _pd.AddActionCount();
             _pd.AddPriority(tidx, 100);
@@ -602,10 +603,10 @@ public class FruPatch
 
     [ScriptMethod(name: "光爆球爆炸时间", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(40219)$"],
         userControl: true)]
-    public void LightBalloonExplode(Event @ev, ScriptAccessory sa)
+    public void LightBalloonExplode(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P2C_LightRampant) return;
-        var sid = @ev.SourceId();
+        var sid = ev.SourceId;
         var dp = sa.DrawCircle(sid, 11, 2500, 2500, $"光球{sid}", true);
         dp.Color = ColorHelper.ColorRed.V4.WithW(4f);
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
@@ -628,9 +629,9 @@ public class FruPatch
     public async void DarkCrystalUntargetable(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P2D_AbsoluteZero) return;
-        var sid = ev.SourceId();
+        var sid = ev.SourceId;
         await Task.Delay(500);
-        sa.SetTargetable(sid, false);
+        sa.SetTargetable(sa.GetById(sid), false);
     }
 
     #endregion P2.4 绝对零度
@@ -641,7 +642,7 @@ public class FruPatch
 
     [ScriptMethod(name: "---- 《P3：暗之巫女》 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["ActionId:Hello1aya2World"],
         userControl: true)]
-    public void SplitLine_Gaia(Event @event, ScriptAccessory accessory)
+    public void SplitLine_Gaia(Event ev, ScriptAccessory accessory)
     {
     }
 
@@ -649,10 +650,150 @@ public class FruPatch
 
     [ScriptMethod(name: "时间压缩阶段转换（DEBUG ONLY）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(40266)$"],
         userControl: Debugging)]
-    public void UlRelativityPhaseChange(Event @event, ScriptAccessory accessory)
+    public void UlrPhaseChange(Event ev, ScriptAccessory sa)
     {
         _fruPhase = FruPhase.P3A_UltimateRelativity;
-        accessory.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
+        sa.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
+        _ct.Init(sa, "时间压缩");
+        _pd.Init(sa, "时间压缩");
+        _ulr.Init(sa, _pd, _ct);
+        _pd.AddPriorities([0, 1, 2, 3, 104, 105, 106, 107]);
+        _events = Enumerable
+            .Range(0, 20)
+            .Select(_ => new ManualResetEvent(false))
+            .ToList();
+    }
+
+    [ScriptMethod(name: "输出时间压缩信息（DEBUG ONLY）", eventType: EventTypeEnum.NpcYell, eventCondition: ["ActionId:Hello1aya2World"],
+        userControl: Debugging)]
+    public void UlrMessagePrint(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P3B_Apocalypse) return;
+        _ulr.ShowMessage();
+    }
+    
+    [ScriptMethod(name: "长短火类型记录（DEBUG ONLY）", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(2455|2462)$"],
+        userControl: Debugging)]
+    public void UlrDarkFireTypeRecord(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
+        
+        // 11s, 21s, 31s
+        const uint fire = 2455;
+        const uint ice = 2462;
+        const uint fireShort = 11000 - 2000;
+        const uint fireMid = 21000 - 2000;
+        const uint fireLong = 31000 - 2000;
+        
+        var dur = ev.DurationMilliseconds();
+        var tidx = sa.GetPlayerIdIndex(ev.TargetId);
+        var stid = ev.StatusId;
+        sa.Log.Debug($"检测到{sa.GetPlayerJobByIndex(tidx)}的 {(stid == fire ? "火" : "冰")} {dur}");
+
+        lock (_ulr)
+        {
+            if (stid == fire)
+            {
+                if (dur > fireShort)
+                    _pd.AddPriority(tidx, 10);
+                if (dur > fireMid)
+                    _pd.AddPriority(tidx, 10);
+                if (dur > fireLong)
+                    _pd.AddPriority(tidx, 10);
+            }
+            else
+            {
+                // TN视为短火，DPS视为长火
+                _pd.AddPriority(tidx, tidx <= 3 ? 10 : 30);
+            }
+        }
+    }
+    
+    [ScriptMethod(name: "沙漏连线记录（DEBUG ONLY）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(008[56])$"],
+        userControl: Debugging)]
+    public void UlrHourglassTetherRecord(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
+        const uint fast = 86;
+        const uint slow = 85;
+        lock (_ulr)
+        {
+            var spos = ev.SourcePosition;
+            var sdir = spos.Position2Dirs(Center, 8);
+            _ulr.TetherDirection[sdir] = ev.Id == fast ? 1 : 2;
+            sa.Log.Debug($"检测到{sdir}方向沙漏，{(ev.Id == fast ? "快" : "慢")}");
+            _ct.AddCounter();
+            
+            if (_ct.Number != 5) return;
+            sa.Log.Debug($"五根线记录完毕，开始寻找相对北。");
+            _ulr.BuildTrueDirection();
+        }
+    }
+
+    // [ScriptMethod(name: "眩晕时自动面向", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:4163"],
+    //     userControl: true, suppress: 10000)]
+    // public void UlrAutoFace(Event ev, ScriptAccessory sa)
+    // {
+    //     if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
+    //     var myDir = _ulr.GetDirection(sa.GetMyIndex());
+    //     sa.Log.Debug($"眩晕，触发自动面向。");
+    //     sa.SetRotation(sa.Data.MyObject, (myDir * 45f).DegToRad().Game2Logic());
+    // }
+    
+    public class UlRelativity
+    {
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public ScriptAccessory sa { get; set; } = null!;
+        public int RelativeNorth { get; set; } = -1;
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public PriorityDict pd { get; set; } = null!;
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public Counter ct { get; set; } = null!;
+        public List<int> TetherDirection { get; set; } = Enumerable.Repeat(0, 8).ToList();  // 0无，1加速，2减速
+        public List<int> RelativeDirection { get; set; } = [4, 6, 5, 3, 7, 1, 2, 0];
+        public List<int> TrueDirection { get; set; } = Enumerable.Repeat(0, 8).ToList();
+        public void Init(ScriptAccessory accessory, PriorityDict priorityDict, Counter counter)
+        {
+            sa = accessory;
+            pd = priorityDict;
+            ct = counter;
+            TetherDirection = Enumerable.Repeat(0, 8).ToList();
+            TrueDirection = Enumerable.Repeat(0, 8).ToList();
+            RelativeNorth = -1;
+        }
+        
+        public void BuildTrueDirection()
+        {
+            // 找到减速灯
+            var slowTetherIdx = TetherDirection.IndexOf(2, 0);
+            var checkIdx1 = (slowTetherIdx - 2 + 8) % 8;
+            var checkIdx2 = (slowTetherIdx + 2 + 8) % 8;
+            RelativeNorth = TetherDirection[checkIdx1] == 1 ? checkIdx1 : checkIdx2;
+            sa.Log.Debug($"根据减速线{slowTetherIdx}计算相对北，检查{checkIdx1}与{checkIdx2}，得到{RelativeNorth}为相对北");
+
+            for (int i = 0; i < 8; i++)
+            {
+                var jobIdx = pd.SelectSpecificPriorityIndex(i).Key;
+                var dir = (RelativeDirection[i] + RelativeNorth) % 8;
+                TrueDirection[jobIdx] = dir;
+                sa.Log.Debug($"字典顺序{i}, {sa.GetPlayerJobByIndex(jobIdx)}({jobIdx}), 需去方位{dir}。");
+            }
+        }
+
+        public void ShowMessage()
+        {
+            var str = "\n ---- [时间压缩] ----\n";
+            str += $"相对北：{RelativeNorth}。\n";
+            str += $"各职能位置：{sa.BuildListStr(TrueDirection)}";
+            
+            sa.Log.Debug(str);
+        }
+
+        public int GetDirection(int jobIdx)
+        {
+            return TrueDirection[jobIdx];
+        }
+
     }
 
     #endregion P3.1 时间压缩
@@ -660,7 +801,7 @@ public class FruPatch
     #region P3.2 地火
 
     [ScriptMethod(name: "输出启示录信息（DEBUG ONLY）", eventType: EventTypeEnum.NpcYell, eventCondition: ["ActionId:Hello1aya2World"],
-        userControl: Debugging)]
+            userControl: Debugging)]
     public void ApoMessagePrint(Event @ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
@@ -678,15 +819,19 @@ public class FruPatch
         _apo.Init(sa, _pd);
         // ST引导超级跳的话，建议开启
         _pd.AddPriorities(ApoTankPriorSwap ? [1, 0, 2, 3, 7, 6, 5, 4] : [0, 1, 2, 3, 7, 6, 5, 4]);    // 初始THD优先级
+        _events = Enumerable
+            .Range(0, 20)
+            .Select(_ => new ManualResetEvent(false))
+            .ToList();
         sa.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
     }
 
     [ScriptMethod(name: "水分摊类型记录（DEBUG ONLY）", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2461"], userControl: Debugging)]
-    public void DarkWaterTypeRecord(Event @ev, ScriptAccessory sa)
+    public void DarkWaterTypeRecord(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
-        var dur = @ev.DurationMilliseconds();
-        var tidx = sa.GetPlayerIdIndex(@ev.TargetId());
+        var dur = ev.DurationMilliseconds();
+        var tidx = sa.GetPlayerIdIndex(ev.TargetId);
 
         // 10s, 29s, 38s
         const uint waterShort = 10000 - 2000;
@@ -712,7 +857,7 @@ public class FruPatch
 
     [ScriptMethod(name: "启示录检测外部标点", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[1234678]|11)$"],
         userControl: Debugging)]
-    public void DarkWaterMarkerFromOut(Event @ev, ScriptAccessory sa)
+    public void DarkWaterMarkerFromOut(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
         if (CaptainMode && ApoCaptainMode) return;
@@ -721,8 +866,8 @@ public class FruPatch
         lock (_apo)
         {
             _ct.AddCounter();
-            var mark = @ev.Id();
-            var tid = @ev.TargetId();
+            var mark = ev.Id;
+            var tid = ev.TargetId;
             var tidx = sa.GetPlayerIdIndex(tid);
 
             var groupIdx = mark switch
@@ -753,16 +898,16 @@ public class FruPatch
     }
 
     [ScriptMethod(name: "水分摊范围提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2461"], userControl: true)]
-    public void DarkWaterRange(Event @ev, ScriptAccessory sa)
+    public void DarkWaterRange(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
         // 程序内部确定分组 -> 检测是否完成精确分组 -> 范围提示
         _events[(int)EventIdx.ApoGrouping].WaitOne();
         _events[(int)EventIdx.ApoPreciseGrouping].WaitOne(1000);
 
-        var tid = @ev.TargetId();
+        var tid = ev.TargetId;
         var tidx = sa.GetPlayerIdIndex(tid);
-        var dur = @ev.DurationMilliseconds();
+        var dur = ev.DurationMilliseconds();
 
         var isSameGroup = _apo.GetMyGroup() == _apo.GetPlayerGroup(tidx);
         var delayed = !_apo.GroupingFixed;
@@ -885,15 +1030,15 @@ public class FruPatch
     }
 
     [ScriptMethod(name: "地火类型记录（DEBUG ONLY）", eventType: EventTypeEnum.ObjectEffect, eventCondition: ["Id1:4", "Id2:regex:^(16|64)$"], userControl: Debugging)]
-    public void ExaflareTypeRecord(Event @ev, ScriptAccessory sa)
+    public void ExaflareTypeRecord(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
 
         lock (_apo)
         {
             if (_apo.ActionCount >= 2) return;
-            var northApoDir = @ev.SourcePosition().Position2Dirs(Center, 8);
-            var rot = @ev.Id2();
+            var northApoDir = ev.SourcePosition.Position2Dirs(Center, 8);
+            var rot = ev.Id2();
             _apo.AddActionCount();
 
             // 记录北方开始点与旋转方向
@@ -909,7 +1054,7 @@ public class FruPatch
     }
 
     [ScriptMethod(name: "暗夜舞蹈引导指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:40181"], userControl: true)]
-    public void ApoDarkDanceGuidance(Event @ev, ScriptAccessory sa)
+    public void ApoDarkDanceGuidance(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
         // 引导是在皇帝位引导，此处可直接取apo中MT与D1所站皇帝位的位置。
@@ -931,16 +1076,16 @@ public class FruPatch
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp11);
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp22);
 
-        var dp = sa.DrawTargetNearFarOrder(@ev.SourceId(), 1, false, 8, 8, 3000, 2000, $"Usami-暗夜舞蹈目标");
+        var dp = sa.DrawTargetNearFarOrder(ev.SourceId, 1, false, 8, 8, 3000, 2000, $"Usami-暗夜舞蹈目标");
         dp.Color = isTank ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor;
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 
     [ScriptMethod(name: "暗夜舞蹈击退方向指引", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:40181", "TargetIndex:1"], userControl: true)]
-    public void ApoDarkDanceKnockBackGuidance(Event @ev, ScriptAccessory sa)
+    public void ApoDarkDanceKnockBackGuidance(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
-        var sid = @ev.SourceId();
+        var sid = ev.SourceId;
         // 将盖娅分成左右
         var isLeft = _apo.IsInLeftGroup(sa.GetMyIndex());
         var dp0 = sa.DrawGuidance(sid, 0, 1500, 3500, $"Usami-击退方向左", -155f.DegToRad().Ccw2Cw(), 3f, isSafe: isLeft);
@@ -1157,7 +1302,7 @@ public class FruPatch
 
     [ScriptMethod(name: "光暗龙诗阶段转换（DEBUG ONLY）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(40239)$"],
         userControl: Debugging)]
-    public void DarklitDragonsongPhaseChange(Event @event, ScriptAccessory accessory)
+    public void DarklitDragonsongPhaseChange(Event ev, ScriptAccessory sa)
     {
         _fruPhase = FruPhase.P4A_DarklitDragonsong;
         _events = Enumerable
@@ -1165,7 +1310,20 @@ public class FruPatch
             .Select(_ => new ManualResetEvent(false))
             .ToList();
         _recorded = new bool[20].ToList();
-        accessory.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
+        sa.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
+    }
+    
+    [ScriptMethod(name: "光之锁突出显示", eventType: EventTypeEnum.Tether, eventCondition: ["Id:006E"],
+        userControl: true)]
+    public void DldLightChainVisual(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P4A_DarklitDragonsong) return;
+        var dp1 = sa.DrawGuidance(ev.SourceId, ev.TargetId, 0, 9000, $"Usami-光锁外");
+        dp1.Color = ColorHelper.ColorDark.V4.WithW(3f);
+        var dp2 = sa.DrawGuidance(ev.SourceId, ev.TargetId, 0, 9000, $"Usami-光锁内");
+        dp2.Color = ColorHelper.ColorYellow.V4;
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp1);
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp2);
     }
 
     #endregion P4.1 光暗龙诗
@@ -1236,7 +1394,7 @@ public class FruPatch
         // _events
         ApoGrouping = 0,
         ApoPreciseGrouping = 1,
-
+        
         // _recorded
     }
 
@@ -1384,13 +1542,11 @@ public class FruPatch
             {
                 str += $"Key {pair.Key} ({accessory.GetPlayerJobByIndex(pair.Key)}), Value {pair.Value}\n";
             }
-            accessory.DebugMsg(str, DebugMode);
             return str;
         }
 
         public string PrintAnnotation()
         {
-            accessory.DebugMsg($"{Annotation}", DebugMode);
             return Annotation;
         }
 
@@ -1544,89 +1700,9 @@ public static class EventExtensions
             return false;
         }
     }
-
-    public static uint ActionId(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["ActionId"]);
-    }
-
-    public static uint SourceId(this Event @event)
-    {
-        return ParseHexId(@event["SourceId"], out var id) ? id : 0;
-    }
-
-    public static uint SourceDataId(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["SourceDataId"]);
-    }
-
-    public static uint TargetId(this Event @event)
-    {
-        return ParseHexId(@event["TargetId"], out var id) ? id : 0;
-    }
-
-    public static uint TargetIndex(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["TargetIndex"]);
-    }
-
-    public static Vector3 SourcePosition(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
-    }
-
-    public static Vector3 TargetPosition(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
-    }
-
-    public static Vector3 EffectPosition(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
-    }
-
-    public static float SourceRotation(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
-    }
-
-    public static float TargetRotation(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<float>(@event["TargetRotation"]);
-    }
-
-    public static string SourceName(this Event @event)
-    {
-        return @event["SourceName"];
-    }
-
-    public static string TargetName(this Event @event)
-    {
-        return @event["TargetName"];
-    }
-
     public static uint DurationMilliseconds(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
-    }
-
-    public static uint Index(this Event @event)
-    {
-        return ParseHexId(@event["Index"], out var id) ? id : 0;
-    }
-
-    public static uint State(this Event @event)
-    {
-        return ParseHexId(@event["State"], out var id) ? id : 0;
-    }
-
-    public static uint DirectorId(this Event @event)
-    {
-        return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
-    }
-    public static uint Id(this Event @event)
-    {
-        return ParseHexId(@event["Id"], out var id) ? id : 0;
     }
 
     public static uint Id2(this Event @event)
@@ -1634,37 +1710,18 @@ public static class EventExtensions
         return ParseHexId(@event["Id2"], out var id) ? id : 0;
     }
 
-    public static uint DataId(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["DataId"]);
-    }
 
-    public static uint StatusId(this Event @event)
+    public static string Message(this Event ev)
     {
-        return JsonConvert.DeserializeObject<uint>(@event["StatusID"]);
-    }
-
-    public static uint StackCount(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["StackCount"]);
-    }
-
-    public static uint Param(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["Param"]);
-    }
-
-    public static string Message(this Event @event)
-    {
-        return @event["Message"];
+        return ev["Message"];
     }
 }
 
 public static class IbcHelper
 {
-    public static IGameObject? GetById(this ScriptAccessory sa, uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong id)
     {
-        return sa.Data.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchById(id);
     }
 
     public static IGameObject? GetMe(this ScriptAccessory sa)
@@ -1800,19 +1857,6 @@ public static class IbcHelper
             return charaStruct->GetStatusManager()->HasStatus(statusId, id);
         }
     }
-    
-    public static float GetStatusRemainingTime(this ScriptAccessory sa, uint id, uint statusId)
-    {
-        IGameObject? chara = sa.GetById(id);
-        if (chara == null || !chara.IsValid()) return 0;
-        unsafe
-        {
-            BattleChara* charaStruct = (BattleChara*)chara.Address;
-            var statusIdx = charaStruct->GetStatusManager()->GetStatusIndex(statusId, id);
-            return charaStruct->GetStatusManager()->GetRemainingTime(statusIdx);
-        }
-    }
-    
 }
 
 public static class DirectionCalc
@@ -2076,10 +2120,10 @@ public static class IndexHelper
     /// <param name="pid">玩家SourceId</param>
     /// <param name="accessory"></param>
     /// <returns>该玩家对应的位置index</returns>
-    public static int GetPlayerIdIndex(this ScriptAccessory accessory, uint pid)
+    public static int GetPlayerIdIndex(this ScriptAccessory accessory, ulong pid)
     {
         // 获得玩家 IDX
-        return accessory.Data.PartyList.IndexOf(pid);
+        return accessory.Data.PartyList.IndexOf((uint)pid);
     }
 
     /// <summary>
@@ -2143,6 +2187,7 @@ public static class ColorHelper
 
 }
 
+#region 绘图函数
 public static class AssignDp
 {
     /// <summary>
@@ -2176,6 +2221,9 @@ public static class AssignDp
             case uint sid:
                 dp.Owner = sid;
                 break;
+            case ulong sid:
+                dp.Owner = sid;
+                break;
             case Vector3 spos:
                 dp.Position = spos;
                 break;
@@ -2186,6 +2234,9 @@ public static class AssignDp
         switch (targetObj)
         {
             case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case ulong tid:
                 if (tid != 0) dp.TargetObject = tid;
                 break;
             case Vector3 tpos:
@@ -2280,7 +2331,7 @@ public static class AssignDp
     /// <param name="byTime">动画效果随时间填充</param>
     /// <param name="lengthByDistance">长度是否随距离改变</param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawTargetNearFarOrder(this ScriptAccessory accessory, uint ownerId, uint orderIdx,
+    public static DrawPropertiesEdit DrawTargetNearFarOrder(this ScriptAccessory accessory, ulong ownerId, uint orderIdx,
         bool isNear, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
@@ -2482,7 +2533,7 @@ public static class AssignDp
     /// <param name="byTime">动画效果随时间填充</param>
     /// <param name="accessory"></param>
     /// <returns></returns>
-    public static DrawPropertiesEdit DrawCircle(this ScriptAccessory accessory, uint ownerId, float scale, int delay, int destroy, string name, bool byTime = false)
+    public static DrawPropertiesEdit DrawCircle(this ScriptAccessory accessory, ulong ownerId, float scale, int delay, int destroy, string name, bool byTime = false)
     {
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = name;
@@ -2539,6 +2590,9 @@ public static class AssignDp
             case uint sid:
                 dp.Owner = sid;
                 break;
+            case ulong sid:
+                dp.Owner = sid;
+                break;
             case Vector3 spos:
                 dp.Position = spos;
                 break;
@@ -2546,6 +2600,9 @@ public static class AssignDp
         switch (targetObj)
         {
             case uint tid:
+                if (tid != 0) dp.TargetObject = tid;
+                break;
+            case ulong tid:
                 if (tid != 0) dp.TargetObject = tid;
                 break;
             case Vector3 tpos:
@@ -2691,6 +2748,9 @@ public static class AssignDp
             case uint tid:
                 dp.TargetObject = tid; // 如果 tid 是 uint 类型
                 break;
+            case ulong tid:
+                dp.TargetObject = tid; // 如果 tid 是 ulong 类型
+                break;
             case Vector3 tpos:
                 dp.TargetPosition = tpos; // 如果 tid 是 Vector3 类型
                 break;
@@ -2739,6 +2799,9 @@ public static class AssignDp
             // 根据传入的 tid 类型来决定是使用 TargetObject 还是 TargetPosition
             case uint tid:
                 dp.TargetObject = tid; // 如果 tid 是 uint 类型
+                break;
+            case ulong tid:
+                dp.TargetObject = tid; // 如果 tid 是 ulong 类型
                 break;
             case Vector3 tpos:
                 dp.TargetPosition = tpos; // 如果 tid 是 Vector3 类型
@@ -2841,15 +2904,13 @@ public static class AssignDp
         return dpList;
     }
 
-    /// <summary>
-    /// 外部用调试模式
-    /// </summary>
-    /// <param name="str"></param>
-    /// <param name="debugMode"></param>
-    /// <param name="accessory"></param>
-    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = false)
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = false, bool debugChat = false)
     {
         if (!debugMode)
+            return;
+        accessory.Log.Debug($"/e [DEBUG] {str}");
+
+        if (!debugChat)
             return;
         accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
@@ -2859,37 +2920,49 @@ public static class AssignDp
     /// </summary>
     /// <param name="accessory"></param>
     /// <param name="myList"></param>
+    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
-    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList)
+    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList, bool isJob = false)
     {
-        return string.Join(", ", myList.Select(item => item?.ToString() ?? ""));
+        return string.Join(", ", myList.Select(item =>
+        {
+            if (isJob && item != null && item is int i)
+                return accessory.GetPlayerJobByIndex(i);
+            return item?.ToString() ?? "";
+        }));
     }
 }
+
+#endregion 绘图函数
 
 #region 特殊函数
 public static class SpecialFunction
 {
-    public static void SetTargetable(this ScriptAccessory sa, uint id, bool targetable)
+    public static void SetTargetable(this ScriptAccessory sa, IGameObject? obj, bool targetable)
     {
-        IGameObject? chara = sa.GetById(id);
-        if (chara == null) return;
+        if (obj == null || !obj.IsValid())
+        {
+            sa.Log.Error($"传入的IGameObject不合法。");
+            return;
+        }
         unsafe
         {
-            GameObject* charaStruct = (GameObject*)chara.Address;
+            GameObject* charaStruct = (GameObject*)obj.Address;
             if (targetable)
             {
-                if (chara.IsDead || chara.IsTargetable) return;
+                if (obj.IsDead || obj.IsTargetable) return;
                 charaStruct->TargetableStatus |= ObjectTargetableFlags.IsTargetable;
             }
             else
             {
-                if (!chara.IsTargetable) return;
+                if (!obj.IsTargetable) return;
                 charaStruct->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
             }
         }
-        sa.Log.Debug($"SetTargetable {targetable} => {chara.Name} {chara}");
+        sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
     }
+    
 }
 
 #endregion 特殊函数
