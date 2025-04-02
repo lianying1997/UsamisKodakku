@@ -38,7 +38,7 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.6
+        v0.0.0.8
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
         不论MT或ST引导，双T都会收到引导方向提示。
@@ -46,12 +46,11 @@ public class FruPatch
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.7";
+    private const string Version = "0.0.0.8";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        适配新版鸭鸭再次做了代码修正。
-        增加P4一运 光之锁 突出显示
+        修复罪壤堕雷火线识别失败的奇怪Bug。
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -224,6 +223,7 @@ public class FruPatch
         if (_fruPhase != FruPhase.P1A_UtopianSky) return;
         var tid = ev.TargetId;
         var tidx = sa.GetPlayerIdIndex(tid);
+        sa.Log.Debug($"乐园绝技 {ev.Id}, {ev.Id1()}");
         lock (_pd)
         {
             _pd.Priorities[tidx] += 10;
@@ -301,7 +301,7 @@ public class FruPatch
 
         _pd.AddPriorities(priority);
     }
-
+    
     [ScriptMethod(name: "罪壤堕头标与指路（DB闲固）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(00F9|011F)$"],
         userControl: true)]
     public void FallOfFaithMarkAndGuidance(Event ev, ScriptAccessory sa)
@@ -321,7 +321,8 @@ public class FruPatch
         if (_fruPhase != FruPhase.P1B_FallOfFaith) return;
         var tid = ev.TargetId;
         var tidx = sa.GetPlayerIdIndex(tid);
-        var tetherType = ev.Id;
+        var tetherType = ev.Id1();
+        sa.Log.Debug($"罪壤堕 {ev.Id}, {ev.Id1()}");
 
         // 后续可根据myIndex进行指路
         var myIndex = sa.GetMyIndex();
@@ -330,6 +331,7 @@ public class FruPatch
         {
             // 连线出现先+1
             _pd.AddActionCount();
+            sa.Log.Debug($"罪壤堕 连线数{_pd.ActionCount} 连了{sa.GetPlayerJobByIndex(tidx)}({tidx}) 是{(tetherType == lightning ? "雷" : "火")}线");
 
             // 根据注释加对应数值
             var addNum = _pd.ActionCount % 2 == 0 ? 100 : 0;
@@ -709,7 +711,7 @@ public class FruPatch
         }
     }
     
-    [ScriptMethod(name: "沙漏连线记录（DEBUG ONLY）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(008[56])$"],
+    [ScriptMethod(name: "沙漏连线记录（DEBUG ONLY）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(0085|0086)$"],
         userControl: Debugging)]
     public void UlrHourglassTetherRecord(Event ev, ScriptAccessory sa)
     {
@@ -721,7 +723,7 @@ public class FruPatch
             var spos = ev.SourcePosition;
             var sdir = spos.Position2Dirs(Center, 8);
             _ulr.TetherDirection[sdir] = ev.Id == fast ? 1 : 2;
-            sa.Log.Debug($"检测到{sdir}方向沙漏，{(ev.Id == fast ? "快" : "慢")}");
+            sa.Log.Debug($"检测到{sdir}方向沙漏，{ev.Id}, {(ev.Id == fast ? "快" : "慢")}");
             _ct.AddCounter();
             
             if (_ct.Number != 5) return;
@@ -1708,6 +1710,11 @@ public static class EventExtensions
     public static uint Id2(this Event @event)
     {
         return ParseHexId(@event["Id2"], out var id) ? id : 0;
+    }
+    
+    public static uint Id1(this Event @event)
+    {
+        return ParseHexId(@event["Id"], out var id) ? id : 0;
     }
 
 
