@@ -24,7 +24,6 @@ using ECommons.MathHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Lumina.Excel.Sheets;
-using Microsoft.Win32.SafeHandles;
 
 namespace UsamisKodakku.Script._07_DawnTrail.FRU;
 
@@ -38,7 +37,7 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.8
+        v0.0.0.9
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
         不论MT或ST引导，双T都会收到引导方向提示。
@@ -46,11 +45,12 @@ public class FruPatch
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.8";
+    private const string Version = "0.0.0.9";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        修复罪壤堕雷火线识别失败的奇怪Bug。
+        1. 新增P3一运眩晕时自动面向（危）
+        2. 新增P4未来的碎片受击警察（该项功能仍待完善，目前仅能报告被哪个技能击中）
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -223,7 +223,7 @@ public class FruPatch
         if (_fruPhase != FruPhase.P1A_UtopianSky) return;
         var tid = ev.TargetId;
         var tidx = sa.GetPlayerIdIndex(tid);
-        sa.Log.Debug($"乐园绝技 {ev.Id}, {ev.Id1()}");
+        sa.Log.Debug($"乐园绝技 {ev.Id}, {ev.Id0()}");
         lock (_pd)
         {
             _pd.Priorities[tidx] += 10;
@@ -301,7 +301,7 @@ public class FruPatch
 
         _pd.AddPriorities(priority);
     }
-    
+
     [ScriptMethod(name: "罪壤堕头标与指路（DB闲固）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(00F9|011F)$"],
         userControl: true)]
     public void FallOfFaithMarkAndGuidance(Event ev, ScriptAccessory sa)
@@ -321,8 +321,8 @@ public class FruPatch
         if (_fruPhase != FruPhase.P1B_FallOfFaith) return;
         var tid = ev.TargetId;
         var tidx = sa.GetPlayerIdIndex(tid);
-        var tetherType = ev.Id1();
-        sa.Log.Debug($"罪壤堕 {ev.Id}, {ev.Id1()}");
+        var tetherType = ev.Id0();
+        sa.Log.Debug($"罪壤堕 {ev.Id}, {ev.Id0()}");
 
         // 后续可根据myIndex进行指路
         var myIndex = sa.GetMyIndex();
@@ -673,20 +673,20 @@ public class FruPatch
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
         _ulr.ShowMessage();
     }
-    
+
     [ScriptMethod(name: "长短火类型记录（DEBUG ONLY）", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(2455|2462)$"],
         userControl: Debugging)]
     public void UlrDarkFireTypeRecord(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
-        
+
         // 11s, 21s, 31s
         const uint fire = 2455;
         const uint ice = 2462;
         const uint fireShort = 11000 - 2000;
         const uint fireMid = 21000 - 2000;
         const uint fireLong = 31000 - 2000;
-        
+
         var dur = ev.DurationMilliseconds();
         var tidx = sa.GetPlayerIdIndex(ev.TargetId);
         var stid = ev.StatusId;
@@ -710,38 +710,38 @@ public class FruPatch
             }
         }
     }
-    
+
     [ScriptMethod(name: "沙漏连线记录（DEBUG ONLY）", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(0085|0086)$"],
         userControl: Debugging)]
     public void UlrHourglassTetherRecord(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
-        const uint fast = 86;
-        const uint slow = 85;
+        const uint fast = 0x86;
+        const uint slow = 0x85;
         lock (_ulr)
         {
             var spos = ev.SourcePosition;
             var sdir = spos.Position2Dirs(Center, 8);
-            _ulr.TetherDirection[sdir] = ev.Id == fast ? 1 : 2;
-            sa.Log.Debug($"检测到{sdir}方向沙漏，{ev.Id}, {(ev.Id == fast ? "快" : "慢")}");
+            _ulr.TetherDirection[sdir] = ev.Id0() == fast ? 1 : 2;
+            sa.Log.Debug($"检测到{sdir}方向沙漏，ev.Id = {ev.Id} ev.Id0 = {ev.Id0()}, {(ev.Id0() == fast ? "快" : "慢")}");
             _ct.AddCounter();
-            
+
             if (_ct.Number != 5) return;
             sa.Log.Debug($"五根线记录完毕，开始寻找相对北。");
             _ulr.BuildTrueDirection();
         }
     }
 
-    // [ScriptMethod(name: "眩晕时自动面向", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:4163"],
-    //     userControl: true, suppress: 10000)]
-    // public void UlrAutoFace(Event ev, ScriptAccessory sa)
-    // {
-    //     if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
-    //     var myDir = _ulr.GetDirection(sa.GetMyIndex());
-    //     sa.Log.Debug($"眩晕，触发自动面向。");
-    //     sa.SetRotation(sa.Data.MyObject, (myDir * 45f).DegToRad().Game2Logic());
-    // }
-    
+    [ScriptMethod(name: "眩晕时自动面向", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:4163"],
+        userControl: true, suppress: 10000)]
+    public void UlrAutoFace(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase != FruPhase.P3A_UltimateRelativity) return;
+        var myDir = _ulr.GetDirection(sa.GetMyIndex());
+        sa.Log.Debug($"眩晕，触发自动面向。");
+        sa.SetRotation(sa.Data.MyObject, (myDir * 45f).DegToRad().Game2Logic());
+    }
+
     public class UlRelativity
     {
         // ReSharper disable once NullableWarningSuppressionIsUsed
@@ -763,7 +763,7 @@ public class FruPatch
             TrueDirection = Enumerable.Repeat(0, 8).ToList();
             RelativeNorth = -1;
         }
-        
+
         public void BuildTrueDirection()
         {
             // 找到减速灯
@@ -787,7 +787,7 @@ public class FruPatch
             var str = "\n ---- [时间压缩] ----\n";
             str += $"相对北：{RelativeNorth}。\n";
             str += $"各职能位置：{sa.BuildListStr(TrueDirection)}";
-            
+
             sa.Log.Debug(str);
         }
 
@@ -868,7 +868,7 @@ public class FruPatch
         lock (_apo)
         {
             _ct.AddCounter();
-            var mark = ev.Id;
+            var mark = ev.Id0();
             var tid = ev.TargetId;
             var tidx = sa.GetPlayerIdIndex(tid);
 
@@ -1300,6 +1300,45 @@ public class FruPatch
     {
     }
 
+    [ScriptMethod(name: "未来的碎片受击警察", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:regex:^(40(190|271|274|241|279|280|277|284|285|289|248|303|250))$"],
+        userControl: true)]
+    public void FragmentMonitor(Event ev, ScriptAccessory sa)
+    {
+        if (_fruPhase is not FruPhase.P4A_DarklitDragonsong and not FruPhase.P4B_CrystallizeTime) return;
+
+        // 确认受击列表内是否包含未来的碎片
+        IGameObject? tObj = sa.GetById(ev.TargetId);
+        if (tObj == null) return;
+        var tDataId = tObj.DataId;
+        if (tDataId != 17841) return;
+
+        // 获得导致碎片受击的技能
+        var aid = ev.ActionId;
+        // 技能列表
+        var skillParam = new Dictionary<uint, string>
+            {
+                { 40190, "光之波动引导" },
+                { 40271, "水分摊" },
+                { 40274, "暗分散" },
+                { 40241, "撞龙头" },
+                { 40279, "冰月环" },
+                { 40280, "风击退" },
+                { 40277, "暗分摊" },
+                { 40284, "真夜舞蹈（远）" },
+                { 40285, "真夜舞蹈（近）" },
+                { 40289, "碎灵一击" },
+                { 40248, "死亡轮回（希瓦）" },
+                { 40303, "死亡轮回（盖娅）" },
+                { 40250, "无尽顿悟" },
+            };
+
+        if (skillParam.ContainsKey(aid))
+        {
+            sa.Method.SendChat($"/e 未来的碎片 被 【{skillParam[aid]}】 给打中了！！！<se.11>");
+        }
+    }
+
     #region P4.1 光暗龙诗
 
     [ScriptMethod(name: "光暗龙诗阶段转换（DEBUG ONLY）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(40239)$"],
@@ -1314,7 +1353,7 @@ public class FruPatch
         _recorded = new bool[20].ToList();
         sa.DebugMsg($"当前阶段为：{_fruPhase}", DebugMode);
     }
-    
+
     [ScriptMethod(name: "光之锁突出显示", eventType: EventTypeEnum.Tether, eventCondition: ["Id:006E"],
         userControl: true)]
     public void DldLightChainVisual(Event ev, ScriptAccessory sa)
@@ -1396,7 +1435,7 @@ public class FruPatch
         // _events
         ApoGrouping = 0,
         ApoPreciseGrouping = 1,
-        
+
         // _recorded
     }
 
@@ -1681,7 +1720,7 @@ public class FruPatch
     }
 
     #endregion
-   
+
 }
 
 #region 函数集
@@ -1711,8 +1750,8 @@ public static class EventExtensions
     {
         return ParseHexId(@event["Id2"], out var id) ? id : 0;
     }
-    
-    public static uint Id1(this Event @event)
+
+    public static uint Id0(this Event @event)
     {
         return ParseHexId(@event["Id"], out var id) ? id : 0;
     }
@@ -2969,7 +3008,21 @@ public static class SpecialFunction
         }
         sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
     }
-    
+
+    public static void SetRotation(this ScriptAccessory sa, IGameObject? obj, float rotation)
+    {
+        if (obj == null || !obj.IsValid())
+        {
+            sa.Log.Error($"传入的IGameObject不合法。");
+            return;
+        }
+        unsafe
+        {
+            GameObject* charaStruct = (GameObject*)obj.Address;
+            charaStruct->SetRotation(rotation);
+        }
+        sa.Log.Debug($"SetRotation => {obj.Name.TextValue} | {obj} => {rotation}");
+    }
 }
 
 #endregion 特殊函数
