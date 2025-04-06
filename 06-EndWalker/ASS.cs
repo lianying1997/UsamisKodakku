@@ -23,7 +23,7 @@ using FFXIVClientStructs;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.2", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.3", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class ASS
 {
@@ -35,7 +35,8 @@ public class ASS
     
     private const string UpdateInfo =
         """
-        修复了因团灭导致初始化失败，继而引发的绘图Bug。
+        1. 修复了Boss2 刚武旋击（钢铁月环）月环范围错误的Bug
+        2. 修复了Boss2 金银咒象 金银Buff优先级站位错误的Bug
         """;
     
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -164,6 +165,40 @@ public class ASS
     {
         if (!DebugMode) return;
         accessory.Method.SendChat($"/e [DEBUG] {str}");
+    }
+    
+    [ScriptMethod(name: "测试项 - 获得玩家位置", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: false)]
+    public void CheckPlayerRole(Event ev, ScriptAccessory sa)
+    {
+        sa.Log.Debug($"玩家位置：{sa.getMyIndex()}");
+    }
+    
+    [ScriptMethod(name: "测试项 - 获得金银Buff场地", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: false)]
+    public void CheckGoldenSilverField(Event ev, ScriptAccessory sa)
+    {
+        var a = Boss2_GoldenSilverField;
+        var str = "";
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                str += Boss2_GoldenSilverField[i][j].ToString();
+                str += "\t";
+            }
+            str += "\n";
+        }
+        sa.Log.Debug($"---- 金银场地 ----\n{str}");
+    }
+    
+    [ScriptMethod(name: "测试项 - 获得金银Buff站位", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
+        userControl: false)]
+    public void CheckGoldenSilverSafeField(Event ev, ScriptAccessory sa)
+    {
+        int[] high = findGoldenSilverIndex(11, true);
+        int[] low = findGoldenSilverIndex(11, false);
+        sa.Log.Debug($"高优先级金银 {high[0]}行{high[1]}列；低优先级金银 {low[0]}行{low[1]}列");
     }
 
     [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
@@ -760,9 +795,9 @@ public class ASS
         HashSet<uint> CHARIOT_2 = [30302, 30624];
         HashSet<uint> CHARIOT_3 = [30303, 30625];
 
-        HashSet<uint> DONUT_1 = [30306, 30628];
+        HashSet<uint> DONUT_1 = [30304, 30626];
         HashSet<uint> DONUT_2 = [30305, 30627];
-        HashSet<uint> DONUT_3 = [30304, 30626];
+        HashSet<uint> DONUT_3 = [30306, 30628];
 
         var aid = @event.ActionId();
         var sid = @event.SourceId();
@@ -776,6 +811,7 @@ public class ASS
         if (_type == DrawTypeEnum.Circle)
         {
             var dp = accessory.drawCircle(sid, 0, 10000, $"刚武旋击钢铁");
+            accessory.Log.Debug($"刚武旋击钢铁 {_innerscale} 技能ID {aid}");
             dp.Scale = new(_innerscale);
             dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
             accessory.Method.SendDraw(DrawModeEnum.Default, _type, dp);
@@ -783,6 +819,7 @@ public class ASS
         else
         {
             var dp = accessory.drawDonut(sid, 10000, 2000, $"刚武旋击月环");
+            accessory.Log.Debug($"刚武旋击月环 {_innerscale} 技能ID {aid}");
             dp.InnerScale = new(_innerscale);
             dp.Scale = new(30f);
             dp.Color = accessory.Data.DefaultDangerColor.WithW(2f);
@@ -857,6 +894,7 @@ public class ASS
 
         var myIndex = accessory.getMyIndex();
         // 11代表金银各1
+        accessory.Log.Debug($"根据顺序，金银Buff为：{Boss2_GoldenSilverBuff[0]}, {Boss2_GoldenSilverBuff[1]}, {Boss2_GoldenSilverBuff[2]}, {Boss2_GoldenSilverBuff[3]},");
         if (Boss2_GoldenSilverBuff[myIndex] != 11)
         {
             int[] _idxs = findGoldenSilverIndex(Boss2_GoldenSilverBuff[myIndex], true);
@@ -864,11 +902,12 @@ public class ASS
         }
         else
         {
-            int[] _priority = [0, 2, 3, 1];   // T 近 远 奶
+            int[] _priority = [0, 3, 1, 2];   // T 近 远 奶
             var _my_prior = _priority[myIndex];
-            var _other_idx = Boss2_GoldenSilverBuff.IndexOf(11);
-            var _other_prior = _priority[myIndex];
-            var _is_first = _my_prior >= _other_prior;
+            var _other_idx = Boss2_GoldenSilverBuff.IndexOf(11) != myIndex ? Boss2_GoldenSilverBuff.IndexOf(11) : Boss2_GoldenSilverBuff.LastIndexOf(11);
+            var _other_prior = _priority[_other_idx];
+            var _is_first = _my_prior < _other_prior;
+            accessory.Log.Debug($"我({myIndex})的优先级为 {_my_prior}，另一人({_other_idx})的优先级为 {_other_prior}，我isFirst {_is_first}");
             int[] _idxs = findGoldenSilverIndex(Boss2_GoldenSilverBuff[myIndex], _is_first);
             drawSafeSquare(_idxs[0], _idxs[1], accessory);
         }
@@ -983,9 +1022,9 @@ public class ASS
 
     private int[] findGoldenSilverIndex(int value, bool is_first)
     {
-        for (int i = 0; i < Boss2_GoldenSilverField.Count(); i++)
+        for (int i = 0; i < Boss2_GoldenSilverField.Count; i++)
         {
-            for (int j = 0; j < Boss2_GoldenSilverField[i].Count(); j++)
+            for (int j = 0; j < Boss2_GoldenSilverField[i].Count; j++)
             {
                 if (Boss2_GoldenSilverField[i][j] == value)
                 {
