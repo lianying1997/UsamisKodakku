@@ -24,29 +24,19 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p8s;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.5", author: "Usami", note: noteStr)]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.6", author: "Usami", note: noteStr)]
 public class p8s
 {
     const string noteStr =
     """
-    v0.0.0.5
-    为了7.1编译成功的尝试。
-    
-    v0.0.0.4
-    1. 调整迭代次数随实际人数变更，避免报错弹出。
-
-    v0.0.0.3:
-    1. 增加万象踩塔指引。
-    
-    v0.0.0.2:
-    1. 重构了部分代码（白费工夫。
-    2. 增加了门神一车指路。
-    3. 增加了本体分散位置指路。
-    4. 加快了本体一冰火指路的出现时间。
-
-    v0.0.0.1:
-    初版完成，门神一分身结束，本体万象结束。
+    v0.0.0.6
+    一车设置场中H2，正右ST。
     鸭门。
+    """;
+
+    private const string UpdateInfo =
+    """
+    1. 修正门神一车站位。
     """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -377,9 +367,9 @@ public class p8s
     {
         Vector3[] safePos = new Vector3[8];
         safePos[0] = new Vector3(100, 0, 90);
-        safePos[1] = new Vector3(100, 0, 110);
+        safePos[1] = new Vector3(110, 0, 100);
         safePos[2] = new Vector3(90, 0, 100);
-        safePos[3] = new Vector3(110, 0, 100);
+        safePos[3] = new Vector3(100, 0, 100);
         safePos[4] = new Vector3(90, 0, 110);
         safePos[5] = new Vector3(110, 0, 110);
         safePos[6] = new Vector3(90, 0, 90);

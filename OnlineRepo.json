@@ -2,12 +2,12 @@
   {
     "Name": "P8S [零式万魔殿 炼净之狱4]",
     "Guid": "97df6974-c726-4a00-9016-293c184adf5c",
-    "Version": "0.0.0.5",
+    "Version": "0.0.0.6",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
-    "Note": "v0.0.0.5\r\n为了7.1编译成功的尝试。\r\n\r\nv0.0.0.4\r\n1. 调整迭代次数随实际人数变更，避免报错弹出。\r\n\r\nv0.0.0.3:\r\n1. 增加万象踩塔指引。\r\n\r\nv0.0.0.2:\r\n1. 重构了部分代码（白费工夫。\r\n2. 增加了门神一车指路。\r\n3. 增加了本体分散位置指路。\r\n4. 加快了本体一冰火指路的出现时间。\r\n\r\nv0.0.0.1:\r\n初版完成，门神一分身结束，本体万象结束。\r\n鸭门。",
-    "UpdateInfo": "",
+    "Note": "v0.0.0.6\n一车设置场中H2，正右ST。\n鸭门。",
+    "UpdateInfo": "1. 修正门神一车站位。",
     "TerritoryIds": [
       1088
     ]
