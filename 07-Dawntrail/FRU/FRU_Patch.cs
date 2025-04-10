@@ -136,6 +136,8 @@ public class FruPatch
     private static Counter _ct = new Counter();
     private static Apocalypse _apo = new Apocalypse();
     private static UlRelativity _ulr = new UlRelativity();
+    
+    private static List<ulong> _fragTargets = [];
 
     private const int Mt = 0;
     private const int St = 1;
@@ -145,6 +147,8 @@ public class FruPatch
     private const int D2 = 5;
     private const int D3 = 6;
     private const int D4 = 7;
+
+    private const ulong FragmentDataId = 17841;
 
     public void Init(ScriptAccessory accessory)
     {
@@ -1306,17 +1310,26 @@ public class FruPatch
     public void FragmentMonitor(Event ev, ScriptAccessory sa)
     {
         if (_fruPhase is not FruPhase.P4A_DarklitDragonsong and not FruPhase.P4B_CrystallizeTime) return;
-
-        // 确认受击列表内是否包含未来的碎片
+        
         IGameObject? tObj = sa.GetById(ev.TargetId);
         if (tObj == null) return;
-        var tDataId = tObj.DataId;
-        if (tDataId != 17841) return;
 
-        // 获得导致碎片受击的技能
-        var aid = ev.ActionId;
-        // 技能列表
-        var skillParam = new Dictionary<uint, string>
+        lock (_fragTargets)
+        {
+            // 初始化受击列表，并加入
+            var tidx = ev.TargetIndex();
+            if (tidx == 1 && _fragTargets.Count != 0)
+                _fragTargets.Clear();
+            _fragTargets.Add(ev.TargetId);
+            
+            // 受击单位为未来的碎片
+            var tDataId = tObj.DataId;
+            if (tDataId != FragmentDataId) return;
+
+            // 获得导致碎片受击的技能
+            var aid = ev.ActionId;
+            // 技能列表
+            var skillParam = new Dictionary<uint, string>
             {
                 { 40190, "光之波动引导" },
                 { 40271, "水分摊" },
@@ -1333,9 +1346,21 @@ public class FruPatch
                 { 40250, "无尽顿悟" },
             };
 
-        if (skillParam.ContainsKey(aid))
-        {
-            sa.Method.SendChat($"/e 未来的碎片 被 【{skillParam[aid]}】 给打中了！！！<se.11>");
+            var str = "";
+            if (_fragTargets.Count != 1)
+            {
+                foreach (var target in _fragTargets)
+                {
+                    IGameObject? obj = sa.GetById(target);
+                    if (obj == null) continue;
+                    str += obj.Name + " ";
+                }
+            }
+            
+            if (skillParam.TryGetValue(aid, out var skillName))
+            {
+                sa.Method.SendChat($"/e 未来的碎片 似乎因【{str}】被【{skillName}】打中了！！！<se.11>");
+            }
         }
     }
 
@@ -1756,6 +1781,10 @@ public static class EventExtensions
         return ParseHexId(@event["Id"], out var id) ? id : 0;
     }
 
+    public static uint TargetIndex(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["TargetIndex"]);
+    }
 
     public static string Message(this Event ev)
     {
