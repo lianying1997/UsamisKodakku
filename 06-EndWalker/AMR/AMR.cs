@@ -45,8 +45,6 @@ public class Amr
         修复了因团灭导致初始化失败，继而引发的绘图Bug。
         """;
 
-    [UserSetting("Debug模式，非开发用请关闭")] public static bool DebugMode { get; set; } = false;
-
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } =
         new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
@@ -117,8 +115,7 @@ public class Amr
 
     public void Init(ScriptAccessory accessory)
     {
-        // accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}", DebugMode);
-
+        accessory.Log.Debug($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}");
         ParamsInit(accessory);
     }
     
@@ -143,11 +140,10 @@ public class Amr
         accessory.Method.RemoveDraw(".*");
     }
 
-    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"],
+    [ScriptMethod(name: "--- 测试项 ---", eventType: EventTypeEnum.Chat, eventCondition: ["HelloAyaWorld"],
         userControl: false)]
     public void EchoDebug(Event @event, ScriptAccessory accessory)
     {
-        if (!DebugMode) return;
         // ---- DEBUG CODE ----
 
         var sid = (uint)0x400070B3;
@@ -181,7 +177,7 @@ public class Amr
         };
         
         ParamsInit(accessory);
-        accessory.DebugMsg($"检测到{bossName}的刷新，参数初始化。", DebugMode);
+        accessory.Log.Debug($"检测到{bossName}的刷新，参数初始化。");
     }
 
     #region Boss1 舞狮
@@ -437,13 +433,13 @@ public class Amr
         public void AddDefamationTargetIdx(int idx)
         {
             _defamationTargetIdx.Add(idx);
-            accessory.DebugMsg($"检测到{accessory.GetPlayerJobByIndex(idx, true)}的大圈", DebugMode);
+            accessory.Log.Debug($"检测到{accessory.GetPlayerJobByIndex(idx, true)}的大圈");
         }
 
         public void AddTowerPos(Vector3 pos)
         {
             _towerPos.Add(pos);
-            accessory.DebugMsg($"检测到{pos}的塔", DebugMode);
+            accessory.Log.Debug($"检测到{pos}的塔");
         }
 
         public int GetTowerNum()
@@ -456,7 +452,6 @@ public class Amr
             SortTowerPosition();
             var towerTargets = FindTowerTargets();
             var combinedList = towerTargets.Zip(_towerPos, (dir, pos) => (dir, pos)).ToList();
-            if (!DebugMode) return combinedList;
 
             var str = "";
             for (var i = 0; i < combinedList.Count; i++)
@@ -464,7 +459,7 @@ public class Amr
                 str += $"{accessory.GetPlayerJobByIndex(combinedList[i].Item1, true)}踩塔{combinedList[i].Item2}\n";
             }
 
-            accessory.DebugMsg(str, DebugMode);
+            accessory.Log.Debug(str);
             return combinedList;
         }
 
@@ -549,7 +544,7 @@ public class Amr
         var dpList = _sc.ExportCloudSolution();
         lock (dpList)
         {
-            accessory.DebugMsg($"需要画{dpList[0].Count}个雷云危险区", DebugMode);
+            accessory.Log.Debug($"需要画{dpList[0].Count}个雷云危险区");
             for (var i = 0; i < dpList[0].Count; i++)
             {
                 // 雷暴云危险区
@@ -676,7 +671,7 @@ public class Amr
                 {
                     var isCw = pos.Position2Dirs(_centerBoss1, 4, false) % 2 == 0;
                     safePos = pos.RotatePoint(_centerBoss1, isCw ? 15f.DegToRad() : -15f.DegToRad());
-                    // accessory.DebugMsg($"安全云点{pos}在外侧，{(isCw ? "顺" : "逆")}时针旋转", DebugMode);
+                    accessory.Log.Debug($"安全云点{pos}在外侧，{(isCw ? "顺" : "逆")}时针旋转");
                 }
                 else
                 {
@@ -684,7 +679,7 @@ public class Amr
                     var isRight = pos.X > _centerBoss1.X;
                     var relativeSafePos = relativePos with { X = relativePos.X + (isRight ? 4f : -4f) };
                     safePos = relativeSafePos.RotatePoint(_centerBoss1, _bossRotation[0].Game2Logic());
-                    // accessory.DebugMsg($"安全云点{pos}在内，直接对X坐标处理", DebugMode);
+                    accessory.Log.Debug($"安全云点{pos}在内，直接对X坐标处理");
                 }
             }
             else
@@ -713,7 +708,7 @@ public class Amr
                 if (cloud.Item3)
                 {
                     var dangerCloudPos = cloud.Item2;
-                    // accessory.DebugMsg($"危险云点为{dangerCloudPos}", DebugMode);
+                    accessory.Log.Debug($"危险云点为{dangerCloudPos}");
                     // 需画出对应危险区域
                     var dp = accessory.DrawCircle(cloud.Item1, cloudScale, 0, 10000, $"雷云{cloud.Item1}");
                     dpList[0].Add(dp);
@@ -742,7 +737,7 @@ public class Amr
 
                     var safeCloudPos = cloud.Item2;
                     var safePos = FindRelativeSafePos(safeCloudPos);
-                    // accessory.DebugMsg($"安全云点为{safeCloudPos}，对应安全区{safePos}", DebugMode);
+                    accessory.Log.Debug($"安全云点为{safeCloudPos}，对应安全区{safePos}");
                     var dp1 = accessory.DrawStaticCircle(safePos, accessory.Data.DefaultSafeColor, 0, 10000, $"雷云就位区1");
                     var dp2 = accessory.DrawStaticCircle(_centerBoss1, accessory.Data.DefaultSafeColor, 0, 10000,
                         $"雷云就位区2");
@@ -827,14 +822,14 @@ public class Amr
                     $"分摊{_liveFireStackIdx[i]}");
                 if (IsJobPartner(_liveFireStackIdx[0], _liveFireStackIdx[1]))
                 {
-                    accessory.DebugMsg($"分摊目标为同职能组，需换位", DebugMode);
+                    accessory.Log.Debug($"分摊目标为同职能组，需换位");
                     _stackSwap = true;
                     if (IsRangePartner(myIndex, _liveFireStackIdx[i]))
                         dp.Color = accessory.Data.DefaultSafeColor;
                 }
                 else
                 {
-                    accessory.DebugMsg($"分摊目标为不同职能组，无需换位", DebugMode);
+                    accessory.Log.Debug($"分摊目标为不同职能组，无需换位");
                     _stackSwap = false;
                     if (IsJobPartner(myIndex, _liveFireStackIdx[i]))
                         dp.Color = accessory.Data.DefaultSafeColor;
@@ -990,7 +985,7 @@ public class Amr
                 {
                     foreach (var fire in _fire)
                     {
-                        accessory.DebugMsg($"正在比较sulphur{sulphur.Item2}与fire{fire.Item2}", DebugMode);
+                        accessory.Log.Debug($"正在比较sulphur{sulphur.Item2}与fire{fire.Item2}");
                         if (!IsInRange(sulphur.Item2, fire.Item2)) continue;
                         _safeSulphurs.Add(sulphur);
                         str += $"位于{sulphur.Item2}的石头在火的攻击范围内，观察其安全区\n";
@@ -999,7 +994,7 @@ public class Amr
 
                 // 排序，0北1南
                 _safeSulphurs.Sort((a, b) => a.Item2.Z.CompareTo(b.Item2.Z));
-                accessory.DebugMsg(str, DebugMode);
+                accessory.Log.Debug(str);
             }
         }
 
@@ -1163,7 +1158,7 @@ public class Amr
         {
             _rr.AddTower(index);
             var isOrange = index < 7;
-            accessory.DebugMsg($"添加了{(isOrange ? "橙" : "蓝")}塔{index}", DebugMode);
+            accessory.Log.Debug($"添加了{(isOrange ? "橙" : "蓝")}塔{index}");
 
             if (_rr.GetTowerPlayerId(isOrange) != accessory.Data.Me) return;
             var towerPos = _centerBoss2 - new Vector3(0, 0, 11);
@@ -1536,7 +1531,7 @@ public class Amr
         {
             _multiKasumisList.Clear();
         }
-        accessory.DebugMsg($"霞斩列表初始化", DebugMode);
+        accessory.Log.Debug($"霞斩列表初始化");
         _manualEvents[4].Set();
     }
     
@@ -1746,7 +1741,7 @@ public class Amr
                 2 => "下",
                 _ => "左"
             };
-            accessory.DebugMsg($"记录下{chariotDonutStr}面向{directionStr}刀");
+            accessory.Log.Debug($"记录下{chariotDonutStr}面向{directionStr}刀");
         }
 
         public void SetKasumiTime(int delay, int destroy)
@@ -1936,7 +1931,7 @@ public class Amr
     {
         _phase = AmrPhase.Boss3_BoundlessScarlet;
         _multiKasumisList.Clear();
-        accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
+        accessory.Log.Debug($"当前阶段为：{_phase}");
     }
     
     [ScriptMethod(name: "赤帝空闪刃扩散", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(34(259|306))$"],
@@ -2017,7 +2012,7 @@ public class Amr
         };
         _multiKasumisList.Clear();
         _isTetherTarget = false;
-        accessory.DebugMsg($"当前阶段为：{_phase}", DebugMode);
+        accessory.Log.Debug($"当前阶段为：{_phase}");
     }
     
     [ScriptMethod(name: "分身 连线居合霞斩记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:0011"],
@@ -2061,11 +2056,11 @@ public class Amr
             var kasumi = _multiKasumisList.FirstOrDefault(k =>
                 k.CheckKasumiSource(tid) && k.CheckKasumiCount(0));
             if (kasumi == null) return;
-            accessory.DebugMsg($"找到了{tid}的第一轮扇形记录。");
+            accessory.Log.Debug($"找到了{tid}的第一轮扇形记录。");
 
             if (kasumi.CheckParamed())
             {
-                accessory.DebugMsg($"因为checkedParam现在是{tid}的第二轮扇形记录。");
+                accessory.Log.Debug($"因为checkedParam现在是{tid}的第二轮扇形记录。");
                 kasumi = _multiKasumisList.FirstOrDefault(k =>
                     k.CheckKasumiSource(tid) && k.CheckKasumiCount(1));
             }
@@ -2079,7 +2074,7 @@ public class Amr
             }
             else
             {
-                accessory.DebugMsg($"{tid}的第二轮赋值0与0，不画。");
+                accessory.Log.Debug($"{tid}的第二轮赋值0与0，不画。");
                 kasumi.SetKasumiTime(0, 0);
             }
         }
@@ -2094,18 +2089,18 @@ public class Amr
         
         lock (_multiKasumisList)
         {
-            accessory.DebugMsg($"你好，你在哪里{_multiKasumisList.Count}", DebugMode);
+            accessory.Log.Debug($"你好，你在哪里{_multiKasumisList.Count}");
             var kasumi0 = _multiKasumisList.FirstOrDefault(k =>
                 k.CheckKasumiSource(sid) && k.CheckKasumiCount(0));
             if (kasumi0 == null) return;
-            accessory.DebugMsg($"正在处理第一步", DebugMode);
+            accessory.Log.Debug($"正在处理第一步");
             kasumi0.TurnDynamicToStatic(false);
             kasumi0.SetKasumiTime(0, 2100);
 
             var kasumi1 = _multiKasumisList.FirstOrDefault(k =>
                 k.CheckKasumiSource(sid) && k.CheckKasumiCount(1));
             if (kasumi1 == null) return;
-            accessory.DebugMsg($"正在处理第二步，添加kasumi0的角度", DebugMode);
+            accessory.Log.Debug($"正在处理第二步，添加kasumi0的角度");
             kasumi1.SetKasumiSourceRotation(kasumi0.GetCleaveRadian() + kasumi0.GetSourceRotation());
             kasumi1.TurnDynamicToStatic(false);
             kasumi1.SetKasumiTime(2100, 5000);
@@ -2124,7 +2119,7 @@ public class Amr
         var spos = @event.SourcePosition();
         var dir = spos.Position2Dirs(_centerBoss3, 4);
         _isLRHand = dir % 2 == 1;
-        accessory.DebugMsg($"大手手位置在{(_isLRHand ? "左右" : "上下")}", DebugMode);
+        accessory.Log.Debug($"大手手位置在{(_isLRHand ? "左右" : "上下")}");
     }
     
     [ScriptMethod(name: "一运 大手手绘图", eventType: EventTypeEnum.PlayActionTimeline,
@@ -2169,7 +2164,7 @@ public class Amr
         var isNear = aid == near;
         if (_isTetherTarget)
             isNear = !isNear;
-        accessory.DebugMsg($"玩家站位应当{(isNear ? "靠近" : "远离")}", DebugMode);
+        accessory.Log.Debug($"玩家站位应当{(isNear ? "靠近" : "远离")}");
         
         var pos = _centerBoss3 with { Z = isNear ? -11.78f : -19.78f };
         var myIndex = accessory.GetMyIndex();
@@ -3484,19 +3479,6 @@ public static class AssignDp
             dpList[2].Add(dpPos);
         }
         return dpList;
-    }
-    
-    /// <summary>
-    /// 外部用调试模式
-    /// </summary>
-    /// <param name="str"></param>
-    /// <param name="debugMode"></param>
-    /// <param name="accessory"></param>
-    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = true)
-    {
-        if (!debugMode)
-            return;
-        accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
 }
 
