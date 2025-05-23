@@ -32,7 +32,7 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.8", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.9", author: "Joshua and Usami", note: noteStr)]
 public class Ucob
 {
     // TODO
@@ -139,7 +139,66 @@ public class Ucob
     Vector3 BahamutFavorPos = new(0, 0, 0);     // P4以初始拉怪点为12点（右下）
     int ArkMornNum = 0;                         // P5死亡轮回死刑次数
     int MornAfahNum = 0;                        // P5无尽顿悟分摊次数
-
+    private static readonly Dictionary<(int, int, int, int, int), (int, int, int)> CauterizeSafePos = 
+    new Dictionary<(int, int, int, int, int), (int, int, int)>
+    {
+        {(1, 2, 3, 4, 5), (11, 5, 7)},
+        {(1, 2, 3, 4, 6), (11, 5, 7)},
+        {(1, 2, 3, 4, 7), (11, 5, 7)},
+        {(1, 2, 3, 4, 8), (11, 5, 8)},
+        {(1, 2, 3, 5, 6), (2, 5, 8)},
+        {(1, 2, 3, 5, 7), (11, 5, 8)},
+        {(1, 2, 3, 5, 8), (2, 5, 8)},
+        {(1, 2, 3, 6, 7), (2, 5, 10)},
+        {(1, 2, 3, 6, 8), (11, 5, 8)},
+        {(1, 2, 3, 7, 8), (2, 5, 8)},
+        {(1, 2, 4, 5, 6), (2, 6, 9)},
+        {(1, 2, 4, 5, 7), (11, 3, 8)},
+        {(1, 2, 4, 5, 8), (2, 6, 8)},
+        {(1, 2, 4, 6, 7), (2, 6, 10)},
+        {(1, 2, 4, 6, 8), (2, 6, 9)},
+        {(1, 2, 4, 7, 8), (11, 3, 8)},
+        {(1, 2, 5, 6, 7), (2, 5, 10)},
+        {(1, 2, 5, 6, 8), (2, 5, 10)},
+        {(1, 2, 5, 7, 8), (11, 5, 8)},
+        {(1, 2, 6, 7, 8), (2, 6, 11)},
+        {(1, 3, 4, 5, 6), (2, 6, 8)},
+        {(1, 3, 4, 5, 7), (2, 6, 8)},
+        {(1, 3, 4, 5, 8), (2, 6, 8)},
+        {(1, 3, 4, 6, 7), (2, 6, 10)},
+        {(1, 3, 4, 6, 8), (2, 6, 9)},
+        {(1, 3, 4, 7, 8), (2, 6, 8)},
+        {(1, 3, 5, 6, 7), (2, 5, 10)},
+        {(1, 3, 5, 6, 8), (2, 5, 9)},
+        {(1, 3, 5, 7, 8), (2, 5, 8)},
+        {(1, 3, 6, 7, 8), (2, 6, 11)},
+        {(1, 4, 5, 6, 7), (2, 8, 10)},
+        {(1, 4, 5, 6, 8), (2, 8, 10)},
+        {(1, 4, 5, 7, 8), (2, 8, 11)},
+        {(1, 4, 6, 7, 8), (2, 6, 11)},
+        {(1, 5, 6, 7, 8), (3, 9, 11)},
+        {(2, 3, 4, 5, 6), (1, 6, 8)},
+        {(2, 3, 4, 5, 7), (1, 6, 8)},
+        {(2, 3, 4, 5, 8), (1, 6, 9)},
+        {(2, 3, 4, 6, 7), (4, 7, 10)},
+        {(2, 3, 4, 6, 8), (1, 6, 9)},
+        {(2, 3, 4, 7, 8), (4, 7, 11)},
+        {(2, 3, 5, 6, 7), (4, 8, 10)},
+        {(2, 3, 5, 6, 8), (1, 5, 9)},
+        {(2, 3, 5, 7, 8), (4, 8, 11)},
+        {(2, 3, 6, 7, 8), (11, 6, 11)},
+        {(2, 4, 5, 6, 7), (3, 8, 10)},
+        {(2, 4, 5, 6, 8), (3, 8, 10)},
+        {(2, 4, 5, 7, 8), (3, 8, 11)},
+        {(2, 4, 6, 7, 8), (3, 9, 11)},
+        {(2, 5, 6, 7, 8), (4, 9, 11)},
+        {(3, 4, 5, 6, 7), (2, 5, 10)},
+        {(3, 4, 5, 6, 8), (2, 7, 10)},
+        {(3, 4, 5, 7, 8), (2, 8, 11)},
+        {(3, 4, 6, 7, 8), (5, 9, 11)},
+        {(3, 5, 6, 7, 8), (5, 9, 11)},
+        {(4, 5, 6, 7, 8), (4, 9, 11)}
+    };
 
     public void Init(ScriptAccessory accessory)
     {
@@ -878,19 +937,21 @@ public class Ucob
         var sortedDragons = CauterizeDragons
             .OrderBy(d => d.Value)  // 根据dir升序排序
             .ToList();
-
         if (!showOtherCauterizeRoute && tid != accessory.Data.Me) return;
 
         switch (CauterizeTimes)
         {
             case 1:
+                CauterizeSafePosDraw(accessory);
                 CauterizeRouteDraw(sortedDragons[0].Key, tid, accessory);
                 CauterizeRouteDraw(sortedDragons[1].Key, tid, accessory);
                 break;
             case 2:
+                CauterizeSafePosDraw(accessory);
                 CauterizeRouteDraw(sortedDragons[2].Key, tid, accessory);
                 break;
             case 3:
+                CauterizeSafePosDraw(accessory);
                 CauterizeRouteDraw(sortedDragons[3].Key, tid, accessory);
                 CauterizeRouteDraw(sortedDragons[4].Key, tid, accessory);
                 break;
@@ -906,6 +967,35 @@ public class Ucob
         dp.Color = accessory.Data.DefaultDangerColor.WithW(0.5f);
         dp.TargetObject = tid;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+    }
+
+    private void CauterizeSafePosDraw(ScriptAccessory accessory)
+    {
+        var sortedDragonsDir = CauterizeDragons.OrderBy(d => d.Value).Select(d => d.Value + 1).ToArray();
+        var sortedDragonsDirTuple = (sortedDragonsDir[0], sortedDragonsDir[1], sortedDragonsDir[2], sortedDragonsDir[3], sortedDragonsDir[4]);
+        var safePosClock = CauterizeSafePos.TryGetValue(sortedDragonsDirTuple, out var safePos) ? safePos : (0,0,0);
+        if (safePosClock.Equals((0,0,0)))
+        {
+            return;
+        }
+        var basePos = new Vector3(0, 0, -21);
+        int clock = CauterizeTimes switch
+        {
+            1 => safePosClock.Item1,
+            2 => safePosClock.Item2,
+            3 => safePosClock.Item3,
+            _ => throw new IndexOutOfRangeException()
+        };
+        var SafePos = RotatePoint(basePos, new(0, 0, 0), angle2Rad(clock * 30 % 360));
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = $"俯冲安全点";
+        dp.Scale = new(2);
+        dp.Owner = accessory.Data.Me;
+        dp.TargetPosition = SafePos;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.DestoryAt = 6000;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
 
     [ScriptMethod(name: "P2奈尔：小龙俯冲实际范围预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(993[12345])$"])]
