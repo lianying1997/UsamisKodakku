@@ -2,6 +2,7 @@
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Extensions;
 using Dalamud.Utility.Numerics;
 using System.Numerics;
 using System.Runtime.Intrinsics.Arm;
@@ -32,7 +33,8 @@ using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d", version: "0.0.1.9", author: "Joshua and Usami", note: noteStr)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d",
+    version: "0.0.2.0", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class Ucob
 {
     // TODO
@@ -41,10 +43,16 @@ public class Ucob
     const string noteStr =
     """
     基于@Joshua的巴哈初版程序改写扩充，
-    感谢合作者@KnightRider。
+    感谢合作者@KnightRider，@Meva。
     请先按需求检查并设置“用户设置”栏目。
     鸭门。
     """;
+    
+    private const string UpdateInfo =
+        """
+        1. @Meva佬更新了P2小龙俯冲的匠心指路。因为答案不唯一，建议搭配俯冲范围显示一并食用。
+        2. 俯冲范围增加了箭头，可较为明显地指引俯冲方向。
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public bool DebugMode { get; set; } = false;
@@ -213,7 +221,7 @@ public class Ucob
 
         DeathSentenceTarget = [0, 0, 0];        // P2死宣目标
         FireBallStatus = [0, 0, 0, 0, 0, 0, 0, 0];    // P2火buff状态
-        FireBallTimes = 0;  // P2火球分摊次数
+        FireBallTimes = 0;      // P2火球分摊次数
         CauterizeDragons = new();            // P2小龙字典（id, 位置）
         CauterizeTimes = 0;                  // P2小龙引导次数
 
@@ -333,65 +341,38 @@ public class Ucob
         }
     }
 
-    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
-    public void EchoDebug(Event @event, ScriptAccessory accessory)
+    [ScriptMethod(name: "测试用", eventType: EventTypeEnum.Chat, eventCondition: ["abcdefgh"], userControl: false)]
+    public void EchoDebug(Event ev, ScriptAccessory sa)
     {
-        if (!DebugMode) return;
-        var msg = @event["Message"].ToString();
-        accessory.Method.SendChat($"/e 获得玩家发送的消息：{msg}");
-
-
-        // 测试
-        // MT ST D2
-        GenerateTarget = [true, true, false, false, false, true, false, false];
-
-        if (TenStrikeBlackOrbDrawn) return;
-
-        int trueCount = 0;
-        for (int i = 0; i < GenerateTarget.Count(); i++)
+        var chara = sa.Data.Objects.SearchById(0x40006505);
+        if (chara == null) return;
+        var achara = sa.Data.Objects.SearchById(0x104FCCD4);
+        if (achara == null) return;
+        sa.Log.Debug($"{chara.Name}, {chara.EntityId}");
+        sa.Log.Debug($"{achara.Name}, {achara.EntityId}");
+        unsafe
         {
-            if (GenerateTarget[i])
-                trueCount++;
+            var tetherAdd = (FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)chara.Address;
+            var a = tetherAdd->NameString;
+            var tethers = tetherAdd->Vfx.Tethers;
+            var tetherNum = tethers.Length;
+            sa.Log.Debug($"tetherNum = {tetherNum}");
+            var tetherTarget0 = tethers[0].TargetId.ObjectId;
+            var tetherId0 = tethers[0].Id;
+            sa.Log.Debug($"tetherTarget0 {tetherId0} = {tetherTarget0:x8}");   // 第一根目标
+            var tetherTarget1 = tethers[1].TargetId.ObjectId;
+            sa.Log.Debug($"tetherTarget1 = {tetherTarget1:x8}");   // 第二根目标
+            
+            var atetherAdd = (FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)achara.Address;
+            var atethers = tetherAdd->Vfx.Tethers;
+            var atetherNum = tethers.Length;
+            sa.Log.Debug($"tetherNum = {tetherNum}");
+            var atetherTarget0 = tethers[0].TargetId.ObjectId;
+            var atetherId0 = tethers[0].Id;
+            sa.Log.Debug($"tetherTarget0 {tetherId0} = {tetherTarget0:x8}");   // 第一根目标
+            var atetherTarget1 = tethers[1].TargetId.ObjectId;
+            sa.Log.Debug($"tetherTarget1 = {tetherTarget1:x8}");   // 第二根目标
         }
-        if (trueCount != 3) return;
-        TenStrikeBlackOrbDrawn = true;
-
-        // 算出每组黑球玩家数目，给出提示信息
-        List<int> TenStrikeBlackOrbGroupTargetNum = calcTenStrikeGroupTargetNum(GenerateTarget);
-        if (DebugMode)
-        {
-            string tenStrikeTargetNum = string.Join(", ", TenStrikeBlackOrbGroupTargetNum);
-            accessory.Method.SendChat($"/e 每组黑球玩家数：{tenStrikeTargetNum}");
-        }
-
-        if (showGlobalTenStrikeBlackOrbMsg)
-            showTenStrikeBlackOrbMsg(TenStrikeBlackOrbGroupTargetNum, accessory);
-
-        // 计算撞球与截球优先级，输出任务List
-        // 注意，截球优先级并无唯一规则，需要观察场上情况灵活变通。
-        List<int> missionList = judgeTenStrikeBlackOrbRoute(GenerateTarget);
-        if (showGlobalTenStrikeBlackOrbMsg)
-        {
-            string mission_record = "";
-            mission_record += $"H1组：撞球{getPlayerJobIndexByIdx(missionList[0])}, 截球{getPlayerJobIndexByIdx(missionList[1])}\n";
-            mission_record += $"H2组：撞球{getPlayerJobIndexByIdx(missionList[2])}, 截球{getPlayerJobIndexByIdx(missionList[3])}\n";
-            mission_record += $"D3D4组：撞球{getPlayerJobIndexByIdx(missionList[4])}, 截球{getPlayerJobIndexByIdx(missionList[5])}\n";
-            accessory.Method.SendChat($"/e {mission_record}");
-        }
-
-        int routeDestoryTime1 = 5000;   // 第一次指路持续时间 & 第二次指路出现时间
-        int routeDestoryTime2 = 5000;   // 第二次指路（截球人）持续时间
-        // 拘束器idx：0为H1组D，1为D3D4组C，2为H2组B
-        drawBlackOrbRoute(missionList[0], 0, 0, routeDestoryTime1, true, accessory);
-        drawBlackOrbRoute(missionList[1], 0, 0, routeDestoryTime1, false, accessory);
-        drawBlackOrbRoute(missionList[1], 0, routeDestoryTime1, routeDestoryTime2, true, accessory);
-        drawBlackOrbRoute(missionList[2], 2, 0, routeDestoryTime1, true, accessory);
-        drawBlackOrbRoute(missionList[3], 2, 0, routeDestoryTime1, false, accessory);
-        drawBlackOrbRoute(missionList[3], 2, routeDestoryTime1, routeDestoryTime2, true, accessory);
-        drawBlackOrbRoute(missionList[4], 1, 0, routeDestoryTime1, true, accessory);
-        drawBlackOrbRoute(missionList[5], 1, 0, routeDestoryTime1, false, accessory);
-        drawBlackOrbRoute(missionList[5], 1, routeDestoryTime1, routeDestoryTime2, true, accessory);
-
     }
 
     #region 全局
@@ -608,7 +589,14 @@ public class Ucob
     {
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
         FireBallTimes++;
+        // accessory.Log.Debug($"{accessory.Data.PartyList.Count}");
         var MyIndex = getMyIndex(accessory);
+        // accessory.Log.Debug($"MyIndex: {MyIndex} ");
+        // accessory.Log.Debug($"me: {accessory.Data.Me}");
+        // accessory.Log.Debug($"party: {accessory.Data.PartyList[0]}, {accessory.Data.PartyList[1]}, {accessory.Data.PartyList[2]}, {accessory.Data.PartyList[3]}, " +
+        //                     $"{accessory.Data.PartyList[4]}, {accessory.Data.PartyList[5]}, {accessory.Data.PartyList[6]}, {accessory.Data.PartyList[7]}");
+        // accessory.Log.Debug($"FireBallStatus: {BuildListStr(accessory, FireBallStatus)}");
+        // accessory.Log.Debug($"FireBallStatus[MyIndex]: {FireBallStatus[MyIndex]}");
         var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = $"火龙火球分摊范围";
         dp.Scale = new(4f);
@@ -633,6 +621,19 @@ public class Ucob
                 return;
         }
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+    
+    /// <summary>
+    /// 将List内信息转换为字符串。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="myList"></param>
+    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public static string BuildListStr<T>(ScriptAccessory accessory, List<T> myList, bool isJob = false)
+    {
+        return string.Join(", ", myList.Select(item => item?.ToString() ?? ""));
     }
 
     [ScriptMethod(name: "P2奈尔：火龙连线分摊范围预警删除（不可控）", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:9925", "TargetIndex:1"], userControl: false)]
@@ -966,7 +967,16 @@ public class Ucob
         dp.DestoryAt = 6000;
         dp.Color = accessory.Data.DefaultDangerColor.WithW(0.5f);
         dp.TargetObject = tid;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        
+        var dp0 = accessory.Data.GetDefaultDrawProperties();
+        dp0.Name = $"俯冲引导方向{sid}";
+        dp0.Scale = new(2.5f, 12.5f);
+        dp0.Owner = sid;
+        dp0.DestoryAt = 6000;
+        dp0.Color = accessory.Data.DefaultDangerColor.WithW(1f);
+        dp0.TargetObject = tid;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp0);
     }
 
     private void CauterizeSafePosDraw(ScriptAccessory accessory)

@@ -54,12 +54,12 @@
   {
     "Name": "UCOB [巴哈姆特绝境战]",
     "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-    "Version": "0.0.1.9",
-    "Author": "Usami",
+    "Version": "0.0.2.0",
+    "Author": "Joshua and Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
-    "Note": "",
-    "UpdateInfo": "没有改动任何东西，只是删掉了一长串更新日志Note。",
+    "Note": "基于@Joshua的巴哈初版程序改写扩充，\r\n感谢合作者@KnightRider，@Meva。\r\n请先按需求检查并设置“用户设置”栏目。\r\n鸭门。",
+    "UpdateInfo": "1. @Meva佬更新了P2小龙俯冲的匠心指路。因为答案不唯一，建议搭配俯冲范围显示一并食用。\r\n2. 俯冲范围增加了箭头，可较为明显地指引俯冲方向。",
     "TerritoryIds": [
       733
     ]
