@@ -16,6 +16,7 @@ using KodakkuAssist.Data;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Extensions;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 using KodakkuAssist.Module.Script.Type;
@@ -33,21 +34,22 @@ public class DsrPatch
         """
         基于K佬绝龙诗绘图的个人向补充，
         请先按需求检查并设置“用户设置”栏目。
-        开启Debug模式，在忆罪宫输入"/e =TST"可以测试地火特殊跑法。
+        在忆罪宫输入"/e =Exaflare"可以测试地火特殊跑法。
         鸭门。
         """;
     
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.12";
+    private const string Version = "0.0.0.13";
     private const string DebugVersion = "a";
     
     private const string UpdateInfo =
         """
-        适配新版鸭鸭(4.0.0.0)做了代码修正。
+        适配新版鸭鸭做了代码修正。
+        移除了DebugMode的开关。
         """;
     
-    [UserSetting("Debug模式，非开发用请关闭")]
-    public static bool DebugMode { get; set; } = false;
+    private const bool Debugging = false;
+    
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
     [UserSetting("站位提示圈绘图-玩家站位颜色")]
@@ -99,7 +101,7 @@ public class DsrPatch
         Phase7Enrage,           // P7 狂暴
     }
     
-    private static Vector3 Center = new Vector3(100, 0, 100);
+    private static Vector3 _center = new Vector3(100, 0, 100);
     private DsrPhase _dsrPhase = DsrPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
     private volatile List<bool> _recorded = new bool[20].ToList();      // 被记录flag
@@ -125,23 +127,22 @@ public class DsrPatch
     private DsrExaflare? _p7Exaflare = null;                            // P7 地火Class
     private uint _p7BossId = 0;                                         // P7 boss Id
     
-    private ManualResetEvent _ThrustEvent = new(false);
-    private ManualResetEvent _ThordanCastAtEdgeEvent = new(false);
-    private ManualResetEvent _MirageDiveRound = new(false);
+    private ManualResetEvent _thrustEvent = new(false);
+    private ManualResetEvent _thordanCastAtEdgeEvent = new(false);
+    private ManualResetEvent _mirageDiveRound = new(false);
     private ManualResetEvent _p5VedrfolnirPosRecordEvent = new(false);
-    private ManualResetEvent _IceAndFireEvent = new(false);
-    private ManualResetEvent _NearOrFarWingsEvent = new(false);
-    private ManualResetEvent _NearOrFarCauterizeEvent = new(false);
-    private ManualResetEvent _NearOrFarInOutEvent = new(false);
-    private ManualResetEvent _BladeEvent = new(false);
-    private ManualResetEvent _TrinityEvent = new(false);
+    private ManualResetEvent _iceAndFireEvent = new(false);
+    private ManualResetEvent _nearOrFarWingsEvent = new(false);
+    private ManualResetEvent _nearOrFarCauterizeEvent = new(false);
+    private ManualResetEvent _nearOrFarInOutEvent = new(false);
+    private ManualResetEvent _bladeEvent = new(false);
+    private ManualResetEvent _trinityEvent = new(false);
     
-    public void Init(ScriptAccessory accessory)
+    public void Init(ScriptAccessory sa)
     {
-        accessory.DebugMsg($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}", DebugMode);
-        accessory.Method.MarkClear();
-        accessory.Method.RemoveDraw(".*");
-        
+        sa.Log.Debug($"Init {Name} v{Version}{DebugVersion} Success.\n{UpdateInfo}");
+        sa.Method.MarkClear();
+        sa.Method.RemoveDraw(".*");
         
         _dsrPhase = DsrPhase.Init;
         _drawn = new bool[20].ToList();
@@ -149,36 +150,16 @@ public class DsrPatch
         _p7BossId = 0;
         _pureOfHeartBaitShown = false;
         
-        _ThordanCastAtEdgeEvent = new ManualResetEvent(false);
-        _ThrustEvent = new ManualResetEvent(false);
-        _MirageDiveRound = new ManualResetEvent(false);
+        _thordanCastAtEdgeEvent = new ManualResetEvent(false);
+        _thrustEvent = new ManualResetEvent(false);
+        _mirageDiveRound = new ManualResetEvent(false);
         _p5VedrfolnirPosRecordEvent = new ManualResetEvent(false);
-        _IceAndFireEvent = new ManualResetEvent(false);
-        _NearOrFarWingsEvent = new ManualResetEvent(false);
-        _NearOrFarCauterizeEvent = new ManualResetEvent(false);
-        _NearOrFarInOutEvent = new ManualResetEvent(false);
-        _BladeEvent = new ManualResetEvent(false);
-        _TrinityEvent = new ManualResetEvent(false);
-    }
-    
-    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST2"], userControl: false)]
-    public void EchoDebug(Event @event, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-        // ---- DEBUG CODE ----
-
-        _p2ThordanPos = new Vector3(99.99f, 0, 122.97f);
-        var spos = new Vector3(91.34f, 0, 95f);  // AT RIGHT
-        // var spos = new Vector3(108.66f, 0, 95f);   // AT LEFT
-
-        var atRight = spos.IsAtRight(_p2ThordanPos, Center);
-        var tetherEdgePos = _p2ThordanPos.RotatePoint(Center, (atRight ? -1 : 1) * 18f.DegToRad());
-        tetherEdgePos = tetherEdgePos.PointInOutside(Center, 3f);
-        
-        var dp = accessory.DrawGuidance(tetherEdgePos, 0, 2000, $"一运连线指路");
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        
-        // -- DEBUG CODE END --
+        _iceAndFireEvent = new ManualResetEvent(false);
+        _nearOrFarWingsEvent = new ManualResetEvent(false);
+        _nearOrFarCauterizeEvent = new ManualResetEvent(false);
+        _nearOrFarInOutEvent = new ManualResetEvent(false);
+        _bladeEvent = new ManualResetEvent(false);
+        _trinityEvent = new ManualResetEvent(false);
     }
     
     #region P1
@@ -204,9 +185,9 @@ public class DsrPatch
         DrawPureOfHeartBait(accessory, 0, 15000);
     }
 
-    private void DrawPureOfHeartBait(ScriptAccessory accessory, int delay, int destroy)
+    private void DrawPureOfHeartBait(ScriptAccessory sa, int delay, int destroy)
     {
-        var myIndex = accessory.GetMyIndex();
+        var myIndex = sa.GetMyIndex();
         Vector3[] baitPos = [new(86.5f, 0.0f, 107.0f), new(86.5f, 0.0f, 103.0f), new(91.5f, 0.0f, 107.0f), new(91.5f, 0.0f, 103.0f)];   //91.5
         var baitPosIdx = myIndex % 2;   // 高在上，低在下
         if (myIndex is 0 or 1 or 6 or 7)
@@ -214,30 +195,30 @@ public class DsrPatch
         for (var posIdx = 0; posIdx < 4; posIdx++)
         {
             var color = baitPosIdx == posIdx ? PosColorPlayer.V4 : PosColorNormal.V4;
-            var dp = accessory.DrawStaticCircle(baitPos[posIdx], color, delay, destroy, $"纯洁心灵", 0.5f);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            var dp = sa.DrawStaticCircle(baitPos[posIdx], color, delay, destroy, $"纯洁心灵", 0.5f);
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
             if (baitPosIdx != posIdx) continue;
-            var dpGuide = accessory.DrawGuidance(baitPos[posIdx], delay, destroy, $"纯洁心灵指路");
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuide);
+            var dpGuide = sa.DrawGuidance(baitPos[posIdx], delay, destroy, $"纯洁心灵指路");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuide);
         }
     }
     
     [ScriptMethod(name: "纯洁心灵引导后续", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:25369"], 
         userControl: false)]
-    public void PureOfHeartBaitRest(Event @event, ScriptAccessory accessory)
+    public void PureOfHeartBaitRest(Event @event, ScriptAccessory sa)
     {
         if (!_pureOfHeartBaitShown) return;
         if (@event.TargetIndex() != 1) return;
-        var myIndex = accessory.GetMyIndex();
+        var myIndex = sa.GetMyIndex();
         lock (this)
         {
             _pureOfHeartBaitCount++;
-            accessory.DebugMsg($"纯洁心灵引导次数：{_pureOfHeartBaitCount}", DebugMode);
+            sa.Log.Debug($"纯洁心灵引导次数：{_pureOfHeartBaitCount}");
             if (_pureOfHeartBaitCount > 6) return;
             var baitDict = new Dictionary<int, int> { { 1, 6 }, { 2, 7 }, { 3, 4 }, { 4, 5 }, { 5, 0 }, { 6, 1 } };
             if (baitDict[_pureOfHeartBaitCount] != myIndex) return;
-            accessory.DebugMsg($"开始绘制玩家的纯洁心灵引导", DebugMode);
-            DrawPureOfHeartBait(accessory, 0, 5000);
+            sa.Log.Debug($"开始绘制玩家的纯洁心灵引导");
+            DrawPureOfHeartBait(sa, 0, 5000);
         }
     }
     
@@ -261,28 +242,28 @@ public class DsrPatch
     }
     
     [ScriptMethod(name: "一运阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25555"], userControl: false)]
-    public void P2_StrengthPhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P2_StrengthPhaseRecord(Event @event, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase2Strength;
         _p2SafeDirection = new bool[8].ToList();
         _p2ThordanPos = new Vector3(0, 0, 0);
         _p2TetherKnightId = [0, 0];
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
     
     [ScriptMethod(name: "一运冲锋位置记录", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(378[123])$"], userControl: false)]
-    public void ThurstDirectionRecord(Event @event, ScriptAccessory accessory)
+    public void ThurstDirectionRecord(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase2Strength) return;
 
         var spos = @event.SourcePosition();
-        var dir = spos.Position2Dirs(Center, 8);
+        var dir = spos.Position2Dirs(_center, 8);
         lock (_p2SafeDirection)
         {
             _p2SafeDirection[dir % 4] = true;
-            accessory.DebugMsg($"List内部true的数量：{_p2SafeDirection.Count(x => x)}", DebugMode);
+            sa.Log.Debug($"List内部true的数量：{_p2SafeDirection.Count(x => x)}");
             if (_p2SafeDirection.Count(x => x) != 3) return;
-            _ThrustEvent.Set();
+            _thrustEvent.Set();
         }
     }
         
@@ -290,7 +271,7 @@ public class DsrPatch
     public void ThrustSafePosDraw(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase2Strength) return;
-        _ThrustEvent.WaitOne();
+        _thrustEvent.WaitOne();
         
         // 由于在处理_p2SafeDirection时，设置了其方位余4，即一定为0、1、2、3，必能在前4个index中找到唯一的false。
         var safeDir = _p2SafeDirection.IndexOf(false);
@@ -299,16 +280,16 @@ public class DsrPatch
         var isStGroup = myIndex % 2 == 1;
         // ST组在0、1、2、3
         var tposCenter =
-            northPos.RotatePoint(Center, isStGroup ? safeDir * float.Pi / 4 : (safeDir + 4) * float.Pi / 4);
-        var tposIn = tposCenter.PointInOutside(Center, 7.5f);
-        var tposLeft = tposCenter.RotatePoint(Center, 20f.DegToRad());
-        var tposRight = tposCenter.RotatePoint(Center, -20f.DegToRad());
+            northPos.RotatePoint(_center, isStGroup ? safeDir * float.Pi / 4 : (safeDir + 4) * float.Pi / 4);
+        var tposIn = tposCenter.PointInOutside(_center, 7.5f);
+        var tposLeft = tposCenter.RotatePoint(_center, 20f.DegToRad());
+        var tposRight = tposCenter.RotatePoint(_center, -20f.DegToRad());
         List<Vector3> tposList = [tposCenter, tposIn, tposLeft, tposRight];
 
         var dp = accessory.DrawGuidance(tposList[myIndex / 2], 0, 7000, $"P2一运安全区位置{myIndex}");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         
-        _ThrustEvent.Reset();
+        _thrustEvent.Reset();
     }
     
     [ScriptMethod(name: "一运分散安全位置指引消失", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:25548"], userControl: false)]
@@ -326,55 +307,55 @@ public class DsrPatch
         if (_dsrPhase != DsrPhase.Phase2Strength) return;
         var spos = @event.SourcePosition();
         _p2ThordanPos = spos;
-        _ThordanCastAtEdgeEvent.Set();
+        _thordanCastAtEdgeEvent.Set();
     }
     
     [ScriptMethod(name: "一运坦克接线提示", eventType: EventTypeEnum.NpcYell, eventCondition: ["Id:regex:^(255[01])$"], userControl: true)]
-    public void TankTetherRouteGuidance(Event @event, ScriptAccessory accessory)
+    public void TankTetherRouteGuidance(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase2Strength) return;
-        var myIndex = accessory.GetMyIndex();
+        var myIndex = sa.GetMyIndex();
         if (myIndex > 1) return;
-        _ThordanCastAtEdgeEvent.WaitOne();
+        _thordanCastAtEdgeEvent.WaitOne();
         lock (_p2TetherKnightId)
         {
             var sid = @event.SourceId();
             var sname = @event.SourceName();
             var spos = @event.SourcePosition();
-            var rad = spos.FindRadian(_p2ThordanPos);
+            // var rad = spos.FindRadian(_p2ThordanPos);
             
-            var atRight = spos.IsAtRight(_p2ThordanPos, Center);
+            var atRight = spos.IsAtRight(_p2ThordanPos, _center);
             _p2TetherKnightId[atRight ? 1 : 0] = sid;
             
             // 此处Id为16进制转10进制表示
-            accessory.DebugMsg($"记录{sname}（对话{@event.Id()}）在{(atRight ? "右" : "左")}", DebugMode);
+            sa.Log.Debug($"记录{sname}（对话{@event.Id()}）在{(atRight ? "右" : "左")}");
 
             if (_p2TetherKnightId.Contains(0)) return;
             var targetKnightIdx = myIndex == 0 ? 0 : 1;
-            var chara = accessory.GetById(_p2TetherKnightId[targetKnightIdx]);
+            var chara = sa.GetById(_p2TetherKnightId[targetKnightIdx]);
             if (chara == null) return;
             
             var knightPos = chara.Position;
-            var tetherEdgePos = _p2ThordanPos.RotatePoint(Center, (myIndex == 0 ? 1 : -1) * 18f.DegToRad());
-            tetherEdgePos = tetherEdgePos.PointInOutside(Center, 3f);
-            var dp = accessory.DrawGuidance(knightPos, tetherEdgePos, 0, 10000, $"接线路径");
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            var tetherEdgePos = _p2ThordanPos.RotatePoint(_center, (myIndex == 0 ? 1 : -1) * 18f.DegToRad());
+            tetherEdgePos = tetherEdgePos.PointInOutside(_center, 3f);
+            var dp = sa.DrawGuidance(knightPos, tetherEdgePos, 0, 10000, $"接线路径");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
     }
     
     [ScriptMethod(name: "一运接线提示删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:25550"], userControl: false)]
-    public void TankTetherRouteGuidanceRemove(Event @event, ScriptAccessory accessory)
+    public void TankTetherRouteGuidanceRemove(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase2Strength) return;
-        accessory.Method.RemoveDraw($"接线路径");
-        _ThordanCastAtEdgeEvent.Reset();
+        sa.Method.RemoveDraw($"接线路径");
+        _thordanCastAtEdgeEvent.Reset();
     }
     
     [ScriptMethod(name: "二运阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:25569"], userControl: false)]
-    public void P2_SancityPhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P2_SancityPhaseRecord(Event @event, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase2Sancity;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
     
     #endregion P2
@@ -388,17 +369,17 @@ public class DsrPatch
     }
     
     [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26376"], userControl:false)]
-    public void P3_PhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P3_PhaseRecord(Event @event, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase3Nidhogg;
         _diveFromGrace = new DiveFromGrace();
-        _diveFromGrace.accessory = accessory;
+        _diveFromGrace.accessory = sa;
         _p3LimitCutStep = 0;
         _p3MyTowerPartner = 0;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
-    public class DiveFromGrace()
+    public class DiveFromGrace
     {
         public ScriptAccessory accessory { get; set; } = null;
         public List<uint> LimitCut1 { get; set; } = [];
@@ -419,9 +400,9 @@ public class DsrPatch
         private const int Third = 2;
 
         // 放塔倒计时
-        private const int FirstDuration = 9000;
-        private const int SecondDuration = 19000;
-        private const int ThirdDuration = 29000;
+        // private const int FirstDuration = 9000;
+        // private const int SecondDuration = 19000;
+        // private const int ThirdDuration = 29000;
 
         public void LimitCutAdd(uint id, int idx)
         {
@@ -676,11 +657,11 @@ public class DsrPatch
                 {
                     // TODO 箭头上距离不确定，需验证数值
                     case Left:
-                        return new Vector3(Center.X - 7.5f, 0, Center.Z);
+                        return new Vector3(_center.X - 7.5f, 0, _center.Z);
                     case Middle:
-                        return new Vector3(Center.X, 0, Center.Z + 7.5f);
+                        return new Vector3(_center.X, 0, _center.Z + 7.5f);
                     case Right:
-                        return new Vector3(Center.X + 7.5f, 0, Center.Z);
+                        return new Vector3(_center.X + 7.5f, 0, _center.Z);
                 }
             }
             return new Vector3(0, 0, 0);
@@ -694,14 +675,14 @@ public class DsrPatch
         var stid = @event.StatusId();
         var tid = @event.TargetId();
 
-        const uint limitCut1 = 3004;
-        const uint limitCut2 = 3005;
-        const uint limitCut3 = 3006;
+        // const uint limitCut1 = 3004;
+        // const uint limitCut2 = 3005;
+        // const uint limitCut3 = 3006;
         _diveFromGrace.LimitCutAdd(tid, (int)stid - 3004);
     }
     
     [ScriptMethod(name: "P3：箭头记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(275[567])$"], userControl: false)]
-    public void P3_LimitCutPosRecord(Event @event, ScriptAccessory accessory)
+    public void P3_LimitCutPosRecord(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
         var stid = @event.StatusId();
@@ -709,10 +690,10 @@ public class DsrPatch
         
         const uint front = 2756;
         const uint behind = 2757;
-        const uint inPlace = 2755;
+        // const uint inPlace = 2755;
 
         const int left = 0;
-        const int middle = 1;
+        // const int middle = 1;
         const int right = 2;
 
         lock (_diveFromGrace)
@@ -732,40 +713,40 @@ public class DsrPatch
         }
         
         if (!_diveFromGrace.AllPlayerRecorded()) return;
-        accessory.DebugMsg($"LimitCutFixed:{_diveFromGrace.LimitCutFixed.StringList()}", DebugMode);
+        sa.Log.Debug($"LimitCutFixed:{_diveFromGrace.LimitCutFixed.StringList()}");
         _diveFromGrace.SetRemainingPlayers();
-        _p3MyTowerPartner = _diveFromGrace.FindTowerPartner(accessory.Data.Me);
-        accessory.DebugMsg($"我需要踩他的塔：{_diveFromGrace.ShowPlayerAction(_p3MyTowerPartner)}", DebugMode);
+        _p3MyTowerPartner = _diveFromGrace.FindTowerPartner(sa.Data.Me);
+        sa.Log.Debug($"我需要踩他的塔：{_diveFromGrace.ShowPlayerAction(_p3MyTowerPartner)}");
     }
     
     [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
-    public void P3_LimitCutAction(Event @event, ScriptAccessory accessory)
+    public void P3_LimitCutAction(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
         _p3LimitCutStep++;
 
-        var aid = @event.ActionId();
-        const int chariotFirst = 26386;
-        const int donutFirst = 26387;
+        // var aid = @event.ActionId();
+        // const int chariotFirst = 26386;
+        // const int donutFirst = 26387;
 
-        var myId = accessory.Data.Me;
+        var myId = sa.Data.Me;
         var idx = _diveFromGrace.FindPlayerLimitCutIndex(myId);
         var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
         var towerPos = _diveFromGrace.GetTowerPosV3(idx, pos);
         
-        const int First = 0;
-        const int Second = 1;
-        const int Third = 2;
+        const int first = 0;
+        const int second = 1;
+        const int third = 2;
         
-        const int Left = 0;
-        const int Middle = 1;
-        const int Right = 2;
+        const int left = 0;
+        const int middle = 1;
+        const int right = 2;
 
         var posStr = pos switch
         {
-            Left => "左",
-            Middle => "中",
-            Right => "右",
+            left => "左",
+            middle => "中",
+            right => "右",
             _ => "未知"
         };
 
@@ -778,28 +759,28 @@ public class DsrPatch
         {
             switch (idx)
             {
-                case First:
+                case first:
                 {
-                    accessory.DebugMsg($"一麻{posStr}第一轮，先去{posStr}{towerPos}放塔，再回人群", DebugMode);
-                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", accessory);
-                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
-                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
+                    sa.Log.Debug($"一麻{posStr}第一轮，先去{posStr}{towerPos}放塔，再回人群");
+                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", sa);
+                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
                     break;
                 }
-                case Second:
+                case second:
                 {
-                    accessory.DebugMsg($"二麻{posStr}第一轮，先回人群，再去{posStr}{towerPos}放塔", DebugMode);
-                    DrawBackToGroup(0, lashGnashCastTime, $"人群", accessory);
+                    sa.Log.Debug($"二麻{posStr}第一轮，先回人群，再去{posStr}{towerPos}放塔");
+                    DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
                     const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
                     const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
-                    DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", accessory);
-                    DrawTowerPosDir(towerPos, pos, jump2DelayTime, jump2Destroy, $"放塔2面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
+                    DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", sa);
+                    DrawTowerPosDir(towerPos, pos, jump2DelayTime, jump2Destroy, $"放塔2面向", sa, _diveFromGrace.LimitCutFixed[idx]);
                     break;
                 }
-                case Third:
+                case third:
                 {
-                    accessory.DebugMsg($"三麻{posStr}第一轮，回人群", DebugMode);
-                    DrawBackToGroup(0, lashGnashCastTime, $"人群", accessory);
+                    sa.Log.Debug($"三麻{posStr}第一轮，回人群");
+                    DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
                     break;
                 }
             }
@@ -809,34 +790,34 @@ public class DsrPatch
             switch (idx)
             {
                 // 第二轮钢铁月环，一麻准备分摊
-                case First:
+                case first:
                 {
                     // 分摊前需先引导，引导位置可以作个向外指的指引
                     // 因为有先引导，回去分摊的延时和消失时间由时间节点计算
-                    if (pos != Middle)
+                    if (pos != middle)
                     {
-                        accessory.DebugMsg($"一麻{posStr}第二轮，引导后回人群", DebugMode);
-                        DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", accessory);
+                        sa.Log.Debug($"一麻{posStr}第二轮，引导后回人群");
+                        DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", sa);
                     }
                     else
                     {
-                        accessory.DebugMsg($"一麻{posStr}第二轮，回人群", DebugMode);
-                        DrawBackToGroup(0, lashGnashCastTime, $"分摊", accessory);
+                        sa.Log.Debug($"一麻{posStr}第二轮，回人群");
+                        DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
                     }
                     break;
                 }
-                case Second:
+                case second:
                 {
-                    accessory.DebugMsg($"二麻{posStr}第二轮，回人群", DebugMode);
-                    DrawBackToGroup(0, lashGnashCastTime, $"分摊", accessory);
+                    sa.Log.Debug($"二麻{posStr}第二轮，回人群");
+                    DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
                     break;
                 }
-                case Third:
+                case third:
                 {
-                    accessory.DebugMsg($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群", DebugMode);
-                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", accessory);
-                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", accessory, _diveFromGrace.LimitCutFixed[idx]);
-                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", accessory);
+                    sa.Log.Debug($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群");
+                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", sa);
+                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
                     break;
                 }
             }
@@ -850,14 +831,14 @@ public class DsrPatch
         var tid = @event.TargetId();
         var aid = @event.ActionId();
         var sid = @event.SourceId();
-        var towerPos = @event.SourcePosition();
+        // var towerPos = @event.SourcePosition();
         var isMyTower = tid == _p3MyTowerPartner;
         if (isMyTower)
         {
         }
 
         const int towerExistTime = 6800;
-        DrawTowerRange(sid, 0, towerExistTime, $"踩塔", accessory, isMyTower, aid);
+        DrawTowerRange(sid, 0, towerExistTime, accessory, isMyTower, aid);
     }
     
     private DrawPropertiesEdit DrawTowerDir(Vector3 towerPos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
@@ -869,21 +850,21 @@ public class DsrPatch
     }
     private DrawPropertiesEdit DrawTowerPosDir(Vector3 towerPos, int pos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
     {
-        const int Left = 0;
-        const int Middle = 1;
-        const int Right = 2;
+        const int left = 0;
+        const int middle = 1;
+        const int right = 2;
 
         var rotation = pos switch
         {
-            Left => -float.Pi / 2,
-            Right => -float.Pi / 2,
+            left => -float.Pi / 2,
+            right => -float.Pi / 2,
             _ => 0
         };
         var targetPos = towerPos.ExtendPoint(rotation, 3.1f);
         var dp = accessory.DrawDirPos2Pos(towerPos, targetPos, delay, destroy, name);
         dp.Scale = new Vector2(3f);
         dp.Color = ColorHelper.ColorYellow.V4;
-        if (draw && pos != Middle)
+        if (draw && pos != middle)
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         return dp;
     }
@@ -897,37 +878,37 @@ public class DsrPatch
         return dp;
     }
 
-    private DrawPropertiesEdit[] DrawTowerRange(uint sid, int delay, int destroy, string name,
-        ScriptAccessory accessory, bool isSafe, uint type, bool draw = true)
+    private DrawPropertiesEdit[] DrawTowerRange(uint sid, int delay, int destroy,
+        ScriptAccessory sa, bool isSafe, uint type, bool draw = true)
     {
         const uint inPlace = 26382;
-        const uint front = 26383;
-        const uint behind = 26384;
+        // const uint front = 26383;
+        // const uint behind = 26384;
         const int towerCastingTime = 3000;
         const int syncTime = 300;
         
         // 后面生成塔位置的sid已经不是原来的sid了，需要在这里找到他经偏置后的位置
-        var tpos = FindTowerAppearPos(sid, type, accessory);
+        var tpos = FindTowerAppearPos(sid, type, sa);
         
-        accessory.DebugMsg($"画出塔范围，{(isSafe ? "我的" : "不是我的")}塔", DebugMode);
-        var color = isSafe ? accessory.Data.DefaultSafeColor.WithW(1.5f) : accessory.Data.DefaultDangerColor;
-        var dp = accessory.DrawCircle(sid, 5f, delay, destroy - towerCastingTime, $"踩塔{sid}");
+        sa.Log.Debug($"画出塔范围，{(isSafe ? "我的" : "不是我的")}塔");
+        var color = isSafe ? sa.Data.DefaultSafeColor.WithW(1.5f) : sa.Data.DefaultDangerColor;
+        var dp = sa.DrawCircle(sid, 5f, delay, destroy - towerCastingTime, $"踩塔{sid}");
         dp.Color = color;
         dp.Offset = type == inPlace ? new Vector3(0, 0, 0) : new Vector3(0, 0, -14);
-        var dp1 = accessory.DrawStaticCircle(tpos, color, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔确定{sid}", 5f);
+        var dp1 = sa.DrawStaticCircle(tpos, color, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔确定{sid}", 5f);
         if (draw)
         {
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
         }
         
         if (!isSafe) return [dp, dp1];
         
-        accessory.DebugMsg($"准备去踩塔", DebugMode);
-        var dp01 = accessory.DrawDirPos(tpos, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔指路确定{sid}");
+        sa.Log.Debug($"准备去踩塔");
+        var dp01 = sa.DrawDirPos(tpos, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔指路确定{sid}");
         if (draw)
         {
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp01);
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp01);
         }
         return [dp, dp1, dp01];
     }
@@ -935,8 +916,8 @@ public class DsrPatch
     private Vector3 FindTowerAppearPos(uint sid, uint type, ScriptAccessory accessory)
     {
         const uint inPlace = 26382;
-        const uint front = 26383;
-        const uint behind = 26384;
+        // const uint front = 26383;
+        // const uint behind = 26384;
         
         var chara = accessory.GetById(sid);
         var srot = chara.Rotation;
@@ -979,7 +960,7 @@ public class DsrPatch
 
     [ScriptMethod(name: "P4阶段记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2748"],
         userControl: false)]
-    public void P4_EyesPhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P4_EyesPhaseRecord(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase == DsrPhase.Phase4Eyes) return;
         _dsrPhase = DsrPhase.Phase4Eyes;
@@ -987,7 +968,7 @@ public class DsrPatch
         _p4MirageDiveNumFirstRoundTarget = new bool[8].ToList();
         _p4MirageDivePos = [];
         _p4PrepareToCenter = false;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
     
     [ScriptMethod(name: "开场就位提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2748"],
@@ -1019,7 +1000,7 @@ public class DsrPatch
         
         var needChange = (myIndex < 4 && stid != blueBuff) || (myIndex >= 4 && stid != redBuff);
         if (!needChange) return;
-        var dp = accessory.DrawGuidance(Center, 0, 5000, $"红蓝Buff置换");
+        var dp = accessory.DrawGuidance(_center, 0, 5000, $"红蓝Buff置换");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         accessory.Method.TextInfo($"场中换Buff", 3000);
     }
@@ -1054,7 +1035,7 @@ public class DsrPatch
 
         var orbPos = new Vector3(83, 0, 100);
         if (myIndex is 6 or 7)
-            orbPos = orbPos.FoldPointHorizon(Center.X);
+            orbPos = orbPos.FoldPointHorizon(_center.X);
         
         // 要细致的话，需要找到球什么时候变大的时间点
         var dp0 = accessory.DrawGuidance(orbPos, 4000, 2000, $"DPS撞球准备");
@@ -1090,9 +1071,9 @@ public class DsrPatch
 
         var orbPos = new Vector3(90, 0, 93);
         if (myIndex >= 2)
-            orbPos = orbPos.FoldPointVertical(Center.Z);
+            orbPos = orbPos.FoldPointVertical(_center.Z);
         if (myIndex % 2 == 1)
-            orbPos = orbPos.FoldPointHorizon(Center.X);
+            orbPos = orbPos.FoldPointHorizon(_center.X);
         
         // accessory.Method.TextInfo($"与DPS换Buff", 2500);
         var dp0 = accessory.DrawGuidance(orbPos, 10000, 2000, $"TN撞球准备");
@@ -1171,55 +1152,55 @@ public class DsrPatch
             _p4MirageDivePos.Add((tdir + 1) % 4);
             if (_p4MirageDivePos.Count != 2) return;
             _p4MirageDivePos.Sort();
-            _MirageDiveRound.Set();
+            _mirageDiveRound.Set();
         }
     }
     
     [ScriptMethod(name: "幻象冲等待回中提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26820", "TargetIndex:1"],
         userControl: true)]
-    public void MirageDiveBackToCenterMentionAwait(Event @event, ScriptAccessory accessory)
+    public void MirageDiveBackToCenterMentionAwait(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase4Eyes) return;
         if (_p4PrepareToCenter) return;
         var tid = @event.TargetId();
-        if (tid != accessory.Data.Me) return;
+        if (tid != sa.Data.Me) return;
         if (_p4MirageDiveNum > 6) return;
         _p4PrepareToCenter = true;
         
-        var dp = accessory.DrawGuidance(new Vector3(90, 0, 100), 0, 5000, $"幻象冲等待回中提示");
-        dp.Color = accessory.Data.DefaultDangerColor;
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        accessory.DebugMsg($"玩家受到伤害，准备回中", DebugMode);
+        var dp = sa.DrawGuidance(new Vector3(90, 0, 100), 0, 5000, $"幻象冲等待回中提示");
+        dp.Color = sa.Data.DefaultDangerColor;
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        sa.Log.Debug($"玩家受到伤害，准备回中");
     }
     
     [ScriptMethod(name: "幻象冲回中提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2776"],
         userControl: true)]
-    public void MirageDiveBackToCenterMention(Event @event, ScriptAccessory accessory)
+    public void MirageDiveBackToCenterMention(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase4Eyes) return;
         if (!_p4PrepareToCenter) return;
         var tid = @event.TargetId();
-        if (tid != accessory.Data.Me) return;
+        if (tid != sa.Data.Me) return;
         if (_p4MirageDiveNum > 6) return;
         _p4PrepareToCenter = false;
         
-        accessory.Method.RemoveDraw($"幻象冲等待回中提示");
-        var dp = accessory.DrawGuidance(new Vector3(90, 0, 100), 0, 2500, $"幻象冲回中提示");
-        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        accessory.DebugMsg($"玩家Buff交换完毕，回中", DebugMode);
+        sa.Method.RemoveDraw($"幻象冲等待回中提示");
+        var dp = sa.DrawGuidance(new Vector3(90, 0, 100), 0, 2500, $"幻象冲回中提示");
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        sa.Log.Debug($"玩家Buff交换完毕，回中");
     }
     
     [ScriptMethod(name: "幻象冲交换提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26820", "TargetIndex:1"],
         userControl: true)]
-    public void MirageDiveSwapMention(Event @event, ScriptAccessory accessory)
+    public void MirageDiveSwapMention(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase4Eyes) return;
         if (_drawn[4]) return;
         _drawn[4] = true;
-        _MirageDiveRound.WaitOne();
+        _mirageDiveRound.WaitOne();
         
         _drawn[4] = false;
-        _MirageDiveRound.Reset();
+        _mirageDiveRound.Reset();
         
         if (_p4MirageDiveNum > 6) return;
         var highPriorityPlayer = _p4MirageDiveNum switch
@@ -1241,25 +1222,25 @@ public class DsrPatch
         var highPriorityPos = basePos.RotatePoint(new(90, 0, 100), _p4MirageDivePos[0] * 90f.DegToRad());
         var lowPriorityPos = basePos.RotatePoint(new(90, 0, 100), _p4MirageDivePos[1] * 90f.DegToRad());
 
-        var highPriorityPlayerJob = accessory.GetPlayerJobByIndex(highPriorityPlayer);
-        var lowPriorityPlayerJob = accessory.GetPlayerJobByIndex(lowPriorityPlayer);
-        var myIndex = accessory.GetMyIndex();
+        var highPriorityPlayerJob = sa.GetPlayerJobByIndex(highPriorityPlayer);
+        var lowPriorityPlayerJob = sa.GetPlayerJobByIndex(lowPriorityPlayer);
+        var myIndex = sa.GetMyIndex();
 
         if (myIndex == highPriorityPlayer)
         {
-            var dp = accessory.DrawGuidance(highPriorityPos, 0, 5000, $"高优先级就位{highPriorityPlayer}");
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            var dp = sa.DrawGuidance(highPriorityPos, 0, 5000, $"高优先级就位{highPriorityPlayer}");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
         if (myIndex == lowPriorityPlayer)
         {
-            var dp = accessory.DrawGuidance(lowPriorityPos, 0, 5000, $"低优先级就位{lowPriorityPlayer}");
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            var dp = sa.DrawGuidance(lowPriorityPos, 0, 5000, $"低优先级就位{lowPriorityPlayer}");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
 
         var str = "";
         str += $"第{_p4MirageDiveNum / 2}轮，高优先级{highPriorityPlayerJob}去{_p4MirageDivePos[0]}号位\n";
         str += $"第{_p4MirageDiveNum / 2}轮，低优先级{lowPriorityPlayerJob}去{_p4MirageDivePos[1]}号位";
-        accessory.DebugMsg(str, DebugMode);
+        sa.Log.Debug(str);
         _p4MirageDivePos.Clear();
     }
     
@@ -1274,10 +1255,10 @@ public class DsrPatch
     }
     
     [ScriptMethod(name: "P5：一运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27529"], userControl: false)]
-    public void P5_HeavensWrath_PhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P5_HeavensWrath_PhaseRecord(Event @event, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase5HeavensWrath;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
     [ScriptMethod(name: "旋风冲旋风预警", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27531"])]
@@ -1335,10 +1316,10 @@ public class DsrPatch
         var tid = @event.TargetId();
         if (tid != accessory.Data.Me) return;
         var spos = @event.SourcePosition();
-        var atRight = spos.IsAtRight(_p5VedrfolnirPos, Center);
-        var targetPos = spos.RotatePoint(Center, (atRight ? 1 : -1) * 172.5f.DegToRad());
+        var atRight = spos.IsAtRight(_p5VedrfolnirPos, _center);
+        var targetPos = spos.RotatePoint(_center, (atRight ? 1 : -1) * 172.5f.DegToRad());
         
-        targetPos = targetPos.PointInOutside(Center, 2f);
+        targetPos = targetPos.PointInOutside(_center, 2f);
         var dp = accessory.DrawGuidance(targetPos, 0, 8000, $"一运连线指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
@@ -1360,8 +1341,8 @@ public class DsrPatch
         var tid = @event.TargetId();
         if (tid != accessory.Data.Me) return;
         
-        var targetPos = _p5VedrfolnirPos.RotatePoint(Center, -67.5f.DegToRad());
-        targetPos = targetPos.PointInOutside(Center, 2f);
+        var targetPos = _p5VedrfolnirPos.RotatePoint(_center, -67.5f.DegToRad());
+        targetPos = targetPos.PointInOutside(_center, 2f);
         var dp = accessory.DrawGuidance(targetPos, 0, 8000, $"一运穿天指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
@@ -1376,21 +1357,21 @@ public class DsrPatch
     }
     
     [ScriptMethod(name: "P5：二运，阶段记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27538"], userControl: false)]
-    public void P5_HeavensDeath_PhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P5_HeavensDeath_PhaseRecord(Event @event, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase5HeavensDeath;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
     [ScriptMethod(name: "二运斧头哥方位指引", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:12637"])]
-    public void P5_FindSerGuerrique(Event @event, ScriptAccessory accessory)
+    public void P5_FindSerGuerrique(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
         var spos = @event.SourcePosition();
-        accessory.DebugMsg($"找到斧头哥位置{spos}", DebugMode);
-        var dp = accessory.DrawDirPos2Pos(Center, spos, 0, 4000, $"场中指向斧头哥", 2f);
+        sa.Log.Debug($"找到斧头哥位置{spos}");
+        var dp = sa.DrawDirPos2Pos(_center, spos, 0, 4000, $"场中指向斧头哥", 2f);
         dp.Color = ColorHelper.ColorWhite.V4;
-        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
     }
 
     #endregion P5
@@ -1404,25 +1385,25 @@ public class DsrPatch
     }
     
     [ScriptMethod(name: "P6：一冰火，阶段记录", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:12613"], userControl: false)]
-    public void P6_IceAndFire1_PhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P6_IceAndFire1_PhaseRecord(Event @event, ScriptAccessory sa)
     {
         // 圣龙出现代表进入一冰火
         if (_dsrPhase != DsrPhase.Phase5HeavensDeath) return;
         _dsrPhase = DsrPhase.Phase6IceAndFire1;
         _p6DragonsGlowAction = [false, false];
         _recorded = new bool[20].ToList();
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
     [ScriptMethod(name: "P6：二冰火，阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2794[79])$"], userControl: false)]
-    public void P6_IceAndFire2_PhaseRecord(Event @event, ScriptAccessory accessory)
+    public void P6_IceAndFire2_PhaseRecord(Event @event, ScriptAccessory sa)
     {
         // 以辣翅辣尾作为二冰火的开始
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
         _dsrPhase = DsrPhase.Phase6IceAndFire2;
         _p6DragonsGlowAction = [false, false];
         _recorded = new bool[20].ToList();
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
     
@@ -1453,7 +1434,7 @@ public class DsrPatch
             _recorded[1] = _recorded[0];
             _recorded[0] = true;
             if (_recorded[0] && _recorded[1])
-                _IceAndFireEvent.Set();
+                _iceAndFireEvent.Set();
         }
     }
 
@@ -1462,14 +1443,14 @@ public class DsrPatch
     {
         if (_dsrPhase is not (DsrPhase.Phase6IceAndFire1 or DsrPhase.Phase6IceAndFire2))
             return;
-        _IceAndFireEvent.WaitOne();
+        _iceAndFireEvent.WaitOne();
         // await Task.Delay(100);
         var myIndex = accessory.GetMyIndex();
         var tankBusterPosition = new Vector3[4];
         tankBusterPosition[0] = new Vector3(84.5f, 0, 88f);
-        tankBusterPosition[1] = tankBusterPosition[0].FoldPointHorizon(Center.X);
+        tankBusterPosition[1] = tankBusterPosition[0].FoldPointHorizon(_center.X);
         tankBusterPosition[2] = tankBusterPosition[0];
-        tankBusterPosition[3] = tankBusterPosition[1].FoldPointVertical(Center.Z);
+        tankBusterPosition[3] = tankBusterPosition[1].FoldPointVertical(_center.Z);
 
         if (_p6DragonsGlowAction[0] && _p6DragonsGlowAction[1])
         {
@@ -1477,7 +1458,7 @@ public class DsrPatch
             if (myIndex > 1) return;
             // 删除K佬脚本中双T的小啾啾
             accessory.Method.RemoveDraw("P6 第二次冰火线ND站位.*");
-            var dp = accessory.DrawDirPos(Center, 0, 6000, $"冰火场中分摊指路");
+            var dp = accessory.DrawDirPos(_center, 0, 6000, $"冰火场中分摊指路");
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
         else
@@ -1488,7 +1469,7 @@ public class DsrPatch
             var str = "";
             str += $"黑龙喷:{_p6DragonsGlowAction[0]}, 白龙喷:{_p6DragonsGlowAction[1]}\n";
             str += $"是{(busterIdx == 0 ? "黑龙" : "白龙")}的死刑。";
-            accessory.DebugMsg($"{str}", DebugMode);
+            accessory.Log.Debug($"{str}");
 
             var isMyBuster = myIndex == busterIdx;
             var dp = accessory.DrawCircle(accessory.Data.PartyList[busterIdx], isMyBuster ? 2f : 15f, 0, 6000, $"冰火死刑");
@@ -1509,7 +1490,7 @@ public class DsrPatch
                 PosColorPlayer.V4.WithW(1.5f), 0, 6000, $"冰火死刑点区域", 1f);
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
         }
-        _IceAndFireEvent.Reset();
+        _iceAndFireEvent.Reset();
     }
 
     #endregion P6 冰火
@@ -1529,7 +1510,7 @@ public class DsrPatch
             _ => DsrPhase.Phase6NearOrFar1,
         };
         _p6DragonsWingAction = [false, false, false];   // P6 双龙远近记录
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        accessory.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
     
     [ScriptMethod(name: "P6：远近，翅膀记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"], userControl: false)]
@@ -1539,7 +1520,7 @@ public class DsrPatch
         const uint leftFar = 27940;
         const uint leftNear = 27939;
         const uint rightFar = 27943;
-        const uint rightNear = 27942;
+        // const uint rightNear = 27942;
         
         if (_dsrPhase is not (DsrPhase.Phase6NearOrFar1 or DsrPhase.Phase6NearOrFar2))
             return;
@@ -1548,8 +1529,8 @@ public class DsrPatch
         // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
         _p6DragonsWingAction[0] = aid is leftFar or rightFar;
         _p6DragonsWingAction[1] = aid is leftFar or leftNear;
-        accessory.DebugMsg($"检测到{(_p6DragonsWingAction[0] ? "T远离" : "T靠近")}, {(_p6DragonsWingAction[1] ? "左" : "右")}安全", DebugMode);
-        _NearOrFarWingsEvent.Set();
+        accessory.Log.Debug($"检测到{(_p6DragonsWingAction[0] ? "T远离" : "T靠近")}, {(_p6DragonsWingAction[1] ? "左" : "右")}安全");
+        _nearOrFarWingsEvent.Set();
     }
 
     
@@ -1559,33 +1540,33 @@ public class DsrPatch
         if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
         var spos = @event.SourcePosition();
         // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
-        _p6DragonsWingAction[2] = spos.X < Center.X;
-        accessory.DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "前安全" : "后安全")}", DebugMode);
-        _NearOrFarCauterizeEvent.Set();
+        _p6DragonsWingAction[2] = spos.X < _center.X;
+        accessory.Log.Debug($"检测到{(_p6DragonsWingAction[2] ? "前安全" : "后安全")}");
+        _nearOrFarCauterizeEvent.Set();
     }
 
     [ScriptMethod(name: "P6：远近，内外记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2794[79])$"], userControl: false)]
     public void P6_NearOrFar_BlackWingsRecord(Event @event, ScriptAccessory accessory)
     {
         const uint insideSafe = 27947;
-        const uint outsideSafe = 27949;
+        // const uint outsideSafe = 27949;
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
         var aid = @event.ActionId();
         // [远T/近F，左安全T/右安全F，前安全T/后安全F/内安全T/外安全F]
         _p6DragonsWingAction[2] = aid == insideSafe;
-        accessory.DebugMsg($"检测到{(_p6DragonsWingAction[2] ? "内安全" : "外安全")}", DebugMode);
-        _NearOrFarInOutEvent.Set();
+        accessory.Log.Debug($"检测到{(_p6DragonsWingAction[2] ? "内安全" : "外安全")}");
+        _nearOrFarInOutEvent.Set();
     }
 
     [ScriptMethod(name: "一远近指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(279(39|4[023]))$"])]
     public void P6_NearOrFar1_Dir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar1) return;
-        _NearOrFarCauterizeEvent.WaitOne();
-        _NearOrFarWingsEvent.WaitOne();
+        _nearOrFarCauterizeEvent.WaitOne();
+        _nearOrFarWingsEvent.WaitOne();
         Vector3[] nearOrFarSafePos = GetQuarterSafePos(_p6DragonsWingAction);
         var nearOrFarDirPosIdx = GetQuarterSafePosIdx(_p6DragonsWingAction);
-        accessory.DebugMsg($"MT去{nearOrFarDirPosIdx[0]}, ST去{nearOrFarDirPosIdx[1]}, 人群去{nearOrFarDirPosIdx[2]}", DebugMode);
+        accessory.Log.Debug($"MT去{nearOrFarDirPosIdx[0]}, ST去{nearOrFarDirPosIdx[1]}, 人群去{nearOrFarDirPosIdx[2]}");
 
         var myIndex = accessory.GetMyIndex();
         var myPartIdx = myIndex >= 2 ? 2 : myIndex;
@@ -1601,8 +1582,8 @@ public class DsrPatch
 
         var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"一远近指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        _NearOrFarCauterizeEvent.Reset();
-        _NearOrFarWingsEvent.Reset();
+        _nearOrFarCauterizeEvent.Reset();
+        _nearOrFarWingsEvent.Reset();
     }
 
     private Vector3[] GetQuarterSafePos(List<bool> wings)
@@ -1622,7 +1603,7 @@ public class DsrPatch
                 quarterSafePos[i] -= new Vector3(22f, 0, 0);
             // 右安全，左右折叠
             if (!wings[1])
-                quarterSafePos[i] = quarterSafePos[i].FoldPointVertical(Center.Z);
+                quarterSafePos[i] = quarterSafePos[i].FoldPointVertical(_center.Z);
         }
         return quarterSafePos;
     }
@@ -1640,8 +1621,8 @@ public class DsrPatch
     public void P6_NearOrFar2_Dir(Event @event, ScriptAccessory accessory)
     {
         if (_dsrPhase != DsrPhase.Phase6NearOrFar2) return;
-        _NearOrFarInOutEvent.WaitOne();
-        _NearOrFarWingsEvent.WaitOne();
+        _nearOrFarInOutEvent.WaitOne();
+        _nearOrFarWingsEvent.WaitOne();
 
         Vector3[] nearOrFarSafePos = GetLineSafePos(_p6DragonsWingAction);
         int[] nearOrFarDirPosIdx = GetLineSafePosIdx(_p6DragonsWingAction);
@@ -1660,8 +1641,8 @@ public class DsrPatch
 
         var dp = accessory.DrawDirPos(targetPos, 0, 7500, $"二远近指路");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        _NearOrFarInOutEvent.Reset();
-        _NearOrFarWingsEvent.Reset();
+        _nearOrFarInOutEvent.Reset();
+        _nearOrFarWingsEvent.Reset();
     }
 
     private static Vector3[] GetLineSafePos(List<bool> wings)
@@ -1702,7 +1683,7 @@ public class DsrPatch
     public void P6_Flame_PhaseRecord(Event @event, ScriptAccessory accessory)
     {
         _dsrPhase = DsrPhase.Phase6Flame;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        accessory.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
     [ScriptMethod(name: "十字火分摊目标", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:27974"])]
@@ -1724,7 +1705,7 @@ public class DsrPatch
     {
         if (_dsrPhase != DsrPhase.Phase6IceAndFire2) return;
         _dsrPhase = DsrPhase.Phase6Cauterize;
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        accessory.Log.Debug($"当前阶段为：{_dsrPhase}");
 
         Vector3[] cauterizePos = new Vector3[2];
         cauterizePos[0] = new Vector3(95f, 0, 79f);
@@ -1761,7 +1742,7 @@ public class DsrPatch
             ExaflareSpecStrategyEnum.绝对前方_AlwaysFront => [2, -10, 50],
             _ => [-10, 100, 0],
         };
-        _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
+        _p7Exaflare = new DsrExaflare(scoreList);
     }
     
 
@@ -1771,7 +1752,7 @@ public class DsrPatch
         var stc = @event.StackCount();
         _p7Exaflare?.SetBladeType(stc);
         if (!IsExaflarePhase()) return;
-        _BladeEvent.Set();
+        _bladeEvent.Set();
     }
     
     [ScriptMethod(name: "地火范围绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:28060"])]
@@ -1782,7 +1763,7 @@ public class DsrPatch
         var srot = @event.SourceRotation();
         var bossChara = accessory.GetById(_p7BossId);
         var bossRot = bossChara?.Rotation ?? float.Pi;
-        var bossPos = bossChara?.Position ?? Center;
+        var bossPos = bossChara?.Position ?? _center;
         const int intervalTime = 1900;
         const int castTime = 6900;
         const int extendDistance = 7;
@@ -1810,11 +1791,11 @@ public class DsrPatch
         if (!IsExaflarePhase()) return;
         if (ExaflareStrategy == ExaflareSpecStrategyEnum.关闭_PleaseDontDoThat) return;
         if (!_p7Exaflare.ExaflareRecordComplete()) return;
-        _BladeEvent.WaitOne();
+        _bladeEvent.WaitOne();
         var guidePosList = _p7Exaflare.ExportExaflareSolution(accessory);
-        accessory.DebugMsg($"你选择的策略是{ExaflareStrategy}", DebugMode);
+        accessory.Log.Debug($"你选择的策略是{ExaflareStrategy}");
         DrawExaflareGuidePos(guidePosList, accessory);
-        _BladeEvent.Reset();
+        _bladeEvent.Reset();
     }
     
     private void DrawExaflareGuidePos(List<Vector3> guidePosList, ScriptAccessory accessory)
@@ -1932,9 +1913,7 @@ public class DsrPatch
 
     private void DebugExaflare(float[] srot, float bossRotRad, uint bladeType, ScriptAccessory accessory)
     {
-        if (!DebugMode) return;
-        
-        accessory.DebugMsg($"你选择的策略是{ExaflareStrategy}", DebugMode);
+        accessory.Log.Debug($"你选择的策略是{ExaflareStrategy}");
         
         List<int> scoreList = ExaflareStrategy switch
         {
@@ -1945,20 +1924,20 @@ public class DsrPatch
             ExaflareSpecStrategyEnum.绝对前方_AlwaysFront => [2, -10, 50],
             _ => [-10, 100, 0],
         };
-        _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
+        _p7Exaflare = new DsrExaflare(scoreList);
         
         // 面相为前、左、右的扩散
         // var spos = @event.SourcePosition();
         // var srot = @event.SourceRotation();
         Vector3[] spos =
         [
-            Center.ExtendPoint(bossRotRad.Game2Logic() - float.Pi, 8),
-            Center.ExtendPoint(bossRotRad.Game2Logic() + 60f.DegToRad(), 8),
-            Center.ExtendPoint(bossRotRad.Game2Logic() - 60f.DegToRad(), 8)
+            _center.ExtendPoint(bossRotRad.Game2Logic() - float.Pi, 8),
+            _center.ExtendPoint(bossRotRad.Game2Logic() + 60f.DegToRad(), 8),
+            _center.ExtendPoint(bossRotRad.Game2Logic() - 60f.DegToRad(), 8)
         ];
         var bossChara = accessory.GetById(_p7BossId);
         var bossRot = bossChara?.Rotation ?? bossRotRad;
-        var bossPos = bossChara?.Position ?? Center;
+        var bossPos = bossChara?.Position ?? _center;
         const int intervalTime = 1900;
         const int castTime = 6900;
         const int extendDistance = 7;
@@ -1993,11 +1972,11 @@ public class DsrPatch
         switch (bladeType)
         {
             case 42:
-                var dp1 = accessory.DrawStaticCircle(Center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"钢铁", 8f);
+                var dp1 = accessory.DrawStaticCircle(_center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"钢铁", 8f);
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
                 break;
             case 43:
-                var dp2 = accessory.DrawStaticDonut(Center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"月环", 50f, 8f);
+                var dp2 = accessory.DrawStaticDonut(_center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"月环", 50f, 8f);
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp2);
                 break;
         }
@@ -2011,25 +1990,24 @@ public class DsrPatch
         DrawExaflareGuidePos(guidePosList, accessory);
     }
 
-    [ScriptMethod(name: "忆罪宫地火模拟器", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
+    [ScriptMethod(name: "忆罪宫地火模拟器", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=Exaflare"], userControl: false)]
     public void ExaflareEchoDebug(Event @event, ScriptAccessory accessory)
     {
-        if (!DebugMode) return;
         // ---- DEBUG CODE ----
         
-        Center = new Vector3(400, -54.97f, -400);
+        _center = new Vector3(400, -54.97f, -400);
         Random random = new Random();
         float bossRotLogicDeg = random.Next(0, 360);
         var bossRotLogicRad = bossRotLogicDeg.DegToRad();
-        accessory.DebugMsg($"随机到的Boss面向为{bossRotLogicRad.RadToDeg()}", DebugMode);
+        accessory.Log.Debug($"随机到的Boss面向为{bossRotLogicRad.RadToDeg()}");
         float[] srot =
         [
             (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
             (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game(),
             (random.Next(0, 8) * float.Pi / 4 + bossRotLogicRad).Logic2Game()
         ];
-        Vector3 bossFace = Center.ExtendPoint(bossRotLogicRad, 8f);
-        var dp = accessory.DrawDirPos2Pos(Center, bossFace, 0, 7000, $"面相", 7.9f);
+        Vector3 bossFace = _center.ExtendPoint(bossRotLogicRad, 8f);
+        var dp = accessory.DrawDirPos2Pos(_center, bossFace, 0, 7000, $"面相", 7.9f);
         dp.Color = ColorHelper.ColorDark.V4;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         DebugExaflare(srot, bossRotLogicRad.Logic2Game(), (uint)random.Next(0, 2) + 42, accessory);
@@ -2057,7 +2035,7 @@ public class DsrPatch
             DsrPhase.Phase7Stack3 => DsrPhase.Phase7Enrage,
             _ => DsrPhase.Phase7Exaflare1,
         };
-        accessory.DebugMsg($"当前阶段为：{_dsrPhase}", DebugMode);
+        accessory.Log.Debug($"当前阶段为：{_dsrPhase}");
 
         if (!_p7FirstEnmityOrder.Contains(true))
         {
@@ -2071,9 +2049,9 @@ public class DsrPatch
         {
             _p7FirstEnmityOrder[0] = !_p7FirstEnmityOrder[0];
             _p7FirstEnmityOrder[1] = !_p7FirstEnmityOrder[1];
-            accessory.DebugMsg($"MT为{(_p7FirstEnmityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEnmityOrder[1] ? "一仇" : "二仇")}", DebugMode);
+            accessory.Log.Debug($"MT为{(_p7FirstEnmityOrder[0] ? "一仇" : "二仇")}，ST为{(_p7FirstEnmityOrder[1] ? "一仇" : "二仇")}");
         }
-        _TrinityEvent.Set();
+        _trinityEvent.Set();
         
         if (!IsStackPhase()) return;
         List<int> scoreList = ExaflareStrategy switch
@@ -2085,7 +2063,7 @@ public class DsrPatch
             ExaflareSpecStrategyEnum.绝对前方_AlwaysFront => [2, -10, 50],
             _ => [-10, 100, 0],
         };
-        _p7Exaflare = new DsrExaflare(DebugMode, scoreList);
+        _p7Exaflare = new DsrExaflare(scoreList);
         
     }
     
@@ -2102,7 +2080,7 @@ public class DsrPatch
     [ScriptMethod(name: "三剑一体接刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(2805[179])$"])]
     public void P7_TrinityAttack(Event @event, ScriptAccessory accessory)
     {
-        _TrinityEvent.WaitOne();
+        _trinityEvent.WaitOne();
         var aid = @event.ActionId();
         var sid = @event.SourceId();
         const uint exaflare = 28059;
@@ -2131,7 +2109,7 @@ public class DsrPatch
         DrawTrinityAggro(sid, delay, 4000, 2, accessory);
         DrawTrinityNear(sid, delay - 4000, 4000, accessory);
         DrawTrinityNear(sid, delay, 4000, accessory);
-        _TrinityEvent.Reset();
+        _trinityEvent.Reset();
     }
 
     private void DrawTrinityAggro(uint sid, int delay, int destroy, uint aggroIdx, ScriptAccessory accessory)
@@ -2183,7 +2161,7 @@ public class DsrPatch
         if (targetIdx != 1)
         {
             if (_p7TrinityDisordered) return;
-            accessory.DebugMsg($"有人多接了一刀，失效", DebugMode);
+            accessory.Log.Debug($"有人多接了一刀，失效");
             accessory.Method.TextInfo($"有人多接了一刀，不再以安全色提示", 3000, true);
             _p7TrinityDisordered = true;
             return;
@@ -2193,7 +2171,7 @@ public class DsrPatch
         var tidx = accessory.GetPlayerIdIndex(tid);
         if (_p7TrinityOrderIdx[_p7TrinityNum] != tidx && !_p7TrinityDisordered)
         {
-            accessory.DebugMsg($"接刀人错误，失效", DebugMode);
+            accessory.Log.Debug($"接刀人错误，失效");
             accessory.Method.TextInfo($"接刀人错误，不再以安全色提示", 3000, true);
             _p7TrinityDisordered = true;
         }
@@ -2204,7 +2182,7 @@ public class DsrPatch
 
         var targetRecent = accessory.GetPlayerJobByIndex(tidx);
         var targetNext = accessory.GetPlayerJobByIndex(_p7TrinityOrderIdx[_p7TrinityNum]);
-        accessory.DebugMsg($"刚刚接刀的是{targetRecent}，下一个接刀人为{targetNext}", DebugMode);
+        accessory.Log.Debug($"刚刚接刀的是{targetRecent}，下一个接刀人为{targetNext}");
     }
 
     [ScriptMethod(name: "三剑一体T刀记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(2806[34])$"], userControl: false)]
@@ -2229,7 +2207,7 @@ public class DsrPatch
 
         // 一仇效果，但目标是二仇 || 二仇效果，但目标是一仇
         if ((_p7FirstEnmityOrder[tidx] || aid != aggro1) && (!_p7FirstEnmityOrder[tidx] || aid != aggro2)) return;
-        accessory.DebugMsg($"接刀仇恨错误，失效", DebugMode);
+        accessory.Log.Debug($"接刀仇恨错误，失效");
         accessory.Method.TextInfo($"接刀仇恨错误，不再以安全色提示", 3000, true);
         _p7TrinityTankDisordered = true;
     }
@@ -2240,16 +2218,15 @@ public class DsrPatch
 
 #region Class 地火
 
-public class DsrExaflare(bool debugMode, List<int> scoreList)
+public class DsrExaflare(List<int> scoreList)
 {
     // 右上0，下1，左2
-    private bool DebugMode = debugMode;
     private List<Vector3> ExaflarePosList { get; set; } = Enumerable.Repeat(new Vector3(0, 0, 0), 3).ToList();
     private Vector3 BossPos { get; set; } = new Vector3(0, 0, 0);
     private List<int> ExaflareDirList { get; set; } = [0, 0, 0];
     private uint BladeType { get; set; } = 0;
     private List<ExaflareSolution> ExaflareSolutionList { get; set; } = [];
-    public int _recordedExaflareNum = 0;
+    public int RecordedExaflareNum = 0;
 
     private ExaflareSolution BuildOneStepSolutionNew(ScriptAccessory accessory)
     {
@@ -2261,9 +2238,9 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         int targetExaflareIdx;
         var debugText = $"[a][一步火]: \n";
         
-        if (!IsFrontPointedByExaflare(0, accessory))
+        if (!IsFrontPointedByExaflare(0))
             targetExaflareIdx = 0;
-        else if (!IsFrontPointedByExaflare(2, accessory))
+        else if (!IsFrontPointedByExaflare(2))
             targetExaflareIdx = 2;
         else
         {
@@ -2290,100 +2267,9 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         debugText += $"[a]玩家序号为{myIndex}, 为{(myIndex < 1?"坦克":"人群")}视角，\n倾向于{(myIndex < 1?"前方":"后方")}就位\n";
         moveStep++;
         
-        accessory.DebugMsg(debugText, DebugMode);
+        accessory.Log.Debug(debugText);
         
-        return new ExaflareSolution([pos1, pos2, pos3], moveStep, true, isUniverse, "一步火", scoreList, DebugMode,
-            accessory);
-    }
-    
-    private ExaflareSolution BuildOneStepSolution(ScriptAccessory accessory)
-    {
-        // 一步火
-        var backExaflarePos = ExaflarePosList[1];
-        const bool isUniverse = false;
-        var moveStep = 0;
-
-        Vector3 pos2;
-        Vector3 pos3;
-
-        int targetExaflareIdx;
-        if (IsBackExaflareRightDir())
-        {
-            accessory.DebugMsg($"[一步火] 检测到背后地火为正地火", DebugMode);
-            // 若背后地火为正地火
-            if (IsBothFrontExaflareRightDir())
-            {
-                accessory.DebugMsg($"[一步火] 检测到前方地火都是正地火", DebugMode);
-                // 观察左右地火是否被指向
-                if (!IsFrontPointedByExaflare(0, accessory))
-                {
-                    targetExaflareIdx = 0;
-                    accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
-                    pos2 = ExaflarePosList[targetExaflareIdx];
-                    pos3 = pos2;
-                }
-                else if (!IsFrontPointedByExaflare(2, accessory))
-                {
-                    targetExaflareIdx = 2;
-                    accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
-                    pos2 = ExaflarePosList[targetExaflareIdx];
-                    pos3 = pos2;
-                }
-                else
-                {
-                    targetExaflareIdx = 0;
-                    accessory.DebugMsg($"[一步火] 检测到前方地火均被指向，随便取左上作安全点", DebugMode);
-                    pos2 = ExaflarePosList[targetExaflareIdx];
-                    pos3 = ExaflarePosList[1].PointInOutside(BossPos, 12f);
-                    moveStep++;
-                }
-            }
-            else
-            {
-                // 找到前方正地火序列，为目的地。如果前方为两个斜火，随便找一个。
-                targetExaflareIdx = IsBothFrontExaflareOpliqueDir() ? 0 : FindFrontRightDirExaflare();
-                // pos2 pos3 定义目的地
-                pos2 = ExaflarePosList[targetExaflareIdx];
-                pos3 = pos2;
-            }
-            accessory.DebugMsg($"[一步火] 找到基于{GetExaflareIdxStr(targetExaflareIdx)}正地火的初始安全区", DebugMode);
-        }
-        else
-        {
-            accessory.DebugMsg($"[一步火] 检测到背后地火为斜地火", DebugMode);
-            // 若背后地火为斜地火
-            if (!IsFrontPointedByExaflare(0, accessory))
-            {
-                targetExaflareIdx = 0;
-                // 若右上地火未被指向，可作为安全点
-                accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
-                pos2 = ExaflarePosList[targetExaflareIdx];
-                pos3 = pos2;
-            }
-            else if (!IsFrontPointedByExaflare(2, accessory))
-            {
-                targetExaflareIdx = 2;
-                // 若左上地火未被指向，可作为安全点
-                accessory.DebugMsg($"[一步火] 检测到{GetExaflareIdxStr(targetExaflareIdx)}地火未被指向，可作为安全点", DebugMode);
-                pos2 = ExaflarePosList[targetExaflareIdx];
-                pos3 = pos2;
-            }
-            else
-            {
-                // 若左上右上两枚地火均被指向，走通用面前火。从背后火的位置向Boss方向延长12
-                moveStep++;
-                targetExaflareIdx = 2;
-                accessory.DebugMsg($"[一步火] 检测到前方两枚地火均被指向，随便取左上作为安全点", DebugMode);
-                pos2 = ExaflarePosList[targetExaflareIdx];
-                pos3 = ExaflarePosList[1].PointInOutside(BossPos, 12f);
-            }
-        }
-        // pos1 根据职能定义起跑点
-        var myIndex = accessory.GetMyIndex();
-        var pos1 = FindFirstSafePosAtFront(targetExaflareIdx, myIndex < 1);
-        moveStep++;
-        
-        return new ExaflareSolution([pos1, pos2, pos3], moveStep, true, isUniverse, "一步火", scoreList, DebugMode,
+        return new ExaflareSolution([pos1, pos2, pos3], moveStep, true, isUniverse, "一步火", scoreList,
             accessory);
     }
     
@@ -2403,8 +2289,8 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         var debugText = $"[b][两步火]: \n";
         
         // 前方两地火是否指向背后
-        var idx0Point = IsBackPointedByExaflare(0, accessory);
-        var idx2Point = IsBackPointedByExaflare(2, accessory);
+        var idx0Point = IsBackPointedByExaflare(0);
+        var idx2Point = IsBackPointedByExaflare(2);
 
         if (!idx0Point && !idx2Point)
         {
@@ -2434,8 +2320,8 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             moveStep++;
             debugText += $"[b]检测到地火全指向背后，转为无脑火\n";
         }
-        accessory.DebugMsg(debugText, DebugMode);
-        return new ExaflareSolution([pos1, pos2, pos3], moveStep, false, isUniverse, "两步火", scoreList, DebugMode,
+        accessory.Log.Debug(debugText);
+        return new ExaflareSolution([pos1, pos2, pos3], moveStep, false, isUniverse, "两步火", scoreList,
             accessory);
     }
 
@@ -2455,7 +2341,7 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
 
     private Vector3 FindFirstSafePosAtFront(int exaflareIdx, bool isTank)
     {
-        var exaflarePos = ExaflarePosList[exaflareIdx];
+        // var exaflarePos = ExaflarePosList[exaflareIdx];
         if (isTank) // 是坦克，则前方起跑
         {
             if (exaflareIdx == 0)
@@ -2499,8 +2385,8 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         var dir = exaflareRelativeDir.Rad2Dirs(8);
         ExaflareDirList[idx] = dir;
         ExaflarePosList[idx] = exaflarePosV3;
-        accessory.DebugMsg($"添加{GetExaflareIdxStr(idx)}地火，坐标{exaflarePosV3}，面向{GetDirStr(dir)}", DebugMode);
-        _recordedExaflareNum++;
+        accessory.Log.Debug($"添加{GetExaflareIdxStr(idx)}地火，坐标{exaflarePosV3}，面向{GetDirStr(dir)}");
+        RecordedExaflareNum++;
     }
     
     /// <summary>
@@ -2529,68 +2415,11 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     }
 
     /// <summary>
-    /// 返回背后地火是否为正角
-    /// </summary>
-    /// <returns></returns>
-    private bool IsBackExaflareRightDir()
-    {
-        return IsExaflareRightDir(1);
-    }
-
-    /// <summary>
-    /// 前方两地火全正角
-    /// </summary>
-    /// <returns></returns>
-    private bool IsBothFrontExaflareRightDir()
-    {
-        return IsExaflareRightDir(0) && IsExaflareRightDir(2);
-    }
-
-    /// <summary>
-    /// 前方两地火全斜角
-    /// </summary>
-    /// <returns></returns>
-    private bool IsBothFrontExaflareOpliqueDir()
-    {
-        return !(IsExaflareRightDir(0) || IsExaflareRightDir(2));
-    }
-    
-    /// <summary>
-    /// 前方两地火正斜类型一致
-    /// </summary>
-    /// <returns></returns>
-    private bool IsBothFrontExaflareSameDir()
-    {
-        return IsExaflareRightDir(0) == IsExaflareRightDir(2);
-    }
-    
-    /// <summary>
-    /// 找到前方正角地火
-    /// </summary>
-    /// <returns>正角地火序号</returns>
-    private int FindFrontRightDirExaflare()
-    {
-        if (IsBothFrontExaflareOpliqueDir()) return -1;
-        return IsExaflareRightDir(0) ? 0 : 2;
-    }
-    
-    /// <summary>
-    /// 找到前方斜角地火
-    /// </summary>
-    /// <returns>斜角地火序号</returns>
-    private int FindFrontObliqueDirExaflare()
-    {
-        if (IsBothFrontExaflareRightDir()) return -1;
-        return IsExaflareRightDir(0) ? 2 : 0;
-    }
-
-    /// <summary>
     /// 找到背后是否被序号为idx的地火指
     /// </summary>
     /// <param name="idx">地火序号</param>
-    /// <param name="accessory"></param>
     /// <returns></returns>
-    private bool IsBackPointedByExaflare(int idx, ScriptAccessory accessory)
+    private bool IsBackPointedByExaflare(int idx)
     {
         // 右上地火指向背后地火的条件：右上地火不是正火且方向不等于1
         // 左上地火指向背后地火的条件：左上地火不是正火且方向不等于7
@@ -2607,9 +2436,8 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
     /// 找到前方序号为idx的地火是否被指
     /// </summary>
     /// <param name="idx">地火序号</param>
-    /// <param name="accessory"></param>
     /// <returns></returns>
-    private bool IsFrontPointedByExaflare(int idx, ScriptAccessory accessory)
+    private bool IsFrontPointedByExaflare(int idx)
     {
         // 右上地火被指：左上地火为正火，且方向不为6（朝左） 或 背后地火是斜火，且方向不为5（朝左下）
         // 左上地火被指：右上地火为正火，且方向不为2（朝右） 或 背后地火是斜火，且方向不为3（朝右下）
@@ -2646,7 +2474,7 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         AddExaflareSolution(BuildTwoStepSolution(accessory));
         
         ExaflareSolutionList = ExaflareSolutionList.OrderBy(solution => solution.Score).ToList();
-        accessory.DebugMsg($"两解法对比，优先级高的是{ExaflareSolutionList[0].Description}，为{ExaflareSolutionList[0].Score}分", DebugMode);
+        accessory.Log.Debug($"两解法对比，优先级高的是{ExaflareSolutionList[0].Description}，为{ExaflareSolutionList[0].Score}分");
         return ExaflareSolutionList[0].ExaflareSolutionPosList;
     }
     
@@ -2654,29 +2482,29 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
      * 下述为构建地火的方法，今后可以单独做成一个class调用
      */
     
-    /// <summary>
-    /// 构建地火坐标
-    /// </summary>
-    /// <param name="center">中心</param>
-    /// <param name="rotation">旋转角度</param>
-    /// <param name="extendDistance">延伸距离</param>
-    /// <returns></returns>
-    private Vector3 GetExaflarePos(Vector3 center, float rotation, float extendDistance)
-    {
-        return center.ExtendPoint(rotation, extendDistance);
-    }
+    // /// <summary>
+    // /// 构建地火坐标
+    // /// </summary>
+    // /// <param name="center">中心</param>
+    // /// <param name="rotation">旋转角度</param>
+    // /// <param name="extendDistance">延伸距离</param>
+    // /// <returns></returns>
+    // private Vector3 GetExaflarePos(Vector3 center, float rotation, float extendDistance)
+    // {
+    //     return center.ExtendPoint(rotation, extendDistance);
+    // }
 
-    private Vector3[] BuildExaflareVector(Vector3 center, float rotation, int extendNum, float extendDistance)
-    {
-        var exaflarePos = new Vector3[extendNum];
-        for (var i = 0; i < extendNum; i++)
-            exaflarePos[i] = GetExaflarePos(center, rotation, (i + 1) * extendDistance);
-        return exaflarePos;
-    }
+    // private Vector3[] BuildExaflareVector(Vector3 center, float rotation, int extendNum, float extendDistance)
+    // {
+    //     var exaflarePos = new Vector3[extendNum];
+    //     for (var i = 0; i < extendNum; i++)
+    //         exaflarePos[i] = GetExaflarePos(center, rotation, (i + 1) * extendDistance);
+    //     return exaflarePos;
+    // }
 
     public bool ExaflareRecordComplete()
     {
-        return _recordedExaflareNum == 3;
+        return RecordedExaflareNum == 3;
     }
 
     private string GetExaflareIdxStr(int idx)
@@ -2734,20 +2562,18 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
         public bool IsUniverse { get; set; }
         public int Score { get; set; }
         public string Description { get; set; }
-        public bool DebugMode { get; set; }
 
         public ExaflareSolution(List<Vector3> exaflareSolutionPosList, int moveStep, bool isFront, bool isUniverse,
-            string description, List<int> scoreList, bool debugMode, ScriptAccessory accessory)
+            string description, List<int> scoreList, ScriptAccessory accessory)
         {
             ExaflareSolutionPosList = exaflareSolutionPosList;
             MoveStep = moveStep;
             IsFront = isFront;
             IsUniverse = isUniverse;
-            Score = CalcScore(scoreList, accessory, debugMode, description);
+            Score = CalcScore(scoreList, accessory, description);
             Description = description;
-            DebugMode = debugMode;
         }
-        private int CalcScore(List<int> scoreList, ScriptAccessory accessory, bool debugMode, string description)
+        private int CalcScore(List<int> scoreList, ScriptAccessory accessory, string description)
         {
             const int moveStepIdx = 0;
             const int isFrontIdx = 1;
@@ -2757,9 +2583,8 @@ public class DsrExaflare(bool debugMode, List<int> scoreList)
             var isFrontScore = IsFront ? scoreList[isFrontIdx] : 0;
             var isUniverseScore = IsUniverse ? scoreList[isUniverseIdx] : 0;
             var totalScore = baseScore + moveStepScore + isFrontScore + isUniverseScore;
-            accessory.DebugMsg(
-                $"{description}的得分为：基础{baseScore} + 步数{moveStepScore} + 前方{isFrontScore} + 无脑{isUniverseScore} = {totalScore}",
-                debugMode);
+            accessory.Log.Debug(
+                $"{description}的得分为：基础{baseScore} + 步数{moveStepScore} + 前方{isFrontScore} + 无脑{isUniverseScore} = {totalScore}");
             return totalScore;
         }
     }
@@ -3294,87 +3119,7 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         return dp;
     }
-
-    /// <summary>
-    /// 返回自己指向某目标对象的dp，可修改dp.TargetObject, dp.Scale
-    /// </summary>
-    /// <param name="targetId">指向目标对象</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">指路线条宽度</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawDirTarget(this ScriptAccessory accessory, uint targetId, int delay, int destroy, string name, float scale = 1f)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Owner = accessory.Data.Me;
-        dp.TargetObject = targetId;
-        dp.ScaleMode |= ScaleMode.YByDistance;
-        dp.Color = accessory.Data.DefaultSafeColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        return dp;
-    }
-
-    /// <summary>
-    /// 返回扇形左右刀
-    /// </summary>
-    /// <param name="accessory"></param>
-    /// <param name="ownerId">起始目标id，通常为boss</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="isLeftCleave">是左刀</param>
-    /// <param name="radian">扇形角度</param>
-    /// <param name="scale">扇形尺寸</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawLeftRightCleave(this ScriptAccessory accessory, uint ownerId, bool isLeftCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Radian = radian;
-        dp.Rotation = isLeftCleave ? float.Pi / 2 : -float.Pi / 2;
-        dp.Owner = ownerId;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
-
-    /// <summary>
-    /// 返回扇形前后刀
-    /// </summary>
-    /// <param name="accessory"></param>
-    /// <param name="ownerId">起始目标id，通常为boss</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="isFrontCleave">是前刀</param>
-    /// <param name="radian">扇形角度</param>
-    /// <param name="scale">扇形尺寸</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawFrontBackCleave(this ScriptAccessory accessory, uint ownerId, bool isFrontCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Radian = radian;
-        dp.Rotation = isFrontCleave ? 0 : -float.Pi;
-        dp.Owner = ownerId;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
-
+    
     /// <summary>
     /// 返回距离某对象目标最近/最远的dp
     /// </summary>
@@ -3402,68 +3147,6 @@ public static class AssignDp
         dp.CentreResolvePattern =
             isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
         dp.CentreOrderIndex = orderIdx;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
-
-    /// <summary>
-    /// 返回距离某坐标位置最近/最远的dp
-    /// </summary>
-    /// <param name="accessory"></param>
-    /// <param name="position">特定坐标点</param>
-    /// <param name="orderIdx">顺序，从1开始</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="width">绘图宽度</param>
-    /// <param name="length">绘图长度</param>
-    /// <param name="isNear">true为最近，false为最远</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <param name="lengthByDistance">长度是否随距离改变</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawPositionNearFarOrder(this ScriptAccessory accessory, Vector3 position, uint orderIdx,
-        bool isNear, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(width, length);
-        dp.Position = position;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.TargetResolvePattern =
-            isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
-        dp.TargetOrderIndex = orderIdx;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
-
-    /// <summary>
-    /// 返回ownerId施法目标的dp
-    /// </summary>
-    /// <param name="accessory"></param>
-    /// <param name="ownerId">起始目标id，通常为boss</param>
-    /// <param name="width">绘图宽度</param>
-    /// <param name="length">绘图长度</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <param name="lengthByDistance">长度是否随距离改变</param>
-    /// <param name="name">绘图名称</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawOwnersTarget(this ScriptAccessory accessory, uint ownerId, float width, float length, int delay,
-        int destroy, string name, bool lengthByDistance = false, bool byTime = false)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(width, length);
-        dp.Owner = ownerId;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.CentreResolvePattern = PositionResolvePatternEnum.OwnerTarget;
         dp.Color = accessory.Data.DefaultDangerColor;
         dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
@@ -3501,61 +3184,6 @@ public static class AssignDp
     }
 
     /// <summary>
-    /// 返回owner与target的dp，可修改 dp.Owner, dp.TargetObject, dp.Scale
-    /// </summary>
-    /// <param name="ownerId">起始目标id，通常为自己</param>
-    /// <param name="targetId">目标单位id</param>
-    /// <param name="width">绘图宽度</param>
-    /// <param name="length">绘图长度</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="lengthByDistance">长度是否随距离改变</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, uint ownerId, uint targetId, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(width, length);
-        dp.Owner = ownerId;
-        dp.TargetObject = targetId;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
-
-    /// <summary>
-    /// 返回owner与target之间的连线dp，使用Line绘制
-    /// </summary>
-    /// <param name="accessory"></param>
-    /// <param name="ownerId">起始目标id，通常为自己</param>
-    /// <param name="targetId">目标单位id</param>
-    /// <param name="scale">线条宽度</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawConnectionBetweenTargets(this ScriptAccessory accessory, uint ownerId,
-        uint targetId, int delay, int destroy, string name, float scale = 1f)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(scale);
-        dp.Owner = ownerId;
-        dp.TargetObject = targetId;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.ScaleMode |= ScaleMode.YByDistance;
-        return dp;
-    }
-
-    /// <summary>
     /// 返回圆形dp，跟随owner，可修改 dp.Owner, dp.Scale
     /// </summary>
     /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
@@ -3576,24 +3204,6 @@ public static class AssignDp
         dp.Delay = delay;
         dp.DestoryAt = destroy;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
-
-    /// <summary>
-    /// 返回环形dp，跟随owner，可修改 dp.Owner, dp.Scale
-    /// </summary>
-    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="scale">外环实心尺寸</param>
-    /// <param name="innerScale">内环空心尺寸</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawDonut(this ScriptAccessory accessory, uint ownerId, float scale, float innerScale, int delay, int destroy, string name, bool byTime = false)
-    {
-        var dp = accessory.DrawFan(ownerId, float.Pi * 2, 0, scale, innerScale, delay, destroy, name, byTime);
         return dp;
     }
 
@@ -3661,31 +3271,6 @@ public static class AssignDp
         dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
         return dp;
     }
-    
-    /// <summary>
-    /// 返回矩形
-    /// </summary>
-    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
-    /// <param name="width">矩形宽度</param>
-    /// <param name="length">矩形长度</param>
-    /// <param name="delay">延时delay ms出现</param>
-    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
-    /// <param name="name">绘图名称</param>
-    /// <param name="byTime">动画效果随时间填充</param>
-    /// <param name="accessory"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawRect(this ScriptAccessory accessory, uint ownerId, float width, float length, int delay, int destroy, string name, bool byTime = false)
-    {
-        var dp = accessory.Data.GetDefaultDrawProperties();
-        dp.Name = name;
-        dp.Scale = new Vector2(width, length);
-        dp.Owner = ownerId;
-        dp.Color = accessory.Data.DefaultDangerColor;
-        dp.Delay = delay;
-        dp.DestoryAt = destroy;
-        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
-        return dp;
-    }
 
     /// <summary>
     /// 返回扇形
@@ -3715,19 +3300,6 @@ public static class AssignDp
         dp.DestoryAt = destroy;
         dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
         return dp;
-    }
-    
-    /// <summary>
-    /// 外部用调试模式
-    /// </summary>
-    /// <param name="str"></param>
-    /// <param name="debugMode"></param>
-    /// <param name="accessory"></param>
-    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = false)
-    {
-        if (!debugMode)
-            return;
-        accessory.Method.SendChat($"/e [DEBUG] {str}");
     }
 }
 
