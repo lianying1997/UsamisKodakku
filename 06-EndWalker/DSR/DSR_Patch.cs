@@ -2797,11 +2797,6 @@ public static class EventExtensions
         return ParseHexId(@event["SourceId"], out var id) ? id : 0;
     }
 
-    public static uint SourceDataId(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["SourceDataId"]);
-    }
-
     public static uint TargetId(this Event @event)
     {
         return ParseHexId(@event["TargetId"], out var id) ? id : 0;
@@ -2822,19 +2817,9 @@ public static class EventExtensions
         return JsonConvert.DeserializeObject<Vector3>(@event["TargetPosition"]);
     }
 
-    public static Vector3 EffectPosition(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
-    }
-
     public static float SourceRotation(this Event @event)
     {
         return JsonConvert.DeserializeObject<float>(@event["SourceRotation"]);
-    }
-
-    public static float TargetRotation(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<float>(@event["TargetRotation"]);
     }
 
     public static string SourceName(this Event @event)
@@ -2842,30 +2827,6 @@ public static class EventExtensions
         return @event["SourceName"];
     }
 
-    public static string TargetName(this Event @event)
-    {
-        return @event["TargetName"];
-    }
-
-    public static uint DurationMilliseconds(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
-    }
-
-    public static uint Index(this Event @event)
-    {
-        return ParseHexId(@event["Index"], out var id) ? id : 0;
-    }
-
-    public static uint State(this Event @event)
-    {
-        return ParseHexId(@event["State"], out var id) ? id : 0;
-    }
-
-    public static uint DirectorId(this Event @event)
-    {
-        return ParseHexId(@event["DirectorId"], out var id) ? id : 0;
-    }
     public static uint Id(this Event @event)
     {
         return ParseHexId(@event["Id"], out var id) ? id : 0;
@@ -2879,11 +2840,6 @@ public static class EventExtensions
     public static uint StackCount(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["StackCount"]);
-    }
-
-    public static uint Param(this Event @event)
-    {
-        return JsonConvert.DeserializeObject<uint>(@event["Param"]);
     }
 }
 
