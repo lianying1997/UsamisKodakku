@@ -44,7 +44,7 @@ public class DsrPatch
     
     private const string UpdateInfo =
         """
-        适配新版鸭鸭做了代码修正。
+        重写了P3踩塔逻辑，现在面对预站位错误或临时改变主意的情况有了一定修正能力。
         移除了DebugMode的开关。
         """;
     
@@ -110,10 +110,8 @@ public class DsrPatch
     private List<bool> _p2SafeDirection = new bool[8].ToList();         // P2 一运冲锋安全位置
     private Vector3 _p2ThordanPos = new Vector3(0, 0, 0);               // P2 一运托尔丹位置
     private List<uint> _p2TetherKnightId = [0, 0];                      // P2 一运接线骑士ID，顺序左、右
-    private static PriorityDict _dfg = new PriorityDict();              // P3 机制记录（新）
-    private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
-    private int _p3LimitCutStep = 0;                                    // P3 麻将机制流程
-    private uint _p3MyTowerPartner = 0;                                 // P3 我要踩的放塔搭档
+    private static PriorityDict _dfg = new PriorityDict();              // P3 机制记录
+    private List<Vector3> _p3TowerAppearPos = [];                       // P3 塔生成位置
     private int _p4MirageDiveNum = 0;                                   // P4 幻象冲次数
     private bool _p4PrepareToCenter = false;                            // P4 幻象冲准备回中
     private List<bool> _p4MirageDiveNumFirstRoundTarget = new bool[8].ToList();         // P4 幻象冲第一轮目标
@@ -379,302 +377,10 @@ public class DsrPatch
         // 个位：左中右站位分别+0, +1, +2
         // 如此安排，个位可随时变，十位改变后，个位无力干涉
         _dfg.Init(sa, "堕天龙炎冲");
-        _diveFromGrace = new DiveFromGrace();
-        _diveFromGrace.accessory = sa;
-        _p3LimitCutStep = 0;
-        _p3MyTowerPartner = 0;
+        _p3TowerAppearPos = [];
         sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
-    public class DiveFromGrace
-    {
-        public ScriptAccessory accessory { get; set; } = null;
-        public List<uint> LimitCut1 { get; set; } = [];
-        public List<uint> LimitCut2 { get; set; } = [];
-        public List<uint> LimitCut3 { get; set; } = [];
-        public int RecordedPlayerNum { get; set; } = 0;
-        public List<bool> LimitCutFixed { get; set; } = [false, false, false];
-        public List<uint> LeftLimitCut { get; set; } = [];
-        public List<uint> RightLimitCut { get; set; } = [];
-        public List<uint> MiddleLimitCut { get; set; } = [];
-
-        private const int Left = 0;
-        private const int Middle = 1;
-        private const int Right = 2;
-
-        private const int First = 0;
-        private const int Second = 1;
-        private const int Third = 2;
-
-        // 放塔倒计时
-        // private const int FirstDuration = 9000;
-        // private const int SecondDuration = 19000;
-        // private const int ThirdDuration = 29000;
-
-        public void LimitCutAdd(uint id, int idx)
-        {
-            switch (idx)
-            {
-                case First:
-                    LimitCut1.Add(id);
-                    break;
-                case Second:
-                    LimitCut2.Add(id);
-                    break;
-                case Third:
-                    LimitCut3.Add(id);
-                    break;
-                default:
-                    return;
-            }
-        }
-        
-        /// <summary>
-        /// 添加麻将方位
-        /// </summary>
-        /// <param name="id">玩家id</param>
-        /// <param name="pos">方位，0左1中2右</param>
-        public void LimitCutPosAdd(uint id, int pos)
-        {
-            switch (pos)
-            {
-                case Left:
-                    LeftLimitCut.Add(id);
-                    break;
-                case Middle:
-                    MiddleLimitCut.Add(id);
-                    break;
-                case Right:
-                    RightLimitCut.Add(id);
-                    break;
-                default:
-                    return;
-            }
-        }
-        
-        /// <summary>
-        /// 找到对应玩家的麻将序号
-        /// </summary>
-        /// <param name="id">玩家id</param>
-        /// <returns>序号，0一麻 1二麻 2三麻</returns>
-        public int FindPlayerLimitCutIndex(uint id)
-        {
-            if (LimitCut1.Contains(id))
-                return First;
-            if (LimitCut2.Contains(id))
-                return Second;
-            if (LimitCut3.Contains(id))
-                return Third;
-            return -1;
-        }
-        
-        /// <summary>
-        /// 找到对应玩家的麻将放置方位
-        /// </summary>
-        /// <param name="id">玩家id</param>
-        /// <returns>方位，0左 1中 2右</returns>
-        public int FindPlayerLimitCutPos(uint id)
-        {
-            if (LeftLimitCut.Contains(id))
-                return Left;
-            if (MiddleLimitCut.Contains(id))
-                return Middle;
-            if (RightLimitCut.Contains(id))
-                return Right;
-            return -1;
-        }
-
-        /// <summary>
-        /// 通过玩家id设置麻将位置是否确定
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public void LimitCutFixedSet(uint id)
-        {
-            var idx = FindPlayerLimitCutIndex(id);
-            LimitCutFixed[idx] = true;
-        }
-
-        public bool AllPlayerRecorded()
-        {
-            return RecordedPlayerNum == 8;
-        }
-
-        private List<uint> GetLimitCutPlayers(int idx)
-        {
-            return idx switch
-            {
-                First => LimitCut1,
-                Second => LimitCut2,
-                Third => LimitCut3,
-                _ => []
-            };
-        }
-        
-        private List<uint> GetLimitCutPosPlayers(int pos)
-        {
-            return pos switch
-            {
-                Left => LeftLimitCut,
-                Middle => MiddleLimitCut,
-                Right => RightLimitCut,
-                _ => []
-            };
-        }
-        
-        /// <summary>
-        /// 找到同组麻将中未被放入方位的玩家
-        /// </summary>
-        /// <returns></returns>
-        private List<uint> FindUnaddedPlayer(int idx)
-        {
-            List<uint> unaddedPlayers = [];
-            var players = GetLimitCutPlayers(idx);
-            foreach (var player in players)
-            {
-                if (FindPlayerLimitCutPos(player) == -1)
-                    unaddedPlayers.Add(player);
-            }
-            return unaddedPlayers;
-        }
-
-        public void SetRemainingPlayers()
-        {
-            // 第一步，先根据fixed情况找到对应的原地玩家，放置到Center
-            for (var idx = 0; idx < 3; idx++)
-            {
-                if (!LimitCutFixed[idx]) continue;
-                var unaddedPlayers = FindUnaddedPlayer(idx);
-                if (unaddedPlayers.Count == 1)
-                    LimitCutPosAdd(unaddedPlayers[0], Middle);
-            }
-            // 第二步，没有fixed的就是全大圈，根据他们的位置放置到不同方位
-            for (var idx = 0; idx < 3; idx++)
-            {
-                if (LimitCutFixed[idx]) continue;
-                
-                var unaddedPlayers = GetLimitCutPlayers(idx);
-                var sortedPlayerIds = unaddedPlayers
-                    .OrderBy(playerId => accessory.GetById(playerId).Position.X)
-                    .ToList();
-                
-                if (idx == Middle)
-                {
-                    LimitCutPosAdd(sortedPlayerIds[0], Left);
-                    LimitCutPosAdd(sortedPlayerIds[1], Right);
-                }
-                else
-                {
-                    LimitCutPosAdd(sortedPlayerIds[0], Left);
-                    LimitCutPosAdd(sortedPlayerIds[1], Middle);
-                    LimitCutPosAdd(sortedPlayerIds[2], Right);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 可能因为踩的位置不同需要重置
-        /// </summary>
-        /// <param name="idx"></param>
-        public void ResetPlayers(int idx)
-        {
-            LeftLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
-            MiddleLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
-            RightLimitCut.RemoveAll(x => GetLimitCutPlayers(idx).Contains(x));
-        }
-        
-        public string ShowPlayerAction(uint id)
-        {
-            var idx = FindPlayerLimitCutIndex(id);
-            var pos = FindPlayerLimitCutPos(id);
-            var str = $"玩家为{idx + 1}麻，位置在{pos switch
-            {
-                0 => "左",
-                1 => "中",
-                2 => "右",
-                _ => "未知"
-            }}";
-            return str;
-        }
-
-        /// <summary>
-        /// 输入玩家id，得到需要踩对方塔的搭档玩家id
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public uint FindTowerPartner(uint id)
-        {
-            var idx = FindPlayerLimitCutIndex(id);
-            var pos = FindPlayerLimitCutPos(id);
-            
-            // 第一步，确定对方的麻将序号
-            // 一般情况下，first -> second, second -> third, third -> first
-            var idxPartner = (idx + 1) % 3;
-            // 特殊情况，second无middle，即first -> third
-            if (idxPartner == Second && pos == Middle)
-                idxPartner = Third;
-
-            // 第二步，如果对方是带箭头的组，且自己是left or right，要交换pos
-            // 即，你去左，但你的左塔是右侧玩家释放
-            if (LimitCutFixed[idxPartner])
-                pos = pos switch
-                {
-                    Left => Right,
-                    Right => Left,
-                    _ => Middle
-                };
-            
-            return FindSpecificPlayer(idxPartner, pos);
-        }
-
-        /// <summary>
-        /// 输入麻将序号与方向，找到特定玩家
-        /// </summary>
-        /// <param name="idx">麻将序号</param>
-        /// <param name="pos">方向</param>
-        /// <returns></returns>
-        public uint FindSpecificPlayer(int idx, int pos)
-        {
-            var ls1 = GetLimitCutPlayers(idx);
-            var ls2 = GetLimitCutPosPlayers(pos);
-            return ls1.FirstOrDefault(player => ls2.Contains(player));
-        }
-
-        /// <summary>
-        /// 输入麻将序号与方向，获得放塔基础坐标（不含钢铁月环）
-        /// </summary>
-        /// <param name="idx"></param>
-        /// <param name="pos"></param>
-        /// <returns></returns>
-        public Vector3 GetTowerPosV3(int idx, int pos)
-        {
-            if (idx == Second)
-            {
-                switch (pos)
-                {
-                    case Left:
-                        return new Vector3(91.75f, 0, 90.8f);
-                    case Right:
-                        return new Vector3(108.25f, 0, 90.8f);
-                }
-            }
-            else
-            {
-                switch (pos)
-                {
-                    // TODO 箭头上距离不确定，需验证数值
-                    case Left:
-                        return new Vector3(_center.X - 7.5f, 0, _center.Z);
-                    case Middle:
-                        return new Vector3(_center.X, 0, _center.Z + 7.5f);
-                    case Right:
-                        return new Vector3(_center.X + 7.5f, 0, _center.Z);
-                }
-            }
-            return new Vector3(0, 0, 0);
-        }
-    }
-    
     [ScriptMethod(name: "P3：麻将记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
     public void P3_LimitCutRecord(Event ev, ScriptAccessory sa)
     {
@@ -734,7 +440,7 @@ public class DsrPatch
         }
     }
     
-    private List<KeyValuePair<int, ulong>> RefreshGroupPosPriority(ScriptAccessory sa, int myPriority)
+    private void RefreshGroupPosPriority(ScriptAccessory sa, int myPriority)
     {
         // 获得同组玩家Id
         var myGroupVal = (myPriority / 100) switch
@@ -751,7 +457,7 @@ public class DsrPatch
         if (myGroupVal == 0)
         {
             sa.Log.Error($"GetDfgGroupPlayers 中 myGroupVal == 0");
-            return [];
+            return;
         }
         
         var myGroupDict = _dfg.SelectMiddlePriorityIndices(myGroupVal / 10, myGroupVal % 10);
@@ -778,243 +484,178 @@ public class DsrPatch
             _dfg.Priorities[pidx] = _dfg.Priorities[pidx] / 10 * 10;
             _dfg.AddPriority(pidx, i);
             
-            sa.Log.Debug($"检测到{sa.GetPlayerJobByIndex(pidx)}在{i switch
+            sa.Log.Debug($"检测到{sa.GetPlayerJobByIndex(pidx)}在{GetDfgPosStr(i, sortedGroupPlayerIds.Count == 2)}，更新其优先级值为{_dfg.Priorities[pidx]}");
+        }
+    }
+    
+    private string GetDfgPosStr(int myDfgIdx, bool isSecondRound = false)
+    {
+        var str = myDfgIdx switch
+        {
+            0 => "左",
+            1 => "中",
+            2 => "右",
+            3 => "左",
+            4 => "右",
+            5 => "左",
+            6 => "中",
+            7 => "右",
+            _ => "未知"
+        };
+
+        if (isSecondRound)
+        {
+            str = myDfgIdx switch
             {
                 0 => "左",
-                1 => "中",
-                _ => "右"
-            }}，更新其优先级值为{_dfg.Priorities[pidx]}");
+                1 => "右",
+            };
         }
-        
-        return sortedGroupPlayerIds;
+        return str;
+    }
+    
+    private Vector3 GetDfgTowerPosV3(int myDfgIdx)
+    {
+        var towerPos = myDfgIdx switch
+        {
+            0 => new Vector3(_center.X - 7.5f, 0, _center.Z),
+            1 => new Vector3(_center.X, 0, _center.Z + 7.5f),
+            2 => new Vector3(_center.X + 7.5f, 0, _center.Z),
+            3 => new Vector3(91.75f, 0, 90.8f),
+            4 => new Vector3(108.25f, 0, 90.8f),
+            5 => new Vector3(_center.X - 7.5f, 0, _center.Z),
+            6 => new Vector3(_center.X, 0, _center.Z + 7.5f),
+            7 => new Vector3(_center.X + 7.5f, 0, _center.Z),
+            _ => new Vector3(0, 0, 0)
+        };
+        return towerPos;
     }
     
     [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
     public void P3_LimitCutAction(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
-        _p3LimitCutStep++;
-
-        // var aid = @event.ActionId();
-        // const int chariotFirst = 26386;
-        // const int donutFirst = 26387;
-
-        var myId = sa.Data.Me;
-        var idx = _dfg.Priorities[sa.GetMyIndex()] / 100;       // 百位代表麻将序号
-        var pos = _dfg.Priorities[sa.GetMyIndex()] % 100;       // 十位与个位合并代表相对位置
-        var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
-        var towerPos = _diveFromGrace.GetTowerPosV3(idx, pos);
+        _dfg.AddActionCount(10);
+        // 仅需获得排序，便可知麻将流程
+        var myPriority = _dfg.Priorities[sa.GetMyIndex()];
+        var myDfgIdx = _dfg.FindPriorityIndexOfKey(sa.GetMyIndex());
+        var hasArrow = myPriority / 10 % 10 != 1;
+        var posStr = GetDfgPosStr(myDfgIdx, myDfgIdx is 3 or 4);
+        var towerPos = GetDfgTowerPosV3(myDfgIdx);
         
-        const int first = 0;
-        const int second = 1;
-        const int third = 2;
-        
-        const int left = 0;
-        const int middle = 1;
-        const int right = 2;
-
-        var posStr = pos switch
-        {
-            left => "左",
-            middle => "中",
-            right => "右",
-            _ => "未知"
-        };
-
         const int lashGnashCastTime = 7600;
         const int inOutCastFirst = 3700;
         const int inOutCastSecond = 3100;
         const int towerExistTime = 6800;
-
-        if (_p3LimitCutStep == 1)
+        
+        if (_dfg.ActionCount == 18) // 正常情况下，第一轮钢铁月环读条时，该值为18。期间五次放塔点名，第二轮钢铁月环读条时，该值为33。
         {
-            switch (idx)
+            switch (myDfgIdx)
             {
-                case first:
-                {
-                    sa.Log.Debug($"一麻{posStr}第一轮，先去{posStr}{towerPos}放塔，再回人群");
+                case 0:
+                case 1:
+                case 2:
+                    sa.Log.Debug($"一麻{posStr} 第一轮，先去{posStr}{towerPos}放塔，再回人群");
                     DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", sa);
-                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+                    // 十位数代表箭头，若为1则是原地，无需画面向
+                    DrawTowerPosDir(towerPos, 0, lashGnashCastTime, $"放塔1面向", sa, hasArrow);
                     DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
                     break;
-                }
-                case second:
-                {
-                    sa.Log.Debug($"二麻{posStr}第一轮，先回人群，再去{posStr}{towerPos}放塔");
+                case 3:
+                case 4:
+                    sa.Log.Debug($"二麻{posStr} 第一轮，先回人群，再去{posStr}{towerPos}放塔");
                     DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
                     const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
                     const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
                     DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", sa);
-                    DrawTowerPosDir(towerPos, pos, jump2DelayTime, jump2Destroy, $"放塔2面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+                    DrawTowerPosDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2面向", sa, hasArrow);
                     break;
-                }
-                case third:
-                {
-                    sa.Log.Debug($"三麻{posStr}第一轮，回人群");
+                case 5:
+                case 6:
+                case 7:
+                    sa.Log.Debug($"三麻{posStr} 第一轮，回人群");
                     DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
                     break;
-                }
+            }
+        }
+        else if (_dfg.ActionCount == 33)
+        {
+            switch (myDfgIdx)
+            {
+                case 0:
+                case 2:
+                    sa.Log.Debug($"一麻{posStr} 第二轮，引导后回人群");
+                    DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", sa);
+                    break;
+                case 1:
+                    sa.Log.Debug($"一麻{posStr} 第二轮，回人群");
+                    DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
+                    break;
+                case 3:
+                case 4:
+                    sa.Log.Debug($"二麻{posStr} 第二轮，回人群");
+                    DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
+                    break;
+                case 5:
+                case 6:
+                case 7:
+                    sa.Log.Debug($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群");
+                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", sa);
+                    DrawTowerPosDir(towerPos, 0, lashGnashCastTime, $"放塔3面向", sa, hasArrow);
+                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
+                    break;
             }
         }
         else
         {
-            switch (idx)
-            {
-                // 第二轮钢铁月环，一麻准备分摊
-                case first:
-                {
-                    // 分摊前需先引导，引导位置可以作个向外指的指引
-                    // 因为有先引导，回去分摊的延时和消失时间由时间节点计算
-                    if (pos != middle)
-                    {
-                        sa.Log.Debug($"一麻{posStr}第二轮，引导后回人群");
-                        DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", sa);
-                    }
-                    else
-                    {
-                        sa.Log.Debug($"一麻{posStr}第二轮，回人群");
-                        DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
-                    }
-                    break;
-                }
-                case second:
-                {
-                    sa.Log.Debug($"二麻{posStr}第二轮，回人群");
-                    DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
-                    break;
-                }
-                case third:
-                {
-                    sa.Log.Debug($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群");
-                    DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", sa);
-                    DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", sa, _diveFromGrace.LimitCutFixed[idx]);
-                    DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
-                    break;
-                }
-            }
+            sa.Log.Error($"P3_LimitCutAction 出错，_dfg.ActionCount = {_dfg.ActionCount}");
         }
     }
     
-    // [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
-    // public void P3_LimitCutAction(Event @event, ScriptAccessory sa)
-    // {
-    //     if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
-    //     _p3LimitCutStep++;
-    //
-    //     // var aid = @event.ActionId();
-    //     // const int chariotFirst = 26386;
-    //     // const int donutFirst = 26387;
-    //
-    //     var myId = sa.Data.Me;
-    //     var idx = _diveFromGrace.FindPlayerLimitCutIndex(myId);
-    //     var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
-    //     var towerPos = _diveFromGrace.GetTowerPosV3(idx, pos);
-    //     
-    //     const int first = 0;
-    //     const int second = 1;
-    //     const int third = 2;
-    //     
-    //     const int left = 0;
-    //     const int middle = 1;
-    //     const int right = 2;
-    //
-    //     var posStr = pos switch
-    //     {
-    //         left => "左",
-    //         middle => "中",
-    //         right => "右",
-    //         _ => "未知"
-    //     };
-    //
-    //     const int lashGnashCastTime = 7600;
-    //     const int inOutCastFirst = 3700;
-    //     const int inOutCastSecond = 3100;
-    //     const int towerExistTime = 6800;
-    //
-    //     if (_p3LimitCutStep == 1)
-    //     {
-    //         switch (idx)
-    //         {
-    //             case first:
-    //             {
-    //                 sa.Log.Debug($"一麻{posStr}第一轮，先去{posStr}{towerPos}放塔，再回人群");
-    //                 DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", sa);
-    //                 DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", sa, _diveFromGrace.LimitCutFixed[idx]);
-    //                 DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
-    //                 break;
-    //             }
-    //             case second:
-    //             {
-    //                 sa.Log.Debug($"二麻{posStr}第一轮，先回人群，再去{posStr}{towerPos}放塔");
-    //                 DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
-    //                 const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
-    //                 const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
-    //                 DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", sa);
-    //                 DrawTowerPosDir(towerPos, pos, jump2DelayTime, jump2Destroy, $"放塔2面向", sa, _diveFromGrace.LimitCutFixed[idx]);
-    //                 break;
-    //             }
-    //             case third:
-    //             {
-    //                 sa.Log.Debug($"三麻{posStr}第一轮，回人群");
-    //                 DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     else
-    //     {
-    //         switch (idx)
-    //         {
-    //             // 第二轮钢铁月环，一麻准备分摊
-    //             case first:
-    //             {
-    //                 // 分摊前需先引导，引导位置可以作个向外指的指引
-    //                 // 因为有先引导，回去分摊的延时和消失时间由时间节点计算
-    //                 if (pos != middle)
-    //                 {
-    //                     sa.Log.Debug($"一麻{posStr}第二轮，引导后回人群");
-    //                     DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", sa);
-    //                 }
-    //                 else
-    //                 {
-    //                     sa.Log.Debug($"一麻{posStr}第二轮，回人群");
-    //                     DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
-    //                 }
-    //                 break;
-    //             }
-    //             case second:
-    //             {
-    //                 sa.Log.Debug($"二麻{posStr}第二轮，回人群");
-    //                 DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
-    //                 break;
-    //             }
-    //             case third:
-    //             {
-    //                 sa.Log.Debug($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群");
-    //                 DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", sa);
-    //                 DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", sa, _diveFromGrace.LimitCutFixed[idx]);
-    //                 DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
-    
     [ScriptMethod(name: "麻将流程，踩塔", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
-    public void P3_TowerAfterPlaced(Event @event, ScriptAccessory accessory)
+    public void P3_TowerAfterPlaced(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
-        var tid = @event.TargetId();
-        var aid = @event.ActionId();
-        var sid = @event.SourceId();
-        // var towerPos = @event.SourcePosition();
-        var isMyTower = tid == _p3MyTowerPartner;
-        if (isMyTower)
+        // 此举动为放塔，若玩家组不按预站位处理，此时有机会对脚本进行调整
+        lock (_dfg)
         {
+            _dfg.AddActionCount();
+            var tid = ev.TargetId;
+            var aid = ev.ActionId;
+            var sid = ev.SourceId;
+            var myDfgIdx = _dfg.FindPriorityIndexOfKey(sa.GetMyIndex());
+            // 后面生成塔位置的sid已经不是原来的sid了，需要在这里找到他经偏置后的位置
+            var tpos = GetTowerAppearPos(sa, sid, aid);
+            _p3TowerAppearPos.Add(tpos);
+            
+            var towerRound = _dfg.ActionCount switch
+            {
+                21 => 0,
+                23 => 1,
+                36 => 2,
+                _ => -1
+            };
+            if (towerRound == -1)
+            {
+                sa.Log.Debug($"_dfg.ActionCount == {_dfg.ActionCount}，未到数值，退出");
+                return;
+            }
+            
+            var myPriority = _dfg.Priorities[sa.GetMyIndex()];
+            // 一/二/三麻玩家放完塔，刷新组内成员相对位置，以便更改后续逻辑
+            if (towerRound == myPriority / 100)
+                RefreshGroupPosPriority(sa, myPriority);
+            // TODO: 放完塔刷一次，踩完塔最好也刷一次
+            
+            // 根据三枚塔坐标左中右排序
+            _p3TowerAppearPos.Sort((pos1, pos2) => pos1.X.CompareTo(pos2.X));
+            
+            // 输入当前的轮次，以及我的优先级位次，画塔
+            DrawTowerRange(sa, towerRound, myDfgIdx, myPriority);
+            
+            // 清空塔
+            _p3TowerAppearPos = [];
         }
-
-        const int towerExistTime = 6800;
-        DrawTowerRange(sid, 0, towerExistTime, accessory, isMyTower, aid);
     }
     
     private DrawPropertiesEdit DrawTowerDir(Vector3 towerPos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
@@ -1024,24 +665,18 @@ public class DsrPatch
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         return dp;
     }
-    private DrawPropertiesEdit DrawTowerPosDir(Vector3 towerPos, int pos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
+    private DrawPropertiesEdit DrawTowerPosDir(Vector3 towerPos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
     {
         const int left = 0;
         const int middle = 1;
         const int right = 2;
 
-        var rotation = pos switch
-        {
-            left => -float.Pi / 2,
-            right => -float.Pi / 2,
-            _ => 0
-        };
-        var targetPos = towerPos.ExtendPoint(rotation, 3.1f);
+        var targetPos = towerPos.ExtendPoint(-90f.DegToRad(), 3.1f);
         var dp = accessory.DrawDirPos2Pos(towerPos, targetPos, delay, destroy, name);
         dp.Scale = new Vector2(3f);
         dp.Color = ColorHelper.ColorYellow.V4;
-        if (draw && pos != middle)
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        if (draw)
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
         return dp;
     }
     
@@ -1054,52 +689,65 @@ public class DsrPatch
         return dp;
     }
 
-    private DrawPropertiesEdit[] DrawTowerRange(uint sid, int delay, int destroy,
-        ScriptAccessory sa, bool isSafe, uint type, bool draw = true)
+    private void DrawTowerRange(ScriptAccessory sa, int towerRound, int myDfgIdx, int myPriority)
     {
-        const uint inPlace = 26382;
-        // const uint front = 26383;
-        // const uint behind = 26384;
-        const int towerCastingTime = 3000;
-        const int syncTime = 300;
+        // 计算持续时间
+        // towerExistTime - towerCastingTime
+        //     0, 6800 - 3000  => 3800
+        //     6800 - 3000 + 300, 3000     => 3300
+        //         => 7100
         
-        // 后面生成塔位置的sid已经不是原来的sid了，需要在这里找到他经偏置后的位置
-        var tpos = FindTowerAppearPos(sid, type, sa);
-        
-        sa.Log.Debug($"画出塔范围，{(isSafe ? "我的" : "不是我的")}塔");
-        var color = isSafe ? sa.Data.DefaultSafeColor.WithW(1.5f) : sa.Data.DefaultDangerColor;
-        var dp = sa.DrawCircle(sid, 5f, delay, destroy - towerCastingTime, $"踩塔{sid}");
-        dp.Color = color;
-        dp.Offset = type == inPlace ? new Vector3(0, 0, 0) : new Vector3(0, 0, -14);
-        var dp1 = sa.DrawStaticCircle(tpos, color, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔确定{sid}", 5f);
-        if (draw)
+        const int towerExistTime = 7100;
+
+        var myRound = myDfgIdx switch
         {
-            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
-            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+            // 玩家需踩第几轮塔
+            0 => 1,
+            2 => 1,
+            1 => 2,
+            3 => 2,
+            4 => 2,
+            5 => 0,
+            6 => 0,
+            7 => 0,
+            _ => -1
+        };
+        if (myRound == -1)
+        {
+            sa.Log.Error($"myDfgIdx = {myDfgIdx} 导致 myRound = {myRound}");
+            return;
         }
+        var isMyRound = myRound == towerRound;
+        var myTowerPos = GetDfgPosStr(myDfgIdx);
         
-        if (!isSafe) return [dp, dp1];
-        
-        sa.Log.Debug($"准备去踩塔");
-        var dp01 = sa.DrawDirPos(tpos, destroy - towerCastingTime + syncTime, towerCastingTime, $"踩塔指路确定{sid}");
-        if (draw)
+        for (int i = 0; i < _p3TowerAppearPos.Count; i++)
         {
+            // 当前是玩家放塔轮次，且该塔为玩家方位
+            var thisTowerPos = GetDfgPosStr(i, towerRound == 1);
+            var isMyTower = isMyRound && (thisTowerPos == myTowerPos);
+
+            var color = isMyTower ? sa.Data.DefaultSafeColor.WithW(1.5f) : sa.Data.DefaultDangerColor;
+            var dp1 = sa.DrawStaticCircle(_p3TowerAppearPos[i], color, 0, towerExistTime, $"塔{towerRound}{thisTowerPos}", 5f);
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+            
+            if (!isMyTower) continue;
+            sa.Log.Debug($"检测到玩家需踩第 {myRound} 轮的 {myTowerPos} 塔");
+            var dp01 = sa.DrawDirPos(_p3TowerAppearPos[i], 0, towerExistTime, $"塔{towerRound}{thisTowerPos}指路");
             sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp01);
         }
-        return [dp, dp1, dp01];
     }
     
-    private Vector3 FindTowerAppearPos(uint sid, uint type, ScriptAccessory accessory)
+    private Vector3 GetTowerAppearPos(ScriptAccessory sa, ulong sid, uint type)
     {
-        const uint inPlace = 26382;
+        // const uint inPlace = 26382;
         // const uint front = 26383;
         // const uint behind = 26384;
         
-        var chara = accessory.GetById(sid);
+        var chara = sa.GetById(sid);
         var srot = chara.Rotation;
         var spos = chara.Position;
         
-        if (type == inPlace) return spos;
+        if (type == 26382) return spos;
         var newPos = spos.ExtendPoint(srot.Game2Logic(), 14);
         return newPos;
     }
