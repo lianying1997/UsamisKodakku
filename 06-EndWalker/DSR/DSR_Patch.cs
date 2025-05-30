@@ -408,20 +408,20 @@ public class DsrPatch
     public void P3_LimitCutPosRecord(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
-        var stid = ev.StatusId;
-        var tid = ev.TargetId;
-        var tidx = sa.GetPlayerIdIndex(tid);
-        
-        var dirVal = stid switch
-        {
-            2576 => 20, // 上箭头，上B
-            2757 => 0, // 下箭头，下D
-            2755 => 10, // 原地，中
-            _ => 10
-        };
-        
         lock (_dfg)
         {
+            var stid = ev.StatusId;
+            var tid = ev.TargetId;
+            var tidx = sa.GetPlayerIdIndex(tid);
+        
+            var dirVal = stid switch
+            {
+                2756 => 20, // 上箭头，上B
+                2757 => 0, // 下箭头，下D
+                2755 => 10, // 原地，中
+                _ => 10
+            };
+            
             _dfg.AddPriority(tidx, dirVal);
             _dfg.AddActionCount();
             sa.Log.Debug($"玩家 {sa.GetPlayerJobByIndex(tidx)} 为 {dirVal switch
@@ -503,14 +503,8 @@ public class DsrPatch
             _ => "未知"
         };
 
-        if (isSecondRound)
-        {
-            str = myDfgIdx switch
-            {
-                0 => "左",
-                1 => "右",
-            };
-        }
+        if (isSecondRound && myDfgIdx is 0 or 1)
+            str = myDfgIdx == 1 ? "右" : "左";
         return str;
     }
     
@@ -612,7 +606,7 @@ public class DsrPatch
         }
     }
     
-    [ScriptMethod(name: "麻将流程，踩塔", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
+    [ScriptMethod(name: "麻将流程，踩塔指路", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
     public void P3_TowerAfterPlaced(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
@@ -645,7 +639,6 @@ public class DsrPatch
             // 一/二/三麻玩家放完塔，刷新组内成员相对位置，以便更改后续逻辑
             if (towerRound == myPriority / 100)
                 RefreshGroupPosPriority(sa, myPriority);
-            // TODO: 放完塔刷一次，踩完塔最好也刷一次
             
             // 根据三枚塔坐标左中右排序
             _p3TowerAppearPos.Sort((pos1, pos2) => pos1.X.CompareTo(pos2.X));
@@ -656,6 +649,13 @@ public class DsrPatch
             // 清空塔
             _p3TowerAppearPos = [];
         }
+    }
+    
+    [ScriptMethod(name: "麻将流程，踩塔后计算", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(26385)$", "TargetIndex:1"], userControl: Debugging)]
+    public void P3_TowerAfterStand(Event ev, ScriptAccessory sa)
+    {
+        // TODO: 放完塔刷一次，踩完塔最好也刷一次
+        // RefreshGroupPosPriority(sa, myPriority);
     }
     
     private DrawPropertiesEdit DrawTowerDir(Vector3 towerPos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
@@ -2050,6 +2050,7 @@ public class DsrPatch
         {
             sa = accessory;
             Priorities = new Dictionary<int, int>();
+            ActionCount = 0;
             for (var i = 0; i < partyNum; i++)
             {
                 Priorities.Add(i, 0);

@@ -119,12 +119,12 @@
   {
     "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
     "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-    "Version": "0.0.0.12",
+    "Version": "0.0.0.13",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
-    "Note": "基于K佬绝龙诗绘图的个人向补充，\r\n请先按需求检查并设置“用户设置”栏目。\r\n开启Debug模式，在忆罪宫输入\"/e =TST\"可以测试地火特殊跑法。\r\n鸭门。",
-    "UpdateInfo": "适配新版鸭鸭(4.0.0.0)做了代码修正。",
+    "Note": "基于K佬绝龙诗绘图的个人向补充，\r\n请先按需求检查并设置“用户设置”栏目。\r\n在忆罪宫输入\"/e =Exaflare\"可以测试地火特殊跑法。\r\n鸭门。",
+    "UpdateInfo": "重写了P3踩塔逻辑，现在面对预站位错误或临时改变主意的情况有了一定修正能力。\n移除了DebugMode的开关。",
     "TerritoryIds": [
       968,
       1112
