@@ -101,6 +101,7 @@ public class DsrPatch
         Phase7Enrage,           // P7 狂暴
     }
     
+    private static List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static Vector3 _center = new Vector3(100, 0, 100);
     private DsrPhase _dsrPhase = DsrPhase.Init;
     private List<bool> _drawn = new bool[20].ToList();                  // 绘图记录
@@ -109,6 +110,7 @@ public class DsrPatch
     private List<bool> _p2SafeDirection = new bool[8].ToList();         // P2 一运冲锋安全位置
     private Vector3 _p2ThordanPos = new Vector3(0, 0, 0);               // P2 一运托尔丹位置
     private List<uint> _p2TetherKnightId = [0, 0];                      // P2 一运接线骑士ID，顺序左、右
+    private static PriorityDict _dfg = new PriorityDict();              // P3 机制记录（新）
     private DiveFromGrace _diveFromGrace = new DiveFromGrace();         // P3 机制记录
     private int _p3LimitCutStep = 0;                                    // P3 麻将机制流程
     private uint _p3MyTowerPartner = 0;                                 // P3 我要踩的放塔搭档
@@ -368,10 +370,15 @@ public class DsrPatch
     {
     }
     
-    [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26376"], userControl:false)]
-    public void P3_PhaseRecord(Event @event, ScriptAccessory sa)
+    [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26376"], userControl: Debugging)]
+    public void P3_PhaseRecord(Event @ev, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase3Nidhogg;
+        // 百位：一麻+0，二麻+100，三麻+100
+        // 十位：下箭头+0，中+10，下箭头+20
+        // 个位：左中右站位分别+0, +1, +2
+        // 如此安排，个位可随时变，十位改变后，个位无力干涉
+        _dfg.Init(sa, "堕天龙炎冲");
         _diveFromGrace = new DiveFromGrace();
         _diveFromGrace.accessory = sa;
         _p3LimitCutStep = 0;
@@ -669,54 +676,117 @@ public class DsrPatch
     }
     
     [ScriptMethod(name: "P3：麻将记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
-    public void P3_LimitCutRecord(Event @event, ScriptAccessory accessory)
+    public void P3_LimitCutRecord(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
-        var stid = @event.StatusId();
-        var tid = @event.TargetId();
-
-        // const uint limitCut1 = 3004;
-        // const uint limitCut2 = 3005;
-        // const uint limitCut3 = 3006;
-        _diveFromGrace.LimitCutAdd(tid, (int)stid - 3004);
+        var stid = ev.StatusId;
+        var tid = ev.TargetId;
+        var tidx = sa.GetPlayerIdIndex(tid);
+        
+        var lmVal = stid switch
+        {
+            3004 => 0,      // 一麻
+            3005 => 100,    // 二麻
+            3006 => 200,    // 三麻
+            _ => 0
+        };
+        lock (_dfg)
+        {
+            // 前三位一麻，中二位二麻，后三位三麻
+            _dfg.AddPriority(tidx, lmVal);
+            sa.Log.Debug($"玩家 {sa.GetPlayerJobByIndex(tidx)} 为 {lmVal/100+1} 麻。");
+        }
     }
     
     [ScriptMethod(name: "P3：箭头记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(275[567])$"], userControl: false)]
-    public void P3_LimitCutPosRecord(Event @event, ScriptAccessory sa)
+    public void P3_LimitCutPosRecord(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
-        var stid = @event.StatusId();
-        var tid = @event.TargetId();
+        var stid = ev.StatusId;
+        var tid = ev.TargetId;
+        var tidx = sa.GetPlayerIdIndex(tid);
         
-        const uint front = 2756;
-        const uint behind = 2757;
-        // const uint inPlace = 2755;
-
-        const int left = 0;
-        // const int middle = 1;
-        const int right = 2;
-
-        lock (_diveFromGrace)
+        var dirVal = stid switch
         {
-            switch (stid)
+            2576 => 20, // 上箭头，上B
+            2757 => 0, // 下箭头，下D
+            2755 => 10, // 原地，中
+            _ => 10
+        };
+        
+        lock (_dfg)
+        {
+            _dfg.AddPriority(tidx, dirVal);
+            _dfg.AddActionCount();
+            sa.Log.Debug($"玩家 {sa.GetPlayerJobByIndex(tidx)} 为 {dirVal switch
             {
-                case front:
-                    _diveFromGrace.LimitCutPosAdd(tid, right);
-                    _diveFromGrace.LimitCutFixedSet(tid);
-                    break;
-                case behind:
-                    _diveFromGrace.LimitCutPosAdd(tid, left);
-                    _diveFromGrace.LimitCutFixedSet(tid);
-                    break; 
-            }
-            _diveFromGrace.RecordedPlayerNum++;
+                0 => "下箭头",
+                10 => "原地",
+                _ => "上箭头"
+            }}。");
+            
+            if (_dfg.ActionCount != 8) return;
+            
+            // 获得自身数值，并依据方位更新
+            var myPriority = _dfg.Priorities[sa.GetMyIndex()];
+            RefreshGroupPosPriority(sa, myPriority);
+            sa.Log.Debug($"玩家在 {_dfg.Annotation} 机制的数值为：{myPriority}");
+        }
+    }
+    
+    private List<KeyValuePair<int, ulong>> RefreshGroupPosPriority(ScriptAccessory sa, int myPriority)
+    {
+        // 获得同组玩家Id
+        var myGroupVal = (myPriority / 100) switch
+        {
+            // 此处取值含义为
+            // 十位：从第几个开始取
+            // 个位：取几个玩家
+            0 => 3,
+            1 => 32,
+            2 => 53,
+            _ => 0
+        };
+        
+        if (myGroupVal == 0)
+        {
+            sa.Log.Error($"GetDfgGroupPlayers 中 myGroupVal == 0");
+            return [];
         }
         
-        if (!_diveFromGrace.AllPlayerRecorded()) return;
-        sa.Log.Debug($"LimitCutFixed:{_diveFromGrace.LimitCutFixed.StringList()}");
-        _diveFromGrace.SetRemainingPlayers();
-        _p3MyTowerPartner = _diveFromGrace.FindTowerPartner(sa.Data.Me);
-        sa.Log.Debug($"我需要踩他的塔：{_diveFromGrace.ShowPlayerAction(_p3MyTowerPartner)}");
+        var myGroupDict = _dfg.SelectMiddlePriorityIndices(myGroupVal / 10, myGroupVal % 10);
+        List<KeyValuePair<int, ulong>> myGroupPlayerIds = [];
+        for (int i = 0; i < myGroupVal % 10; i++)
+        {
+            var pidx = myGroupDict[i].Key;
+            var eid = sa.Data.PartyList[pidx];
+            var prior = myGroupDict[i].Value;
+            myGroupPlayerIds.Add(new KeyValuePair<int, ulong>(pidx, eid));
+            sa.Log.Debug($"与我同组的玩家有{sa.GetPlayerJobByIndex(pidx)}，其优先级数值为{prior}, EntityId为{eid}");
+        }
+        
+        // 根据同组左右位置排序
+        var sortedGroupPlayerIds = myGroupPlayerIds
+            .OrderBy(v => sa.GetById(v.Value).Position.X)
+            .ToList();
+
+        // 根据排序为优先级字典添加值
+        for (int i = 0; i < sortedGroupPlayerIds.Count; i++)
+        {
+            var pidx = sortedGroupPlayerIds[i].Key;
+            // 删除个位
+            _dfg.Priorities[pidx] = _dfg.Priorities[pidx] / 10 * 10;
+            _dfg.AddPriority(pidx, i);
+            
+            sa.Log.Debug($"检测到{sa.GetPlayerJobByIndex(pidx)}在{i switch
+            {
+                0 => "左",
+                1 => "中",
+                _ => "右"
+            }}，更新其优先级值为{_dfg.Priorities[pidx]}");
+        }
+        
+        return sortedGroupPlayerIds;
     }
     
     [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
@@ -730,7 +800,8 @@ public class DsrPatch
         // const int donutFirst = 26387;
 
         var myId = sa.Data.Me;
-        var idx = _diveFromGrace.FindPlayerLimitCutIndex(myId);
+        var idx = _dfg.Priorities[sa.GetMyIndex()] / 100;       // 百位代表麻将序号
+        var pos = _dfg.Priorities[sa.GetMyIndex()] % 100;       // 十位与个位合并代表相对位置
         var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
         var towerPos = _diveFromGrace.GetTowerPosV3(idx, pos);
         
@@ -823,6 +894,111 @@ public class DsrPatch
             }
         }
     }
+    
+    // [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
+    // public void P3_LimitCutAction(Event @event, ScriptAccessory sa)
+    // {
+    //     if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+    //     _p3LimitCutStep++;
+    //
+    //     // var aid = @event.ActionId();
+    //     // const int chariotFirst = 26386;
+    //     // const int donutFirst = 26387;
+    //
+    //     var myId = sa.Data.Me;
+    //     var idx = _diveFromGrace.FindPlayerLimitCutIndex(myId);
+    //     var pos = _diveFromGrace.FindPlayerLimitCutPos(myId);
+    //     var towerPos = _diveFromGrace.GetTowerPosV3(idx, pos);
+    //     
+    //     const int first = 0;
+    //     const int second = 1;
+    //     const int third = 2;
+    //     
+    //     const int left = 0;
+    //     const int middle = 1;
+    //     const int right = 2;
+    //
+    //     var posStr = pos switch
+    //     {
+    //         left => "左",
+    //         middle => "中",
+    //         right => "右",
+    //         _ => "未知"
+    //     };
+    //
+    //     const int lashGnashCastTime = 7600;
+    //     const int inOutCastFirst = 3700;
+    //     const int inOutCastSecond = 3100;
+    //     const int towerExistTime = 6800;
+    //
+    //     if (_p3LimitCutStep == 1)
+    //     {
+    //         switch (idx)
+    //         {
+    //             case first:
+    //             {
+    //                 sa.Log.Debug($"一麻{posStr}第一轮，先去{posStr}{towerPos}放塔，再回人群");
+    //                 DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔1", sa);
+    //                 DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔1面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+    //                 DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
+    //                 break;
+    //             }
+    //             case second:
+    //             {
+    //                 sa.Log.Debug($"二麻{posStr}第一轮，先回人群，再去{posStr}{towerPos}放塔");
+    //                 DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
+    //                 const int jump2DelayTime = lashGnashCastTime + inOutCastFirst + inOutCastSecond;
+    //                 const int jump2Destroy = 17700 - jump2DelayTime;  // 17700 从下方时间节点处取
+    //                 DrawTowerDir(towerPos, jump2DelayTime, jump2Destroy, $"放塔2", sa);
+    //                 DrawTowerPosDir(towerPos, pos, jump2DelayTime, jump2Destroy, $"放塔2面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+    //                 break;
+    //             }
+    //             case third:
+    //             {
+    //                 sa.Log.Debug($"三麻{posStr}第一轮，回人群");
+    //                 DrawBackToGroup(0, lashGnashCastTime, $"人群", sa);
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     else
+    //     {
+    //         switch (idx)
+    //         {
+    //             // 第二轮钢铁月环，一麻准备分摊
+    //             case first:
+    //             {
+    //                 // 分摊前需先引导，引导位置可以作个向外指的指引
+    //                 // 因为有先引导，回去分摊的延时和消失时间由时间节点计算
+    //                 if (pos != middle)
+    //                 {
+    //                     sa.Log.Debug($"一麻{posStr}第二轮，引导后回人群");
+    //                     DrawBackToGroup(26900 - 21500, 28900 - 26900, $"分摊", sa);
+    //                 }
+    //                 else
+    //                 {
+    //                     sa.Log.Debug($"一麻{posStr}第二轮，回人群");
+    //                     DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
+    //                 }
+    //                 break;
+    //             }
+    //             case second:
+    //             {
+    //                 sa.Log.Debug($"二麻{posStr}第二轮，回人群");
+    //                 DrawBackToGroup(0, lashGnashCastTime, $"分摊", sa);
+    //                 break;
+    //             }
+    //             case third:
+    //             {
+    //                 sa.Log.Debug($"三麻{posStr}第二轮，先去{posStr}{towerPos}放塔，再回人群");
+    //                 DrawTowerDir(towerPos, 0, lashGnashCastTime, $"放塔", sa);
+    //                 DrawTowerPosDir(towerPos, pos, 0, lashGnashCastTime, $"放塔3面向", sa, _diveFromGrace.LimitCutFixed[idx]);
+    //                 DrawBackToGroup(lashGnashCastTime, towerExistTime, $"人群", sa);
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
     
     [ScriptMethod(name: "麻将流程，踩塔", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
     public void P3_TowerAfterPlaced(Event @event, ScriptAccessory accessory)
@@ -2213,7 +2389,166 @@ public class DsrPatch
     }
 
     #endregion P7 接刀
+    public class PriorityDict
+    {
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public ScriptAccessory sa {get; set;} = null!;
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public Dictionary<int, int> Priorities {get; set;} = null!;
+        public string Annotation { get; set; } = "";
+        public int ActionCount { get; set; } = 0;
+        
+        public void Init(ScriptAccessory accessory, string annotation, int partyNum = 8)
+        {
+            sa = accessory;
+            Priorities = new Dictionary<int, int>();
+            for (var i = 0; i < partyNum; i++)
+            {
+                Priorities.Add(i, 0);
+            }
+            Annotation = annotation;
+        }
 
+        /// <summary>
+        /// 为特定Key增加优先级
+        /// </summary>
+        /// <param name="idx">key</param>
+        /// <param name="priority">优先级数值</param>
+        public void AddPriority(int idx, int priority)
+        {
+            Priorities[idx] += priority;
+        }
+        
+        /// <summary>
+        /// 从Priorities中找到前num个数值最小的，得到新的Dict返回
+        /// </summary>
+        /// <param name="num"></param>
+        /// <returns></returns>
+        public List<KeyValuePair<int, int>> SelectSmallPriorityIndices(int num)
+        {
+            return SelectMiddlePriorityIndices(0, num);
+        }
+
+        /// <summary>
+        /// 从Priorities中找到前num个数值最大的，得到新的Dict返回
+        /// </summary>
+        /// <param name="num"></param>
+        /// <returns></returns>
+        public List<KeyValuePair<int, int>> SelectLargePriorityIndices(int num)
+        {
+            return SelectMiddlePriorityIndices(0, num, true);
+        }
+        
+        /// <summary>
+        /// 从Priorities中找到升序排列中间的数值，得到新的Dict返回
+        /// </summary>
+        /// <param name="skip">跳过skip个元素。若从第二个开始取，skip=1</param>
+        /// <param name="num"></param>
+        /// <param name="descending">降序排列，默认为false</param>
+        /// <returns></returns>
+        public List<KeyValuePair<int, int>> SelectMiddlePriorityIndices(int skip, int num, bool descending = false)
+        {
+            if (Priorities.Count < skip + num)
+                return new List<KeyValuePair<int, int>>();
+
+            IEnumerable<KeyValuePair<int, int>> sortedPriorities;
+            if (descending)
+            {
+                // 根据值从大到小降序排序，并取前num个键
+                sortedPriorities = Priorities
+                    .OrderByDescending(pair => pair.Value) // 先根据值排列
+                    .ThenBy(pair => pair.Key) // 再根据键排列
+                    .Skip(skip) // 跳过前skip个元素
+                    .Take(num); // 取前num个键值对
+            }
+            else
+            {
+                // 根据值从小到大升序排序，并取前num个键
+                sortedPriorities = Priorities
+                    .OrderBy(pair => pair.Value) // 先根据值排列
+                    .ThenBy(pair => pair.Key) // 再根据键排列
+                    .Skip(skip) // 跳过前skip个元素
+                    .Take(num); // 取前num个键值对
+            }
+            
+            return sortedPriorities.ToList();
+        }
+        
+        /// <summary>
+        /// 从Priorities中找到升序排列第idx位的数据，得到新的Dict返回
+        /// </summary>
+        /// <param name="idx"></param>
+        /// <param name="descending">降序排列，默认为false</param>
+        /// <returns></returns>
+        public KeyValuePair<int, int> SelectSpecificPriorityIndex(int idx, bool descending = false)
+        {
+            var sortedPriorities = SelectMiddlePriorityIndices(0, 8, descending);
+            return sortedPriorities[idx];
+        }
+
+        /// <summary>
+        /// 从Priorities中找到对应key的数据，得到其Value排序后位置返回
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="descending">降序排列，默认为false</param>
+        /// <returns></returns>
+        public int FindPriorityIndexOfKey(int key, bool descending = false)
+        {
+            var sortedPriorities = SelectMiddlePriorityIndices(0, 8, descending);
+            var i = 0;
+            foreach (var dict in sortedPriorities)
+            {
+                if (dict.Key == key) return i;
+                i++;
+            }
+
+            return i;
+        }
+        
+        /// <summary>
+        /// 一次性增加优先级数值
+        /// 通常适用于特殊优先级（如H-T-D-H）
+        /// </summary>
+        /// <param name="priorities"></param>
+        public void AddPriorities(List<int> priorities)
+        {
+            if (Priorities.Count != priorities.Count)
+                throw new ArgumentException("输入的列表与内部设置长度不同");
+
+            for (var i = 0; i < Priorities.Count; i++)
+                AddPriority(i, priorities[i]);
+        }
+
+        /// <summary>
+        /// 输出优先级字典的Key与优先级
+        /// </summary>
+        /// <returns></returns>
+        public string ShowPriorities(bool showJob = true)
+        {
+            var str = $"{Annotation} ({ActionCount}-th) 优先级字典：\n";
+            if (Priorities.Count == 0)
+            {
+                str += $"PriorityDict Empty.\n";
+                return str;
+            }
+            foreach (var pair in Priorities)
+            {
+                str += $"Key {pair.Key} {(showJob ? $"({_role[pair.Key]})" : "")}, Value {pair.Value}\n";
+            }
+
+            return str;
+        }
+
+        public PriorityDict DeepCopy()
+        {
+            return JsonConvert.DeserializeObject<PriorityDict>(JsonConvert.SerializeObject(this)) ?? new PriorityDict();
+        }
+
+        public void AddActionCount(int count = 1)
+        {
+            ActionCount += count;
+        }
+    }
 }
 
 #region Class 地火
@@ -2714,9 +3049,9 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IGameObject? GetById(this ScriptAccessory sa, uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong id)
     {
-        return sa.Data.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchById(id);
     }
 }
 
@@ -2925,10 +3260,10 @@ public static class IndexHelper
     /// <param name="pid">玩家SourceId</param>
     /// <param name="accessory"></param>
     /// <returns>该玩家对应的位置index</returns>
-    public static int GetPlayerIdIndex(this ScriptAccessory accessory, uint pid)
+    public static int GetPlayerIdIndex(this ScriptAccessory accessory, ulong pid)
     {
         // 获得玩家 IDX
-        return accessory.Data.PartyList.IndexOf(pid);
+        return accessory.Data.PartyList.IndexOf((uint)pid);
     }
 
     /// <summary>
