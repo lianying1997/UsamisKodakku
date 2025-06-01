@@ -110,6 +110,7 @@ public class DsrPatch
     private List<bool> _p2SafeDirection = new bool[8].ToList();         // P2 一运冲锋安全位置
     private Vector3 _p2ThordanPos = new Vector3(0, 0, 0);               // P2 一运托尔丹位置
     private List<uint> _p2TetherKnightId = [0, 0];                      // P2 一运接线骑士ID，顺序左、右
+    private bool _p3DfgEnable = false;                                  // P3 指路使能
     private static PriorityDict _dfg = new PriorityDict();              // P3 机制记录
     private List<Vector3> _p3TowerAppearPos = [];                       // P3 塔生成位置
     private int _p4MirageDiveNum = 0;                                   // P4 幻象冲次数
@@ -368,10 +369,12 @@ public class DsrPatch
     {
     }
     
-    [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26376"], userControl: Debugging)]
-    public void P3_PhaseRecord(Event @ev, ScriptAccessory sa)
+    [ScriptMethod(name: "P3：阶段记录", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:26376"], userControl: Debugging)]
+    public void P3_PhaseRecord(Event ev, ScriptAccessory sa)
     {
         _dsrPhase = DsrPhase.Phase3Nidhogg;
+        _p3DfgEnable = false;
         // 百位：一麻+0，二麻+100，三麻+100
         // 十位：下箭头+0，中+10，下箭头+20
         // 个位：左中右站位分别+0, +1, +2
@@ -381,10 +384,12 @@ public class DsrPatch
         sa.Log.Debug($"当前阶段为：{_dsrPhase}");
     }
 
-    [ScriptMethod(name: "P3：麻将记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(300[456])$"], userControl: false)]
+    [ScriptMethod(name: "堕天龙炎冲流程指路", eventType: EventTypeEnum.StatusAdd,
+        eventCondition:["StatusID:regex:^(300[456])$"], userControl: true)]
     public void P3_LimitCutRecord(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        _p3DfgEnable = true;
         var stid = ev.StatusId;
         var tid = ev.TargetId;
         var tidx = sa.GetPlayerIdIndex(tid);
@@ -404,10 +409,12 @@ public class DsrPatch
         }
     }
     
-    [ScriptMethod(name: "P3：箭头记录", eventType: EventTypeEnum.StatusAdd, eventCondition:["StatusID:regex:^(275[567])$"], userControl: false)]
+    [ScriptMethod(name: "箭头记录", eventType: EventTypeEnum.StatusAdd,
+        eventCondition:["StatusID:regex:^(275[567])$"], userControl: Debugging)]
     public void P3_LimitCutPosRecord(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        if (!_p3DfgEnable) return;
         lock (_dfg)
         {
             var stid = ev.StatusId;
@@ -525,10 +532,12 @@ public class DsrPatch
         return towerPos;
     }
     
-    [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting, eventCondition:["ActionId:regex:^(2638[67])$"])]
+    [ScriptMethod(name: "麻将流程，放塔与分摊", eventType: EventTypeEnum.StartCasting,
+        eventCondition:["ActionId:regex:^(2638[67])$"], userControl: Debugging)]
     public void P3_LimitCutAction(Event @event, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
+        if (!_p3DfgEnable) return;
         _dfg.AddActionCount(10);
         // 仅需获得排序，便可知麻将流程
         var myPriority = _dfg.Priorities[sa.GetMyIndex()];
@@ -606,11 +615,13 @@ public class DsrPatch
         }
     }
     
-    [ScriptMethod(name: "麻将流程，踩塔指路", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"])]
+    [ScriptMethod(name: "麻将流程，踩塔指路", eventType: EventTypeEnum.ActionEffect, 
+        eventCondition:["ActionId:regex:^(2638[234])$", "TargetIndex:1"], userControl: Debugging)]
     public void P3_TowerAfterPlaced(Event ev, ScriptAccessory sa)
     {
         if (_dsrPhase != DsrPhase.Phase3Nidhogg) return;
         // 此举动为放塔，若玩家组不按预站位处理，此时有机会对脚本进行调整
+        if (!_p3DfgEnable) return;
         lock (_dfg)
         {
             _dfg.AddActionCount();
@@ -649,13 +660,6 @@ public class DsrPatch
             // 清空塔
             _p3TowerAppearPos = [];
         }
-    }
-    
-    [ScriptMethod(name: "麻将流程，踩塔后计算", eventType: EventTypeEnum.ActionEffect, eventCondition:["ActionId:regex:^(26385)$", "TargetIndex:1"], userControl: Debugging)]
-    public void P3_TowerAfterStand(Event ev, ScriptAccessory sa)
-    {
-        // TODO: 放完塔刷一次，踩完塔最好也刷一次
-        // RefreshGroupPosPriority(sa, myPriority);
     }
     
     private DrawPropertiesEdit DrawTowerDir(Vector3 towerPos, int delay, int destroy, string name, ScriptAccessory accessory, bool draw = true)
