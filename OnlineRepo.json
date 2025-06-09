@@ -183,5 +183,18 @@
     "TerritoryIds": [
       1238
     ]
+  },
+  {
+    "Name": "M6S [零式阿卡狄亚 中量级2]",
+    "Guid": "4f5decb5-4a78-4e83-96c8-09678761a751",
+    "Version": "0.0.0.1",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "",
+    "Note": "v0.0.0.1\r\n初版，Game8攻略。",
+    "UpdateInfo": "",
+    "TerritoryIds": [
+      1259
+    ]
   }
 ]
