@@ -75,6 +75,7 @@ public class M6S
     }
     
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
+    private static readonly Vector3 CenterRiver = new Vector3(100, 0, 96);
     private M6SPhase _M6sPhase = M6SPhase.Init;
     private static readonly Random Random = new();
     private volatile List<bool> _bools = new bool[20].ToList();
@@ -208,7 +209,7 @@ public class M6S
     public void P1A_PhaseChange(Event ev, ScriptAccessory sa)
     {
         // WingMark 42614
-        if (_M6sPhase != M6SPhase.Init) return;
+        if (_M6sPhase != M6SPhase.Init & _M6sPhase != M6SPhase.P4D_FlyLava) return;
         _M6sPhase = M6SPhase.P1A_DoubleStyle;
         sa.Log.Debug($"当前阶段为：{_M6sPhase}");
     }
@@ -374,7 +375,6 @@ public class M6S
 
         List<Vector3> points = GlobalStrat switch
         {
-            // TODO CN MT需标定
             StgEnum.CnServer =>
             [
                 // 左上就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
@@ -382,10 +382,10 @@ public class M6S
                 // 右下就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
                 new(87.5f, 0, 105.5f), new(101.5f, 0, 101.5f), 
                 // 左上就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
-                new(96.5f, 0, 83), new(110.5f, 0, 96.5f), new(84.8f, 0, 112.7f), new(108.3f, 0, 112.6f),
+                new(94.45f, 0, 97.62f), new(110.5f, 0, 96.5f), new(84.8f, 0, 112.7f), new(108.3f, 0, 112.6f),
                 new(83f, 0, 96.5f), new(96.5f, 0, 110.5f), new(83f, 0, 83f), new(110.5f, 0, 83f),
                 // 右下就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
-                new(103f, 0, 91.5f), new(117f, 0, 103.5f), new(89.5f, 0, 117f), new(116.8f, 0, 116.8f),
+                new(105.5f, 0, 105.5f), new(117f, 0, 103.5f), new(89.5f, 0, 117f), new(116.8f, 0, 116.8f),
                 new(90.5f, 0, 103.65f), new(103f, 0, 117f), new(89.5f, 0, 89.5f), new(117f, 0, 90f),
             ],
             _ =>
@@ -681,7 +681,7 @@ public class M6S
                 (>= 79 and < 89) => 0,
                 >= 89 => 1
             };
-            Rotation = TowerPos.FindRadian(Center);
+            Rotation = TowerPos.FindRadian(CenterRiver);
         }
     }
     
