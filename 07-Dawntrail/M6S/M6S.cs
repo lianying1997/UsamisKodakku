@@ -36,14 +36,15 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.1
-    初版，Game8攻略。
+    v0.0.0.2
+    初版，默认Game8攻略。
+    CNServer攻略请于用户设置中调整。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
-    private const string UpdateInfo = "";
+    private const string UpdateInfo = "预分配了CNServer的攻略。";
 
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -51,9 +52,9 @@ public class M6S
 
     private List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
 
-    // [UserSetting("整体策略")]
-    // public static DsStgEnum GlobalStrat { get; set; } = DsStgEnum.Game8_Default;
-    public enum DsStgEnum
+    [UserSetting("整体策略")]
+    public static StgEnum GlobalStrat { get; set; } = StgEnum.Game8_Default;
+    public enum StgEnum
     {
         Game8_Default,
         CnServer,
@@ -361,20 +362,38 @@ public class M6S
         var isStack = aid == 42631;
         sa.Log.Debug($"Boss读条：{(isStack ? "火分摊": "雷分散")}");
         _events[0].WaitOne();
-        
-        List<Vector3> points =
-        [
-            // 左上就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
-            new(98.5f, 0, 98.5f), new(85f, 0, 108f),
-            // 右下就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
-            new(101.5f, 0, 101.5f), new(87.5f, 0, 105.5f),
-            // 左上就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
-            new(96.5f, 0, 83), new(96.5f, 0, 110.5f), new(83f, 0, 96.5f), new(110.5f, 0, 96.5f),
-            new(84.8f, 0, 112.7f), new(108.3f, 0, 112.6f), new(83f, 0, 83f), new(110.5f, 0, 83f),
-            // 右下就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
-            new(103f, 0, 91.5f), new(103f, 0, 117f), new(90.5f, 0, 103.65f), new(117f, 0, 103.5f),
-            new(89.5f, 0, 117f), new(116.8f, 0, 116.8f), new(89.5f, 0, 89.5f), new(117f, 0, 90f),
-        ];
+
+        List<Vector3> points = GlobalStrat switch
+        {
+            // TODO CN MT需标定
+            StgEnum.CnServer =>
+            [
+                // 左上就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
+                new(85f, 0, 108f), new(98.5f, 0, 98.5f), 
+                // 右下就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
+                new(87.5f, 0, 105.5f), new(101.5f, 0, 101.5f), 
+                // 左上就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
+                new(96.5f, 0, 83), new(110.5f, 0, 96.5f), new(84.8f, 0, 112.7f), new(108.3f, 0, 112.6f),
+                new(83f, 0, 96.5f), new(96.5f, 0, 110.5f), new(83f, 0, 83f), new(110.5f, 0, 83f),
+                // 右下就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
+                new(103f, 0, 91.5f), new(117f, 0, 103.5f), new(89.5f, 0, 117f), new(116.8f, 0, 116.8f),
+                new(90.5f, 0, 103.65f), new(103f, 0, 117f), new(89.5f, 0, 89.5f), new(117f, 0, 90f),
+            ],
+            _ =>
+            [
+                // 左上就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
+                new(98.5f, 0, 98.5f), new(85f, 0, 108f),
+                // 右下就位：MT/H1/D1/D2分摊，ST/H2/D3/D4分摊
+                new(101.5f, 0, 101.5f), new(87.5f, 0, 105.5f),
+                // 左上就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
+                new(96.5f, 0, 83), new(96.5f, 0, 110.5f), new(83f, 0, 96.5f), new(110.5f, 0, 96.5f),
+                new(84.8f, 0, 112.7f), new(108.3f, 0, 112.6f), new(83f, 0, 83f), new(110.5f, 0, 83f),
+                // 右下就位：MT/ST/H1/H2/D1/D2/D3/D4分散,
+                new(103f, 0, 91.5f), new(103f, 0, 117f), new(90.5f, 0, 103.65f), new(117f, 0, 103.5f),
+                new(89.5f, 0, 117f), new(116.8f, 0, 116.8f), new(89.5f, 0, 89.5f), new(117f, 0, 90f),
+            ],
+        };
+
         var myIndex = sa.GetMyIndex();
         var isMtGroup = myIndex is 0 or 2 or 4 or 5;
         // 0 2 4 5, 1 3 6 7
@@ -520,12 +539,19 @@ public class M6S
     public void P4C_StandPoint(Event ev, ScriptAccessory sa)
     {
         // MT, ST, H1, H2, D1, D2, D3, D4
-        // TODO: 国服H1D3在右上岛，H2D4在左上岛，此处为Game8
-        List<Vector3> standPoint =
-        [
-            IslandPos[1], IslandPos[1], IslandPos[2], IslandPos[0],
-            IslandPos[1], IslandPos[1], IslandPos[2], IslandPos[0]
-        ];
+        // 国服H1D3在右上岛，H2D4在左上岛
+        List<Vector3> standPoint = GlobalStrat switch
+        {
+            StgEnum.CnServer => [
+                IslandPos[1], IslandPos[1], IslandPos[0], IslandPos[2],
+                IslandPos[1], IslandPos[1], IslandPos[0], IslandPos[2]
+            ],
+             _ => [
+                IslandPos[1], IslandPos[1], IslandPos[2], IslandPos[0],
+                IslandPos[1], IslandPos[1], IslandPos[2], IslandPos[0]
+            ],
+        };
+
         var dp = sa.DrawGuidance(standPoint[sa.GetMyIndex()], 0, 6000, $"岩浆就位");
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
@@ -688,10 +714,10 @@ public class M6S
         _towers.SetTowerPlayer([95], 1);  // 固定值，右上塔，ST
         _towers.SetTowerPlayer([94], 4);  // 固定值，左下塔，D1
         _towers.SetTowerPlayer([93], 0);  // 固定值，左上塔，MT
-        _towers.SetTowerPlayer([69, 72, 74, 76, 78], 2);    // 左上塔，场基左，H1
-        _towers.SetTowerPlayer([70, 71, 73, 75, 77], 6);    // 左上塔，场基右，D3
-        _towers.SetTowerPlayer([79, 81, 83, 85, 87], 3);    // 右上塔，场基左，H2
-        _towers.SetTowerPlayer([80, 82, 84, 86, 88], 7);    // 右上塔，场基右，D4
+        _towers.SetTowerPlayer([69, 72, 74, 76, 78], GlobalStrat == StgEnum.CnServer ? 7 : 2);    // 左上塔，场基左，Game8 H1, 国服D4
+        _towers.SetTowerPlayer([70, 71, 73, 75, 77], GlobalStrat == StgEnum.CnServer ? 3 : 6);    // 左上塔，场基右，Game8 D3, 国服H2
+        _towers.SetTowerPlayer([79, 81, 83, 85, 87], GlobalStrat == StgEnum.CnServer ? 2 : 3);    // 右上塔，场基左，Game8 H2, 国服H1
+        _towers.SetTowerPlayer([80, 82, 84, 86, 88], GlobalStrat == StgEnum.CnServer ? 6 : 7);    // 右上塔，场基右，Game8 D4, 国服D3
 
         var myTower = _towers.GetTowerByPlayerIdx(sa.GetMyIndex());
         var dp0 = sa.DrawStaticCircle(myTower.TowerPos, sa.Data.DefaultDangerColor.WithW(1.5f), 0, 8000, $"待踩塔范围", 3f);
@@ -728,20 +754,28 @@ public class M6S
         // Game8策略
         // 初始优先级列表，个位数为身份，十位数为顺时针顺序，H1-D3-H2-D4-D2-ST-MT-D1
         // 岛屿序号后续会根据百位数决定
-        List<int> priorityList = [60, 51, 2, 23, 74, 45, 16, 37];
+        
+        // 国服策略
+        // H左R右，无法分清则H中R远；T近M远（？？？）
+        // 顺时针顺序：D3-H1, D4-H2, D2-ST-MT-D1
+        List<int> priorityList = GlobalStrat switch
+        {
+            StgEnum.CnServer => [60, 51, 12, 33, 74, 45, 6, 27],
+            _ => [60, 51, 2, 23, 74, 45, 16, 37],
+        };
         
         // 判断是否为南八塔
         var mostTowerInfo = _towers.FindMostTowerIslandIdx();
         if (mostTowerInfo is { MaxTowerNum: 8, MaxIslandIdx: 1 })
         {
-            _towers.SetTowerPlayer([89], 6);
-            _towers.SetTowerPlayer([90], 2);
-            _towers.SetTowerPlayer([91], 0);
-            _towers.SetTowerPlayer([92], 5);
-            _towers.SetTowerPlayer([93], 3);
-            _towers.SetTowerPlayer([94], 4);
-            _towers.SetTowerPlayer([95], 7);
-            _towers.SetTowerPlayer([96], 1);
+            _towers.SetTowerPlayer([89], GlobalStrat == StgEnum.CnServer ? 0 : 6);  // 正上，国服MT，G8 D3
+            _towers.SetTowerPlayer([90], GlobalStrat == StgEnum.CnServer ? 6 : 2);  // 外左，国服D3，G8 H1
+            _towers.SetTowerPlayer([91], GlobalStrat == StgEnum.CnServer ? 1 : 0);  // 正下，国服ST，G8 MT
+            _towers.SetTowerPlayer([92], GlobalStrat == StgEnum.CnServer ? 7 : 5);  // 外右，国服D4，G8 D2
+            _towers.SetTowerPlayer([93], GlobalStrat == StgEnum.CnServer ? 2 : 3);  // 左上，国服H1，G8 H2
+            _towers.SetTowerPlayer([94], GlobalStrat == StgEnum.CnServer ? 4 : 4);  // 左下，国服D1，G8 D1
+            _towers.SetTowerPlayer([95], GlobalStrat == StgEnum.CnServer ? 3 : 7);  // 右上，国服H2，G8 D4
+            _towers.SetTowerPlayer([96], GlobalStrat == StgEnum.CnServer ? 5 : 1);  // 右下，国服D2，G8 ST
         }
         else
         {
@@ -750,10 +784,10 @@ public class M6S
             if (maxIslandIdx == 0)
             {
                 // 右上4人塔，集体逆时针
-                priorityList[2] += 100;     // H1去下
-                priorityList[6] += 100;     // D3去下
-                priorityList[3] += 200;     // H2去左上
-                priorityList[7] += 200;     // D4去左上
+                priorityList[GlobalStrat == StgEnum.CnServer ? 3 : 2] += 100;     // 国服H2 Game8 H1去下
+                priorityList[GlobalStrat == StgEnum.CnServer ? 7 : 6] += 100;     // 国服D4 Game8 D3去下
+                priorityList[GlobalStrat == StgEnum.CnServer ? 2 : 3] += 200;     // 国服H1 Game8 H2去左上
+                priorityList[GlobalStrat == StgEnum.CnServer ? 6 : 7] += 200;     // 国服D3 Game8 D4去左上
             }
             else
             {
@@ -762,8 +796,8 @@ public class M6S
                 priorityList[1] += 200;     // ST去左上
                 priorityList[4] += 200;     // D1去左上
                 priorityList[5] += 200;     // D2去左上
-                priorityList[3] += 100;     // H2去下
-                priorityList[7] += 100;     // D4去下
+                priorityList[GlobalStrat == StgEnum.CnServer ? 2 : 3] += 100;     // 国服H1 Game8 H2去下
+                priorityList[GlobalStrat == StgEnum.CnServer ? 6 : 7] += 100;     // 国服D3 Game8 D4去下
             }
             // 流程正义
             priorityList.Sort((a, b) => a.CompareTo(b));
