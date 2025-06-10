@@ -34,7 +34,7 @@ using System.Security.AccessControl;
 namespace UsamisScript.StormBlood.Ucob;
 
 [ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d",
-    version: "0.0.2.0", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
+    version: "0.0.2.1", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class Ucob
 {
     // TODO
@@ -50,8 +50,7 @@ public class Ucob
     
     private const string UpdateInfo =
         """
-        1. @Meva佬更新了P2小龙俯冲的匠心指路。因为答案不唯一，建议搭配俯冲范围显示一并食用。
-        2. 俯冲范围增加了箭头，可较为明显地指引俯冲方向。
+        1. 尝试修复连击大地摇动引导方向有概率不出现的问题。
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -1753,61 +1752,64 @@ public class Ucob
         if (!ParseObjectId(@event["TargetId"], out var tid)) return;
         TenStrikeEarthShakerNum++;
 
-        Task.Delay(100).ContinueWith(t =>
+        lock (this)
         {
-            if (DebugMode)
-                accessory.Method.SendChat($"/e 检测到TenStrikeEarthShakerNum：{TenStrikeEarthShakerNum}");
-
-            if (TenStrikeEarthShakerNum != 4) return;
-
-            if (tid == accessory.Data.Me)
-                isEarthShakerFirstRound = true;
-
-            Vector3 safePosition = new(0, 0, -24);
-            Vector3 safePosition1 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 80);
-            Vector3 safePosition2 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 80);
-            Vector3 safePosition3 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 140);
-            Vector3 safePosition4 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 140);
-
-            Vector3 safePosition5 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 40);
-            Vector3 safePosition6 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 40);
-            Vector3 safePosition7 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 100);
-            Vector3 safePosition8 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 100);
-
-            var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = "连击安全区标记";
-            dp.Scale = new(1.5f);
-            dp.ScaleMode = ScaleMode.YByDistance;
-            dp.Color = posColorNormal.V4.WithW(3);
-            dp.Position = new(0, 0, 0);
-            dp.DestoryAt = 5000;
-
-            if (isEarthShakerFirstRound)
+            Task.Delay(100).ContinueWith(t =>
             {
-                dp.Delay = 0;
-                dp.TargetPosition = safePosition1;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-                dp.TargetPosition = safePosition2;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-                dp.TargetPosition = safePosition3;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-                dp.TargetPosition = safePosition4;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-            }
+                if (DebugMode)
+                    accessory.Method.SendChat($"/e 检测到TenStrikeEarthShakerNum：{TenStrikeEarthShakerNum}");
 
-            else
-            {
-                dp.Delay = 5000;
-                dp.TargetPosition = safePosition5;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-                dp.TargetPosition = safePosition6;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-                dp.TargetPosition = safePosition7;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-                dp.TargetPosition = safePosition8;
-                accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
-            }
-        });
+                if (TenStrikeEarthShakerNum != 4) return;
+
+                if (tid == accessory.Data.Me)
+                    isEarthShakerFirstRound = true;
+
+                Vector3 safePosition = new(0, 0, -24);
+                Vector3 safePosition1 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 80);
+                Vector3 safePosition2 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 80);
+                Vector3 safePosition3 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 140);
+                Vector3 safePosition4 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 140);
+
+                Vector3 safePosition5 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 40);
+                Vector3 safePosition6 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 40);
+                Vector3 safePosition7 = RotatePoint(safePosition, new(0, 0, 0), float.Pi / 180 * 100);
+                Vector3 safePosition8 = RotatePoint(safePosition, new(0, 0, 0), -float.Pi / 180 * 100);
+
+                var dp = accessory.Data.GetDefaultDrawProperties();
+                dp.Name = "连击安全区标记";
+                dp.Scale = new(1.5f);
+                dp.ScaleMode = ScaleMode.YByDistance;
+                dp.Color = posColorNormal.V4.WithW(3);
+                dp.Position = new(0, 0, 0);
+                dp.DestoryAt = 5000;
+
+                if (isEarthShakerFirstRound)
+                {
+                    dp.Delay = 0;
+                    dp.TargetPosition = safePosition1;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                    dp.TargetPosition = safePosition2;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                    dp.TargetPosition = safePosition3;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                    dp.TargetPosition = safePosition4;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                }
+
+                else
+                {
+                    dp.Delay = 5000;
+                    dp.TargetPosition = safePosition5;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                    dp.TargetPosition = safePosition6;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                    dp.TargetPosition = safePosition7;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                    dp.TargetPosition = safePosition8;
+                    accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp);
+                }
+            });
+        }
     }
 
     #endregion

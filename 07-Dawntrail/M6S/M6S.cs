@@ -44,7 +44,7 @@ public class M6S
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
     private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
-    private const string UpdateInfo = "预分配了CNServer的攻略。";
+    private const string UpdateInfo = $"预分配了CNServer的攻略。\n修复雷云指路一个小Bug。";
 
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -164,6 +164,15 @@ public class M6S
     public void Debug_CloudPosAndRotation(Event ev, ScriptAccessory sa)
     {
         GetCloudInfo(sa);
+    }
+    
+    [ScriptMethod(name: "测试项 计算角度与面向", eventType: EventTypeEnum.NpcYell, 
+        eventCondition: ["HelloayaWorld:asdf"], userControl: Debugging)]
+    public void Debug_CalcDir(Event ev, ScriptAccessory sa)
+    {
+        var rad = 96f.DegToRad();
+        var cloudRotDir = rad.Rad2Dirs(6, false);
+        sa.Log.Debug($"{cloudRotDir}");
     }
     
     [ScriptMethod(name: "测试项 塔范围", eventType: EventTypeEnum.NpcYell, 
@@ -449,16 +458,17 @@ public class M6S
         var cloudPos = cloudChara.Position;
         var cloudDir = cloudPos.Position2Dirs(Center, 3, false);
         var cloudRotation = cloudChara.Rotation;
-        sa.Log.Debug($"检测到雷云位置：{cloudPos}，面向角度：{cloudRotation.RadToDeg()}, 逻辑基：{cloudRotation.Game2Logic().RadToDeg()},位于方位{cloudDir}");
+        
         var dp = sa.DrawGuidance((ulong)cloudChara.EntityId, (ulong)0, 0, 4000, $"面向");
         dp.Scale = new Vector2(1, 4);
         dp.ScaleMode = ScaleMode.None;
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
 
-        var cloudRotDir = cloudRotation.Game2Logic().Rad2Dirs(6);
+        var cloudRotDir = cloudRotation.Game2Logic().Rad2Dirs(6, false);
+        sa.Log.Debug($"检测到雷云位置：{cloudPos}，面向角度：{cloudRotation.RadToDeg()}, 逻辑基：{cloudRotation.Game2Logic().RadToDeg()}, 位于方位{cloudDir}, 面向分割{cloudRotDir}");
         
         // 检测是否为刚出生，无旋转角度
-        if (cloudRotDir is 2 or 3)
+        if (cloudRotDir is 3)
             cloudRotDir = Math.Abs(cloudRotation.Game2Logic().RadToDeg() - 180) < 1 ? -1 : cloudRotDir;
         
         return new CloudInfo(cloudPos, cloudRotation.RadToDeg(), cloudDir, cloudRotDir);
