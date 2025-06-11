@@ -204,13 +204,20 @@ public class M6S
     {
     }
 
-    [ScriptMethod(name: "P1 - 双绘图 阶段转换", eventType: EventTypeEnum.StartCasting, 
+    [ScriptMethod(name: "WingMark引起的阶段转换", eventType: EventTypeEnum.StartCasting, 
         eventCondition: ["ActionId:42614"], userControl: Debugging)]
     public void P1A_PhaseChange(Event ev, ScriptAccessory sa)
     {
-        // WingMark 42614
-        if (_M6sPhase != M6SPhase.Init & _M6sPhase != M6SPhase.P4D_FlyLava) return;
-        _M6sPhase = M6SPhase.P1A_DoubleStyle;
+        if (_M6sPhase == M6SPhase.P4C_Lava)
+        {
+            _M6sPhase = M6SPhase.P4D_FlyLava;
+            _towers.RefreshParam(sa, true);
+        }
+        else
+        {
+            if (_M6sPhase != M6SPhase.Init & _M6sPhase != M6SPhase.P4D_FlyLava) return;
+            _M6sPhase = M6SPhase.P1A_DoubleStyle;
+        }
         sa.Log.Debug($"当前阶段为：{_M6sPhase}");
     }
     
@@ -743,15 +750,7 @@ public class M6S
     
     #endregion P4C 岩浆
     
-    [ScriptMethod(name: "P4D - 岩浆飞行 阶段转换", eventType: EventTypeEnum.StartCasting, 
-        eventCondition: ["ActionId:42614"], userControl: Debugging)]
-    public void P4D_PhaseChange(Event ev, ScriptAccessory sa)
-    {
-        if (_M6sPhase != M6SPhase.P4C_Lava) return;
-        _M6sPhase = M6SPhase.P4D_FlyLava;
-        _towers.RefreshParam(sa, true);
-        sa.Log.Debug($"当前阶段为：{_M6sPhase}");
-    }
+
 
     [ScriptMethod(name: "P4D - 飞行方向、目标塔", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:42614"], userControl: true)]
