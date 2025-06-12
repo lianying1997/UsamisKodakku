@@ -36,17 +36,17 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.2
+    v0.0.0.3
     初版，默认Game8攻略。
     CNServer攻略请于用户设置中调整。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
-    private const string UpdateInfo = $"预分配了CNServer的攻略。\n修复雷云指路一个小Bug。";
+    private const string UpdateInfo = $"添加Sticky Mousse分摊目标指路";
 
-    private const bool Debugging = false;
+    private const bool Debugging = true;
     private static readonly bool LocalTest = false;
     private static readonly bool LocalStrTest = false;     // 本地不标点，仅用字符串表示。
 
@@ -222,8 +222,8 @@ public class M6S
         sa.Log.Debug($"当前阶段为：{_M6sPhase}");
     }
     
-    [ScriptMethod(name: "---- P1A 粘性炸弹初始化 ----", eventType: EventTypeEnum.NpcYell, 
-        eventCondition: ["HelloayaWorld:asdf"], userControl: Debugging)]
+    [ScriptMethod(name: "---- P1A 粘性炸弹初始化 ----", eventType: EventTypeEnum.StartCasting, 
+        eventCondition: ["ActionId:42645"], userControl: Debugging)]
     public void StickyMousseInit(Event ev, ScriptAccessory sa)
     {
         // Init Param at StartCasting 42645
@@ -232,12 +232,13 @@ public class M6S
         sa.Log.Debug($"检测到Sticky Mousse，优先级初始化");
     }
     
-    [ScriptMethod(name: "---- P1A 粘性炸弹 ----", eventType: EventTypeEnum.NpcYell, 
-        eventCondition: ["HelloayaWorld:asdf"], userControl: true)]
+    [ScriptMethod(name: "---- P1A 粘性炸弹 ----", eventType: EventTypeEnum.ActionEffect, 
+        eventCondition: ["ActionId:42646", "TargetIndex:1"], userControl: true)]
     public void StickyMousseTarget(Event ev, ScriptAccessory sa)
     {
         // ActionEffect 42646, Index 1
         var tidx = sa.GetPlayerIdIndex(ev.TargetId);
+        int targetIdx = -1;
         lock (_pd)
         {
             _pd.AddActionCount();
@@ -245,8 +246,32 @@ public class M6S
             if (_pd.ActionCount != 2) return;
 
             var myIndex = sa.GetMyIndex();
-            
+            // 玩家是分摊目标，不执行后续
+            if (_pd.Priorities[myIndex] > 1000) return;
+
+            for (int i = 0; i < 2; i++)
+            {
+                // 计算距离
+                var tKey = _pd.SelectSpecificPriorityIndex(i, true).Key;
+                var distance = 3 - Math.Abs(Math.Abs(tKey - myIndex) - 3);
+                _pd.AddPriority(tKey, distance * 100);
+
+                // 计算顺逆
+                var cwIdx = (tKey - myIndex + 6) % 6;
+                _pd.AddPriority(tKey, cwIdx * 10);
+                sa.Log.Debug($"玩家{sa.GetPlayerJobByIndex(myIndex)}与{sa.GetPlayerJobByIndex(tKey)}的距离为{distance}，顺时针顺位为{cwIdx}，对方优先值为{_pd.Priorities[tKey]}");
+                
+                // 似乎仍有优化空间，因为个位数没有使用，但是int数足够大，无所谓了
+            }
+
+            // MT与人群找两个目标中较小的（降序idx1），ST找较大的（降序idx0）
+            targetIdx = _pd.SelectSpecificPriorityIndex(myIndex == 1 ? 0 : 1, true).Key;
+            sa.Log.Debug(
+                $"据决策，玩家{sa.GetPlayerJobByIndex(myIndex)}的分摊对象为{sa.GetPlayerJobByIndex(targetIdx)}({_pd.Priorities[targetIdx]})");
         }
+
+        var dp = sa.DrawGuidance(sa.Data.PartyList[targetIdx], 0, 4000, $"粘性炸弹目标");
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
     
     #endregion P1 开场
