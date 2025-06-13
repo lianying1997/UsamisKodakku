@@ -71,7 +71,7 @@ public class TopPatch
     
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
-    [UserSetting("指挥模式")]
+    // [UserSetting("指挥模式")]
     public static bool CaptainMode { get; set; } = true;
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor PosColorNormal { get; set; } = new() { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
