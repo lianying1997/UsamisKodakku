@@ -228,11 +228,14 @@ public class M6S
     {
         // Init Param at StartCasting 42645
         _pd.Init(sa, "StickyMousse");
-        _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);
+        _pd.AddPriorities([0, 1, 6, 3, 5, 4, 7, 2]);
+        //    D3 7  D4 2
+        // H1 6       H2 3
+        //    D1 5  D2 4
         sa.Log.Debug($"检测到Sticky Mousse，优先级初始化");
     }
     
-    [ScriptMethod(name: "---- P1A 粘性炸弹 ----", eventType: EventTypeEnum.ActionEffect, 
+    [ScriptMethod(name: "P1A 粘性炸弹", eventType: EventTypeEnum.ActionEffect, 
         eventCondition: ["ActionId:42646", "TargetIndex:1"], userControl: true)]
     public void StickyMousseTarget(Event ev, ScriptAccessory sa)
     {
@@ -251,26 +254,32 @@ public class M6S
 
             for (int i = 0; i < 2; i++)
             {
-                // 计算距离
                 var tKey = _pd.SelectSpecificPriorityIndex(i, true).Key;
-                var distance = 3 - Math.Abs(Math.Abs(tKey - myIndex) - 3);
-                _pd.AddPriority(tKey, distance * 100);
-
+                var tVal = _pd.Priorities[tKey].GetDecimalDigit(1);
+                var myVal = _pd.Priorities[myIndex];
+                var distance = 0;
+                // 计算距离
+                if (myIndex != 0 & myIndex != 1)
+                {
+                    distance = 3 - Math.Abs(Math.Abs(tVal - myVal) - 3);
+                    _pd.AddPriority(tKey, distance * 100);
+                }
+                
                 // 计算顺逆
-                var cwIdx = (tKey - myIndex + 6) % 6;
+                var cwIdx = (tVal - myVal + 6) % 6;
                 _pd.AddPriority(tKey, cwIdx * 10);
                 sa.Log.Debug($"玩家{sa.GetPlayerJobByIndex(myIndex)}与{sa.GetPlayerJobByIndex(tKey)}的距离为{distance}，顺时针顺位为{cwIdx}，对方优先值为{_pd.Priorities[tKey]}");
                 
                 // 似乎仍有优化空间，因为个位数没有使用，但是int数足够大，无所谓了
             }
 
-            // MT与人群找两个目标中较小的（降序idx1），ST找较大的（降序idx0）
-            targetIdx = _pd.SelectSpecificPriorityIndex(myIndex == 1 ? 0 : 1, true).Key;
+            // MT找两个目标中较大的（降序idx0），ST与人群找较小的（降序idx1）
+            targetIdx = _pd.SelectSpecificPriorityIndex(myIndex == 0 ? 0 : 1, true).Key;
             sa.Log.Debug(
                 $"据决策，玩家{sa.GetPlayerJobByIndex(myIndex)}的分摊对象为{sa.GetPlayerJobByIndex(targetIdx)}({_pd.Priorities[targetIdx]})");
         }
 
-        var dp = sa.DrawGuidance(sa.Data.PartyList[targetIdx], 0, 4000, $"粘性炸弹目标");
+        var dp = sa.DrawGuidance((ulong)sa.Data.PartyList[targetIdx], 0, 4000, $"粘性炸弹目标");
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
     
@@ -1225,6 +1234,26 @@ public static class DirectionCalc
         if (radian < 0)
             radian += 2 * MathF.PI;
         return radian;
+    }
+    
+    /// <summary>
+    /// 获取给定数的指定位数
+    /// </summary>
+    /// <param name="val">给定数值</param>
+    /// <param name="x">对应位数，个位为1</param>
+    /// <returns></returns>
+    public static int GetDecimalDigit(this int val, int x)
+    {
+        string valStr = val.ToString();
+        int length = valStr.Length;
+
+        if (x < 1 || x > length)
+        {
+            return -1;
+        }
+
+        char digitChar = valStr[length - x]; // 从右往左取第x位
+        return int.Parse(digitChar.ToString());
     }
 
 }
