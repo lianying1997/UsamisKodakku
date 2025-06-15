@@ -36,21 +36,21 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.2
+    v0.0.0.3
     初版，默认Game8攻略。
     CNServer攻略请于用户设置中调整。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
-    private const string UpdateInfo = $"预分配了CNServer的攻略。\n修复雷云指路一个小Bug。";
+    private const string UpdateInfo = $"添加Sticky Mousse分摊目标指路";
 
-    private const bool Debugging = false;
+    private const bool Debugging = true;
     private static readonly bool LocalTest = false;
     private static readonly bool LocalStrTest = false;     // 本地不标点，仅用字符串表示。
 
-    private List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
+    private static List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
 
     [UserSetting("整体策略")]
     public static StgEnum GlobalStrat { get; set; } = StgEnum.Game8_Default;
@@ -109,6 +109,7 @@ public class M6S
     ];
     
     private static Towers _towers = new();
+    private static PriorityDict _pd = new();
     
     public void Init(ScriptAccessory sa)
     {
@@ -219,6 +220,67 @@ public class M6S
             _M6sPhase = M6SPhase.P1A_DoubleStyle;
         }
         sa.Log.Debug($"当前阶段为：{_M6sPhase}");
+    }
+    
+    [ScriptMethod(name: "---- P1A 粘性炸弹初始化 ----", eventType: EventTypeEnum.StartCasting, 
+        eventCondition: ["ActionId:42645"], userControl: Debugging)]
+    public void StickyMousseInit(Event ev, ScriptAccessory sa)
+    {
+        // Init Param at StartCasting 42645
+        _pd.Init(sa, "StickyMousse");
+        _pd.AddPriorities([0, 1, 6, 3, 5, 4, 7, 2]);
+        //    D3 7  D4 2
+        // H1 6       H2 3
+        //    D1 5  D2 4
+        sa.Log.Debug($"检测到Sticky Mousse，优先级初始化");
+    }
+    
+    [ScriptMethod(name: "P1A 粘性炸弹", eventType: EventTypeEnum.ActionEffect, 
+        eventCondition: ["ActionId:42646", "TargetIndex:1"], userControl: true)]
+    public void StickyMousseTarget(Event ev, ScriptAccessory sa)
+    {
+        // ActionEffect 42646, Index 1
+        var tidx = sa.GetPlayerIdIndex(ev.TargetId);
+        int targetIdx = -1;
+        lock (_pd)
+        {
+            _pd.AddActionCount();
+            _pd.AddPriority(tidx, 1000);
+            if (_pd.ActionCount != 2) return;
+
+            var myIndex = sa.GetMyIndex();
+            // 玩家是分摊目标，不执行后续
+            if (_pd.Priorities[myIndex] > 1000) return;
+
+            for (int i = 0; i < 2; i++)
+            {
+                var tKey = _pd.SelectSpecificPriorityIndex(i, true).Key;
+                var tVal = _pd.Priorities[tKey].GetDecimalDigit(1);
+                var myVal = _pd.Priorities[myIndex];
+                var distance = 0;
+                // 计算距离
+                if (myIndex != 0 & myIndex != 1)
+                {
+                    distance = 3 - Math.Abs(Math.Abs(tVal - myVal) - 3);
+                    _pd.AddPriority(tKey, distance * 100);
+                }
+                
+                // 计算顺逆
+                var cwIdx = (tVal - myVal + 6) % 6;
+                _pd.AddPriority(tKey, cwIdx * 10);
+                sa.Log.Debug($"玩家{sa.GetPlayerJobByIndex(myIndex)}与{sa.GetPlayerJobByIndex(tKey)}的距离为{distance}，顺时针顺位为{cwIdx}，对方优先值为{_pd.Priorities[tKey]}");
+                
+                // 似乎仍有优化空间，因为个位数没有使用，但是int数足够大，无所谓了
+            }
+
+            // MT找两个目标中较大的（降序idx0），ST与人群找较小的（降序idx1）
+            targetIdx = _pd.SelectSpecificPriorityIndex(myIndex == 0 ? 0 : 1, true).Key;
+            sa.Log.Debug(
+                $"据决策，玩家{sa.GetPlayerJobByIndex(myIndex)}的分摊对象为{sa.GetPlayerJobByIndex(targetIdx)}({_pd.Priorities[targetIdx]})");
+        }
+
+        var dp = sa.DrawGuidance((ulong)sa.Data.PartyList[targetIdx], 0, 4000, $"粘性炸弹目标");
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
     
     #endregion P1 开场
@@ -843,6 +905,171 @@ public class M6S
         sa.Method.TextInfo(str, 6000, true);
     }
     #endregion P4 山川
+    
+        public class PriorityDict
+    {
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public ScriptAccessory sa {get; set;} = null!;
+        // ReSharper disable once NullableWarningSuppressionIsUsed
+        public Dictionary<int, int> Priorities {get; set;} = null!;
+        public string Annotation { get; set; } = "";
+        public int ActionCount { get; set; } = 0;
+        
+        public void Init(ScriptAccessory accessory, string annotation, int partyNum = 8, bool refreshActionCount = true)
+        {
+            sa = accessory;
+            Priorities = new Dictionary<int, int>();
+            for (var i = 0; i < partyNum; i++)
+            {
+                Priorities.Add(i, 0);
+            }
+            Annotation = annotation;
+            if (refreshActionCount)
+                ActionCount = 0;
+        }
+
+        /// <summary>
+        /// 为特定Key增加优先级
+        /// </summary>
+        /// <param name="idx">key</param>
+        /// <param name="priority">优先级数值</param>
+        public void AddPriority(int idx, int priority)
+        {
+            Priorities[idx] += priority;
+        }
+        
+        /// <summary>
+        /// 从Priorities中找到前num个数值最小的，得到新的Dict返回
+        /// </summary>
+        /// <param name="num"></param>
+        /// <returns></returns>
+        public List<KeyValuePair<int, int>> SelectSmallPriorityIndices(int num)
+        {
+            return SelectMiddlePriorityIndices(0, num);
+        }
+
+        /// <summary>
+        /// 从Priorities中找到前num个数值最大的，得到新的Dict返回
+        /// </summary>
+        /// <param name="num"></param>
+        /// <returns></returns>
+        public List<KeyValuePair<int, int>> SelectLargePriorityIndices(int num)
+        {
+            return SelectMiddlePriorityIndices(0, num, true);
+        }
+        
+        /// <summary>
+        /// 从Priorities中找到升序排列中间的数值，得到新的Dict返回
+        /// </summary>
+        /// <param name="skip">跳过skip个元素。若从第二个开始取，skip=1</param>
+        /// <param name="num"></param>
+        /// <param name="descending">降序排列，默认为false</param>
+        /// <returns></returns>
+        public List<KeyValuePair<int, int>> SelectMiddlePriorityIndices(int skip, int num, bool descending = false)
+        {
+            if (Priorities.Count < skip + num)
+                return new List<KeyValuePair<int, int>>();
+
+            IEnumerable<KeyValuePair<int, int>> sortedPriorities;
+            if (descending)
+            {
+                // 根据值从大到小降序排序，并取前num个键
+                sortedPriorities = Priorities
+                    .OrderByDescending(pair => pair.Value) // 先根据值排列
+                    .ThenBy(pair => pair.Key) // 再根据键排列
+                    .Skip(skip) // 跳过前skip个元素
+                    .Take(num); // 取前num个键值对
+            }
+            else
+            {
+                // 根据值从小到大升序排序，并取前num个键
+                sortedPriorities = Priorities
+                    .OrderBy(pair => pair.Value) // 先根据值排列
+                    .ThenBy(pair => pair.Key) // 再根据键排列
+                    .Skip(skip) // 跳过前skip个元素
+                    .Take(num); // 取前num个键值对
+            }
+            
+            return sortedPriorities.ToList();
+        }
+        
+        /// <summary>
+        /// 从Priorities中找到升序排列第idx位的数据，得到新的Dict返回
+        /// </summary>
+        /// <param name="idx"></param>
+        /// <param name="descending">降序排列，默认为false</param>
+        /// <returns></returns>
+        public KeyValuePair<int, int> SelectSpecificPriorityIndex(int idx, bool descending = false)
+        {
+            var sortedPriorities = SelectMiddlePriorityIndices(0, Priorities.Count, descending);
+            return sortedPriorities[idx];
+        }
+
+        /// <summary>
+        /// 从Priorities中找到对应key的数据，得到其Value排序后位置返回
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="descending">降序排列，默认为false</param>
+        /// <returns></returns>
+        public int FindPriorityIndexOfKey(int key, bool descending = false)
+        {
+            var sortedPriorities = SelectMiddlePriorityIndices(0, Priorities.Count, descending);
+            var i = 0;
+            foreach (var dict in sortedPriorities)
+            {
+                if (dict.Key == key) return i;
+                i++;
+            }
+
+            return i;
+        }
+        
+        /// <summary>
+        /// 一次性增加优先级数值
+        /// 通常适用于特殊优先级（如H-T-D-H）
+        /// </summary>
+        /// <param name="priorities"></param>
+        public void AddPriorities(List<int> priorities)
+        {
+            if (Priorities.Count != priorities.Count)
+                throw new ArgumentException("输入的列表与内部设置长度不同");
+
+            for (var i = 0; i < Priorities.Count; i++)
+                AddPriority(i, priorities[i]);
+        }
+
+        /// <summary>
+        /// 输出优先级字典的Key与优先级
+        /// </summary>
+        /// <returns></returns>
+        public string ShowPriorities(bool showJob = true)
+        {
+            var str = $"{Annotation} ({ActionCount}-th) 优先级字典：\n";
+            if (Priorities.Count == 0)
+            {
+                str += $"PriorityDict Empty.\n";
+                return str;
+            }
+            foreach (var pair in Priorities)
+            {
+                str += $"Key {pair.Key} {(showJob ? $"({_role[pair.Key]})" : "")}, Value {pair.Value}\n";
+            }
+
+            return str;
+        }
+
+        public PriorityDict DeepCopy()
+        {
+            return JsonConvert.DeserializeObject<PriorityDict>(JsonConvert.SerializeObject(this)) ?? new PriorityDict();
+        }
+
+        public void AddActionCount(int count = 1)
+        {
+            ActionCount += count;
+        }
+
+    }
+    
 }
 
 #region 函数集
@@ -1008,6 +1235,26 @@ public static class DirectionCalc
             radian += 2 * MathF.PI;
         return radian;
     }
+    
+    /// <summary>
+    /// 获取给定数的指定位数
+    /// </summary>
+    /// <param name="val">给定数值</param>
+    /// <param name="x">对应位数，个位为1</param>
+    /// <returns></returns>
+    public static int GetDecimalDigit(this int val, int x)
+    {
+        string valStr = val.ToString();
+        int length = valStr.Length;
+
+        if (x < 1 || x > length)
+        {
+            return -1;
+        }
+
+        char digitChar = valStr[length - x]; // 从右往左取第x位
+        return int.Parse(digitChar.ToString());
+    }
 
 }
 #endregion 计算函数
@@ -1023,6 +1270,18 @@ public static class IndexHelper
     public static int GetMyIndex(this ScriptAccessory accessory)
     {
         return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+    }
+    
+    /// <summary>
+    /// 输入玩家dataId，获得对应的位置index
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置index</returns>
+    public static int GetPlayerIdIndex(this ScriptAccessory accessory, ulong pid)
+    {
+        // 获得玩家 IDX
+        return accessory.Data.PartyList.IndexOf((uint)pid);
     }
 
     /// <summary>
