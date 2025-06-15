@@ -187,12 +187,12 @@
   {
     "Name": "M6S [零式阿卡狄亚 中量级2]",
     "Guid": "4f5decb5-4a78-4e83-96c8-09678761a751",
-    "Version": "0.0.0.2",
+    "Version": "0.0.0.3",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/M6S/M6S.cs",
-    "Note": "v0.0.0.2\r\n初版，默认Game8攻略。\r\nCNServer攻略请于用户设置中调整。",
-    "UpdateInfo": "预分配了CNServer的攻略。\n修复雷云指路一个小Bug。",
+    "Note": "v0.0.0.3\r\n初版，默认Game8攻略。\r\nCNServer攻略请于用户设置中调整。",
+    "UpdateInfo": "添加Sticky Mousse分摊目标指路",
     "TerritoryIds": [
       1259
     ]
