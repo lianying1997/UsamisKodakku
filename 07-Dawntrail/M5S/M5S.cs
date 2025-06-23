@@ -22,9 +22,10 @@ using KodakkuAssist.Data;
 using KodakkuAssist.Extensions;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
+// 1257
 namespace KodakkuScript
 {
-	[ScriptType(name: "至天の座アルカディア零式クルーザー級1", territorys: [1257], guid: "783C797E-52BB-41ED-98CD-A2315533036F", version: "0.0.0.5", note: noteStr, author: "UMP")]
+	[ScriptType(name: "至天の座アルカディア零式クルーザー級1", territorys: [], guid: "783C797E-52BB-41ED-98CD-A2315533036F", version: "0.0.0.5", note: noteStr, author: "UMP")]
 
 	internal class M5S
 	{
@@ -94,9 +95,7 @@ namespace KodakkuScript
 			List<string> role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
 			sa.Method.TextInfo(
 				$"你是【{role[myIndex]}】，使用策略为【{(GlobalStrat == StgEnum.CnServer ? "国服" : "日野")}】，\n若有误请及时调整。", 4000, true);
-
 		}
-		
 
 		[ScriptMethod(name: "钢铁月环_范围显示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4287[68])$"])]
 		public void 钢铁月环_范围显示(Event @event, ScriptAccessory accessory)
@@ -697,21 +696,20 @@ namespace KodakkuScript
 		[ScriptMethod(name: "跳舞1_站位指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(42858)$"])]
 		public void 跳舞1_站位指路(Event @event, ScriptAccessory accessory)
 		{
-			// TODO 方块坐标待整理
-			
 			if (parse != 2) return;
 			var myObj = accessory.Data.MyObject;
 			if (myObj == null) return;
 			var myStatus = myObj.HasStatus(4462) ? 4462u : 4463u;
 			var myStatusTime = GetStatusRemainingTime(accessory, myObj, myStatus);
+			accessory.Log.Debug($"状态剩余时间为{myStatusTime}");
 			var myPos = 0;
-			if (myStatusTime > 7000) myPos++;
-			if (myStatusTime > 12000) myPos++;
-			if (myStatusTime > 17000) myPos++;
-			if (myStatusTime > 22000) myPos++;
+			if (myStatusTime > 7) myPos++;
+			if (myStatusTime > 12) myPos++;
+			if (myStatusTime > 17) myPos++;
+			if (myStatusTime > 22) myPos++;
 			// idx 0 不可能出现，除非什么buff都没有
 			// 根据Buff长短从上到下
-			List<Vector3> safePos = [new(100, 0, 100), new(100, 0, 85), new(100, 0, 95), new(100, 0, 105), new(100, 0, 115)];
+			List<Vector3> safePos = [new(100, 0, 100), new(100, 0, 92.5f), new(100, 0, 97.5f), new(100, 0, 102.5f), new(100, 0, 107.5f)];
 
 			// 指路
 			var dp = accessory.Data.GetDefaultDrawProperties();
@@ -721,7 +719,7 @@ namespace KodakkuScript
 			dp.Owner = accessory.Data.Me;
 			dp.TargetPosition = safePos[myPos];
 			dp.Color = accessory.Data.DefaultSafeColor;
-			dp.DestoryAt = 4000;
+			dp.DestoryAt = 5000;
 			accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
 		}
 
@@ -836,71 +834,209 @@ namespace KodakkuScript
 				IsNorthSafeInFrog1 = true;
 			}
 		}
+		
+		[ScriptMethod(name: "小青蛙1_指路G8", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4284[46])$"])]
+		public void 小青蛙1_指路G8(Event @event, ScriptAccessory accessory)
+		{
+			if (parse != 3) return;
+			if (GlobalStrat != StgEnum.Game8_Default) return;
+			if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+			int[] group = [6, 5, 4, 7, 2, 1, 0, 3];
+			var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+			if (myindex != accessory.Data.PartyList.IndexOf(tid) && group[myindex] != accessory.Data.PartyList.IndexOf(tid)) return;
+			//42844 = 分摊，42846 = 分散
+			if (@event.ActionId == 42844)
+			{
+				if (myindex == 0 || myindex == 4)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分摊指路MTD1";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1? new Vector3(100f, 0f, 89.5f): new Vector3(89.5f, 0f, 100f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 1 || myindex == 5)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分摊指路STD2";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(100f, 0f, 110.5f) : new Vector3(110.5f, 0f, 100f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 2 || myindex == 6)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分摊指路H1D3";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(100f, 0f, 81.5f) : new Vector3(81.5f, 0f, 100f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 3 || myindex == 7)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分摊指路H2D4";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(100f, 0f, 118.5f) : new Vector3(118.5f, 0f, 100f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+			}
+			if (@event.ActionId == 42846)
+			{
+				if (myindex == 0)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路MT";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(104.5f, 0f, 89.5f) : new Vector3(89.5f, 0f, 95.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 1)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路ST";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(95.5f, 0f, 110.5f) : new Vector3(110.5f, 0f, 104.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 2)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路H1";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(104.5f, 0f, 81.5f) : new Vector3(81.5f, 0f, 104.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 3)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路H2";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(95.5f, 0f, 118.5f) : new Vector3(118.5f, 0f, 104.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 4)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路D1";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(95.5f, 0f, 89.5f) : new Vector3(89.5f, 0f, 104.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 5)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路D2";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(104.5f, 0f, 110.5f) : new Vector3(110.5f, 0f, 95.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 6)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路D3";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(95.5f, 0f, 81.5f) : new Vector3(81.5f, 0f, 104.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+				if (myindex == 7)
+				{
+					var dp = accessory.Data.GetDefaultDrawProperties();
+					dp.Name = "小青蛙1_分散指路D4";
+					dp.Scale = new(2);
+					dp.ScaleMode |= ScaleMode.YByDistance;
+					dp.Owner = accessory.Data.Me;
+					dp.TargetPosition = IsNorthSafeInFrog1 ? new Vector3(104.5f, 0f, 118.5f) : new Vector3(118.5f, 0f, 95.5f);
+					dp.Color = accessory.Data.DefaultSafeColor;
+					dp.DestoryAt = 5000;
+					accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+				}
+			}
+		}
 
-		[ScriptMethod(name: "小青蛙1_指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4284[46])$"])]
-		public void 小青蛙1_指路(Event @event, ScriptAccessory accessory)
+		[ScriptMethod(name: "小青蛙1_指路CN", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4284[46])$"])]
+		public void 小青蛙1_指路CN(Event @event, ScriptAccessory accessory)
 		{
 			// 龙龙凤凤
 			if (parse != 3) return;
+			if (GlobalStrat != StgEnum.CnServer) return;
 			if (!ParseObjectId(@event["TargetId"], out var tid)) return;
 			int[] group = [6, 5, 4, 7, 2, 1, 0, 3];
 			var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
 			if (myindex != accessory.Data.PartyList.IndexOf(tid) && group[myindex] != accessory.Data.PartyList.IndexOf(tid)) return;
 			//42844 = 分摊，42846 = 分散
 			var isSpread = @event.ActionId == 42846;
-			
-			var mySafePos = new Vector3(100, 0, 89.5f);	// 北侧分摊位
-			var behindBias = new Vector3(0, 0, 8f);		// 后方偏置
-			
-			// 靠后偏置，远程组（H1, H2, D3, D4）
-			if (myindex is 2 or 3 or 6 or 7)
-			{
-				mySafePos -= behindBias;
-				accessory.Log.Debug($"玩家为远程组，靠后偏置");
-			}
-			
-			var spreadBias = new Vector3(4.5f, 0, 0);	// 分散偏置
-			// 上下翻转，G8 ST组（ST, H2, D2, D4），CN 近奶组（H1, H2, D1, D2）
-			if ((GlobalStrat == StgEnum.Game8_Default && myindex is 1 or 3 or 5 or 7) ||
-			    (GlobalStrat == StgEnum.CnServer && myindex is 2 or 3 or 4 or 5))
-			{
-				mySafePos = FoldPointVertical(mySafePos, 100);
-				accessory.Log.Debug($"玩家为右/下组，上下翻转");
-			}
-			
-			// 安全区交换至左右
-			if (!IsNorthSafeInFrog1)
-			{
-				(mySafePos.X, mySafePos.Z) = (mySafePos.Z, mySafePos.X);
-				(spreadBias.X, spreadBias.Z) = (spreadBias.Z, spreadBias.X);
-				accessory.Log.Debug($"安全区在左右，X与Z交换");
-			}
 
-			if (isSpread)
-			{
-				// 南北分散偏置，初始定义
-				List<int> spreadBiasAdder = [-1, 1, -1, 1, -1, 1, -1, 1];
-				if (GlobalStrat == StgEnum.Game8_Default)
-				{
-					for (int i = 0; i < 4; i++)
-						spreadBiasAdder[i] *= -1;
-				}
-			
-				// 东西分散，修改偏置
-				if (!IsNorthSafeInFrog1)
-				{
-					if (GlobalStrat == StgEnum.Game8_Default)
-						spreadBiasAdder = spreadBiasAdder.Select(x => -x).ToList();
-					else
-					{
-						spreadBiasAdder[5] *= -1;
-						spreadBiasAdder[7] *= -1;
-					}
-				}
-				accessory.Log.Debug($"分散，执行分散偏置");
-				mySafePos += spreadBiasAdder[myindex] * spreadBias;
-			}
+			List<Vector3> safePoints = Enumerable.Repeat(new Vector3(0, 0, 0), 16).ToList();
+		
+			safePoints[0] = new Vector3(95.5f, 0, 89.5f);
+			safePoints[1] = FoldPointHorizon(safePoints[0], 100);
+			safePoints[6] = safePoints[0] - new Vector3(0, 0, 8);			// 0
+			safePoints[7] = FoldPointHorizon(safePoints[6], 100);	// 1
+		
+			safePoints[2] = FoldPointVertical(safePoints[6], 100);	// 4
+			safePoints[3] = FoldPointVertical(safePoints[7], 100);	// 5
+			safePoints[4] = FoldPointVertical(safePoints[0], 100);
+			safePoints[5] = FoldPointVertical(safePoints[1], 100);
 
+			safePoints[8] = new Vector3(safePoints[0].Z, safePoints[0].Y, safePoints[0].X);
+			safePoints[9] = FoldPointHorizon(safePoints[8], 100);
+			safePoints[14] = safePoints[8] - new Vector3(8, 0, 0);			// 8
+			safePoints[15] = FoldPointHorizon(safePoints[14], 100);	// 9
+		
+			safePoints[10] = FoldPointVertical(safePoints[14], 100);	// 12
+			safePoints[11] = FoldPointVertical(safePoints[15], 100);	// 13
+			safePoints[12] = FoldPointVertical(safePoints[8], 100);
+			safePoints[13] = FoldPointVertical(safePoints[9], 100);
+
+			List<int> stackPosIdx = [0, 1, 4, 5, 4, 5, 0, 1, 8, 9, 12, 13, 12, 13, 8, 9];
+			var posIdx = myindex + (IsNorthSafeInFrog1 ? 0 : 8);
+			if (!isSpread)
+				posIdx = stackPosIdx[posIdx];
+		
 			accessory.Log.Debug(
 				$"策略为：{(GlobalStrat == StgEnum.CnServer ? "国服" : "G8日野")}，玩家为：{myindex}，安全区在：{(IsNorthSafeInFrog1 ? "上下" : "左右")}");
 
@@ -909,10 +1045,11 @@ namespace KodakkuScript
 			dp.Scale = new(2);
 			dp.ScaleMode |= ScaleMode.YByDistance;
 			dp.Owner = accessory.Data.Me;
-			dp.TargetPosition = mySafePos;
+			dp.TargetPosition = safePoints[posIdx];
 			dp.Color = accessory.Data.DefaultSafeColor;
 			dp.DestoryAt = 5000;
 			accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
 		}
 
 		[ScriptMethod(name: "第二次聚光灯_跳舞BUFF记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:4461"], userControl: false)]
