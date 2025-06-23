@@ -22,10 +22,9 @@ using KodakkuAssist.Data;
 using KodakkuAssist.Extensions;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
-// 1257
 namespace KodakkuScript
 {
-	[ScriptType(name: "至天の座アルカディア零式クルーザー級1", territorys: [], guid: "783C797E-52BB-41ED-98CD-A2315533036F", version: "0.0.0.5", note: noteStr, author: "UMP")]
+	[ScriptType(name: "至天の座アルカディア零式クルーザー級1", territorys: [1257], guid: "783C797E-52BB-41ED-98CD-A2315533036F", version: "0.0.0.5", note: noteStr, author: "UMP")]
 
 	internal class M5S
 	{

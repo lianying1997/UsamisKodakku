@@ -110,6 +110,7 @@ public class M6S
     
     private static Towers _towers = new();
     private static PriorityDict _pd = new();
+    private static bool _initHint = false;
     
     public void Init(ScriptAccessory sa)
     {
@@ -127,6 +128,7 @@ public class M6S
             .Range(0, 20)
             .Select(_ => new ManualResetEvent(false))
             .ToList();
+        _initHint = false;
     }
 
     #region 测试项
@@ -203,6 +205,18 @@ public class M6S
         eventCondition: ["HelloayaWorld:asdf"], userControl: true)]
     public void P1_SplitLine(Event ev, ScriptAccessory sa)
     {
+    }
+    
+    [ScriptMethod(name: "策略与身份提示", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(42787)$"], userControl: true)]
+    public void 策略与身份提示(Event ev, ScriptAccessory sa)
+    {
+        if (_initHint) return;
+        _initHint = true;
+        var myIndex = sa.Data.PartyList.IndexOf(sa.Data.Me); 
+        List<string> role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
+        sa.Method.TextInfo(
+            $"你是【{role[myIndex]}】，使用策略为【{(GlobalStrat == StgEnum.CnServer ? "国服" : "日野")}】，\n若有误请及时调整。", 4000, true);
     }
 
     [ScriptMethod(name: "WingMark引起的阶段转换", eventType: EventTypeEnum.StartCasting, 
