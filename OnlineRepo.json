@@ -187,12 +187,12 @@
   {
     "Name": "M6S [零式阿卡狄亚 中量级2]",
     "Guid": "4f5decb5-4a78-4e83-96c8-09678761a751",
-    "Version": "0.0.0.3",
+    "Version": "0.0.0.4",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/M6S/M6S.cs",
-    "Note": "v0.0.0.3\r\n初版，默认Game8攻略。\r\nCNServer攻略请于用户设置中调整。",
-    "UpdateInfo": "添加Sticky Mousse分摊目标指路",
+    "Note": "v0.0.0.4\r\n默认配置为CNServer攻略\r\n如需使用Game8配置，请于用户设置中调整。\r\n待完善。",
+    "UpdateInfo": "1. 新下载默认配置项改为CNServer，曾经下载的用户请根据需要调整；\r\n2. 修复Sticky Mousse MT/ST分摊目标指路错误；\r\n3. 调整了沙坑炸弹/飞弹近战组的站位指路；\r\n4. 添加Double Style机制指路；\r\n5. 添加Color Riot死刑远近提示；\r\n6. 添加沙漠阶段116分散、四角分散指路，包含场基与危险基。",
     "TerritoryIds": [
       1259
     ]

@@ -36,28 +36,43 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.3
-    初版，默认Game8攻略。
-    CNServer攻略请于用户设置中调整。
+    v0.0.0.4
+    默认配置为CNServer攻略
+    如需使用Game8配置，请于用户设置中调整。
+    待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.3";
-    private const string DebugVersion = "a";
-    private const string UpdateInfo = $"添加Sticky Mousse分摊目标指路";
+    private const string Version = "0.0.0.4";
 
-    private const bool Debugging = true;
-    private static readonly bool LocalTest = false;
-    private static readonly bool LocalStrTest = false;     // 本地不标点，仅用字符串表示。
+    private const string UpdateInfo =
+        """
+        1. 新下载默认配置项改为CNServer，曾经下载的用户请根据需要调整；
+        2. 修复Sticky Mousse MT/ST分摊目标指路错误；
+        3. 调整了沙坑炸弹/飞弹近战组的站位指路；
+        4. 添加Double Style机制指路；
+        5. 添加Color Riot死刑远近提示；
+        6. 添加沙漠阶段116分散、四角分散指路，包含场基与危险基。
+        """;
+
+    private const bool Debugging = false;
 
     private static List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
 
     [UserSetting("整体策略")]
-    public static StgEnum GlobalStrat { get; set; } = StgEnum.Game8_Default;
+    public static StgEnum GlobalStrat { get; set; } = StgEnum.CnServer;
     public enum StgEnum
     {
-        Game8_Default,
+        Game8,
         CnServer,
+    }
+    
+    [UserSetting("仙人掌四角策略")]
+    public static QuickSandStgEnum QuickSandStrat { get; set; } = QuickSandStgEnum.BattleFieldBasis_场基;
+    public enum QuickSandStgEnum
+    {
+        BattleFieldBasis_场基,
+        DangerCornerBasis_危险基,
     }
 
     private enum M6SPhase
@@ -116,8 +131,9 @@ public class M6S
     {
         _M6sPhase = M6SPhase.Init;
         InitParams();
-        sa.Log.Debug($"M6S 脚本已刷新。");
+        sa.Log.Debug($"M6S {Version} 脚本已刷新。");
         sa.Method.RemoveDraw(".*");
+        _initHint = false;
     }
 
     private void InitParams()
@@ -128,7 +144,6 @@ public class M6S
             .Range(0, 20)
             .Select(_ => new ManualResetEvent(false))
             .ToList();
-        _initHint = false;
     }
 
     #region 测试项
@@ -208,7 +223,7 @@ public class M6S
     }
     
     [ScriptMethod(name: "策略与身份提示", eventType: EventTypeEnum.StartCasting,
-        eventCondition: ["ActionId:regex:^(42787)$"], userControl: true)]
+        eventCondition: ["ActionId:regex:^(42684)$"], userControl: true)]
     public void 策略与身份提示(Event ev, ScriptAccessory sa)
     {
         if (_initHint) return;
@@ -216,7 +231,9 @@ public class M6S
         var myIndex = sa.Data.PartyList.IndexOf(sa.Data.Me); 
         List<string> role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
         sa.Method.TextInfo(
-            $"你是【{role[myIndex]}】，使用策略为【{(GlobalStrat == StgEnum.CnServer ? "国服" : "日野")}】，\n若有误请及时调整。", 4000, true);
+            $"你是【{role[myIndex]}】，使用策略为【{(GlobalStrat == StgEnum.CnServer ? "国服" : "日野")}】，\n" +
+            $"沙漠阶段四角仙人掌采用【{(QuickSandStrat == QuickSandStgEnum.BattleFieldBasis_场基 ? "场基" : "危险基")}】，\n" +
+            $"若有误请及时调整。", 5000);
     }
 
     [ScriptMethod(name: "WingMark引起的阶段转换", eventType: EventTypeEnum.StartCasting, 
@@ -233,7 +250,42 @@ public class M6S
             if (_M6sPhase != M6SPhase.Init & _M6sPhase != M6SPhase.P4D_FlyLava) return;
             _M6sPhase = M6SPhase.P1A_DoubleStyle;
         }
+
+        InitParams();
         sa.Log.Debug($"当前阶段为：{_M6sPhase}");
+    }
+    
+    [ScriptMethod(name: "P1A 死刑", eventType: EventTypeEnum.StartCasting, 
+        eventCondition: ["ActionId:regex:^(4264[12])$"], userControl: true)]
+    public void P1A_ColorRiot(Event ev, ScriptAccessory sa)
+    {
+        if (sa.Data.PartyList.Count != 8) return;
+        var myIndex = sa.GetMyIndex();
+        if (myIndex > 1) return;
+        
+        // const uint blueClose = 42641;
+        const uint redClose = 42642;
+        const uint redBuff = 4451;
+        const uint blueBuff = 4452;
+        
+        var aid = ev.ActionId;
+        var flag = -1 * myIndex;
+        // MT=0, ST=1, MT先近
+        // 规定flag>0时，近；flag<0时，远
+        
+        // 判断自身
+        var myObj = sa.Data.MyObject;
+        if (myObj == null) return;
+        var partnerObj = (IPlayerCharacter?)sa.GetById(sa.Data.PartyList[myIndex == 0 ? 1 : 0]);
+        if (partnerObj == null) return;
+        
+        // 令红Buff>0，同时考虑玩家自身与搭档。另外，若出现双同色Buff情况，让玩家的命更值钱，权重上升。
+        flag += (myObj.HasStatus(redBuff) ? 1 : 0) * 10 + (myObj.HasStatus(blueBuff) ? -1 : 0) * 10;
+        flag += (partnerObj.HasStatus(redBuff) ? 1 : 0) * 5 + (partnerObj.HasStatus(blueBuff) ? -1 : 0) * 5;
+        flag *= aid == redClose ? -1 : 1;   // redClose是指Boss会赋于红Buff，需要红Buff远离
+        sa.Log.Debug($"死刑 Flag: {flag}");
+
+        sa.Method.TextInfo(flag >= 0 ? $"【靠近】死刑" : $"【远离】死刑", 5000, true);
     }
     
     [ScriptMethod(name: "---- P1A 粘性炸弹初始化 ----", eventType: EventTypeEnum.StartCasting, 
@@ -242,7 +294,7 @@ public class M6S
     {
         // Init Param at StartCasting 42645
         _pd.Init(sa, "StickyMousse");
-        _pd.AddPriorities([0, 1, 6, 3, 5, 4, 7, 2]);
+        _pd.AddPriorities([0, 0, 6, 3, 5, 4, 7, 2]);
         //    D3 7  D4 2
         // H1 6       H2 3
         //    D1 5  D2 4
@@ -280,11 +332,10 @@ public class M6S
                 }
                 
                 // 计算顺逆
-                var cwIdx = (tVal - myVal + 6) % 6;
+                var cwIdx = (tVal - myVal + 6 - (myIndex is 0 or 1 ? 2 : 0)) % 6;
                 _pd.AddPriority(tKey, cwIdx * 10);
+                sa.Log.Debug($"tKey: {tKey}, tVal: {tVal}, myVal: {myVal}");
                 sa.Log.Debug($"玩家{sa.GetPlayerJobByIndex(myIndex)}与{sa.GetPlayerJobByIndex(tKey)}的距离为{distance}，顺时针顺位为{cwIdx}，对方优先值为{_pd.Priorities[tKey]}");
-                
-                // 似乎仍有优化空间，因为个位数没有使用，但是int数足够大，无所谓了
             }
 
             // MT找两个目标中较大的（降序idx0），ST与人群找较小的（降序idx1）
@@ -297,6 +348,142 @@ public class M6S
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
     
+    [ScriptMethod(name: "P1A 飞行分摊初始化", eventType: EventTypeEnum.StartCasting, 
+        eventCondition: ["ActionId:regex:^(4263[57])$"], userControl: Debugging)]
+    public void ColorClashStackRecord(Event ev, ScriptAccessory sa)
+    {
+        const uint partnerStack = 42637;
+        // const uint partyStack = 42635;
+        _pd.Init(sa, "飞行分摊", 5);
+        _pd.AddPriority(4, ev.ActionId == partnerStack ? 2 : 4);
+        // 前四个index留作方位
+        sa.Log.Debug($"记录分摊人数：{_pd.Priorities[4]}人分摊");
+    }
+    
+    [ScriptMethod(name: "P1A 飞行分摊指路", eventType: EventTypeEnum.Tether, 
+        eventCondition: ["Id:regex:^(013F|0140)$"], userControl: true)]
+    public void ColorClashTetherRecord(Event ev, ScriptAccessory sa)
+    {
+        if (_M6sPhase != M6SPhase.P1A_DoubleStyle) return;
+        const uint heavenBomb = 0x47A1;
+        const uint paintBomb = 0x47A0;
+        const uint succubus = 0x47A5;
+        const uint morbol = 0x47A4;
+
+        var tetherObj = sa.GetById(ev.SourceId);
+        if (tetherObj == null) return;
+        List<uint> tetherObjs = [paintBomb, heavenBomb, morbol, succubus];
+        
+        lock (_pd)
+        {
+            var tetherDataId = tetherObj.DataId;
+            if (!tetherObjs.Contains(tetherDataId)) return;
+            var tetherObjDir = tetherObj.Position.Position2Dirs(Center, 4, true);
+
+            switch (tetherDataId)
+            {
+                // 前四个index对应安全象限，从右上开始，顺时针增加，即1~4象限，用index0~3表示
+                // 危险的象限会增加数值，取最小值对应的index即为安全区。
+                case paintBomb:
+                    // 固定
+                    sa.Log.Debug($"检测到爆弹，2、3象限危险");
+                    _pd.AddPriority(2, 10);
+                    _pd.AddPriority(3, 10);
+                    break;
+                case heavenBomb:
+                    // 固定
+                    sa.Log.Debug($"检测到飞弹，0、1象限危险");
+                    _pd.AddPriority(0, 10);
+                    _pd.AddPriority(1, 10);
+                    break;
+                case succubus:
+                {
+                    var safeDir2 = (tetherObjDir + 4 - 1) % 4;
+                    sa.Log.Debug($"检测到梦魔，{tetherObjDir}、{safeDir2}象限危险");
+                    _pd.AddPriority(tetherObjDir, 10);
+                    _pd.AddPriority(safeDir2, 10);
+                    break;
+                }
+                case morbol:
+                {
+                    var safeDir1 = (tetherObjDir + 4 + 1) % 4;
+                    var safeDir2 = (tetherObjDir + 4 + 2) % 4;
+                    sa.Log.Debug($"检测到魔界花，{safeDir1}、{safeDir2}象限危险");
+                    _pd.AddPriority(safeDir1, 10);
+                    _pd.AddPriority(safeDir2, 10);
+                    break;
+                }
+                default:
+                    return;
+            }
+            
+            // 直到获得唯一一个安全区，停止记录并输出结果
+            var posDictSecond = _pd.SelectSpecificPriorityIndex(1);
+            if (posDictSecond.Value == 0) return;
+            sa.Log.Debug($"{_pd.ShowPriorities(false)}");
+
+            List<Vector3> safePosList = Enumerable.Repeat(new Vector3(0, 0, 0), 20).ToList();
+
+            // 飞行位置
+            safePosList[2] = new Vector3(112, 0, 88);
+            safePosList[0] = safePosList[2].RotatePoint(Center, 180f.DegToRad());
+            safePosList[1] = safePosList[2].RotatePoint(Center, 270f.DegToRad());
+            safePosList[3] = safePosList[2].RotatePoint(Center, 90f.DegToRad());
+
+            safePosList[4] = new Vector3(119, 0, 92);   // 第0象限 左
+            safePosList[5] = new Vector3(108, 0, 81);   // 第0象限 右
+            safePosList[6] = new Vector3(112, 0, 88);   // 第0象限 前
+            safePosList[7] = new Vector3(118, 0, 82);   // 第0象限 后
+            
+            safePosList[8] = safePosList[6].FoldPointVertical(Center.Z);    // 第1象限 左
+            safePosList[9] = safePosList[5].FoldPointVertical(Center.Z);    // 第1象限 右
+            safePosList[10] = safePosList[7].FoldPointVertical(Center.Z);   // 第1象限 前
+            safePosList[11] = safePosList[8].FoldPointVertical(Center.Z);   // 第1象限 后
+            
+            safePosList[12] = safePosList[5].PointCenterSymmetry(Center);   // 第2象限 左
+            safePosList[13] = safePosList[6].PointCenterSymmetry(Center);   // 第2象限 右
+            safePosList[14] = safePosList[7].PointCenterSymmetry(Center);   // 第2象限 前
+            safePosList[15] = safePosList[8].PointCenterSymmetry(Center);   // 第2象限 后
+            
+            safePosList[16] = safePosList[5].PointCenterSymmetry(Center);   // 第3象限 左
+            safePosList[17] = safePosList[6].PointCenterSymmetry(Center);   // 第3象限 右
+            safePosList[18] = safePosList[7].PointCenterSymmetry(Center);   // 第3象限 前
+            safePosList[19] = safePosList[8].PointCenterSymmetry(Center);   // 第3象限 后
+            
+            // 根据玩家身份建立安全对角位置
+            var isPartnerStack = _pd.Priorities[4] == 2;
+            var basePosIdx = sa.GetMyIndex() switch
+            {
+                0 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 0 : 2 : 0,  // MT CN左，G8前，44分摊左
+                1 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 1 : 1 : 1,  // ST CN右，G8右，44分摊右
+                2 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 2 : 0 : 0,  // H1 CN前，G8左，44分摊左
+                3 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 3 : 3 : 1,  // H2 CN后，G8后，44分摊右
+                4 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 0 : 2 : 0,  // D1 CN左，G8前，44分摊左
+                5 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 1 : 1 : 1,  // D2 CN右，G8右，44分摊右
+                6 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 2 : 0 : 0,  // D3 CN前，G8左，44分摊左
+                7 => isPartnerStack ? GlobalStrat == StgEnum.CnServer ? 3 : 3 : 1,  // D4 CN右，G8右，44分摊右
+                _ => 0,
+            };
+            var safePosDir = _pd.SelectSpecificPriorityIndex(0).Key;
+            var safePos1 = safePosList[safePosDir];
+            var safePos2 = safePosList[4 * (safePosDir + 1) + basePosIdx];
+            sa.Log.Debug($"先飞去第{safePosDir}象限（0~3），再去{basePosIdx}（0~3，左右前后）");
+
+            var dp1 = sa.DrawGuidance(safePos1, 0, 8000, $"飞行分摊1");
+            var dp2 = sa.DrawGuidance(safePos2, 8000, 7000, $"飞行分摊2");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp2);
+        }
+    }
+    
+    [ScriptMethod(name: "P1A 飞行分摊指路删除", eventType: EventTypeEnum.ActionEffect, 
+        eventCondition: ["ActionId:regex:^(426(39|40))$"], userControl: Debugging)]
+    public void ColorClashRemove(Event ev, ScriptAccessory sa)
+    {
+        sa.Method.RemoveDraw($"飞行分摊1");
+        sa.Method.RemoveDraw($"飞行分摊2");
+    }
+    
     #endregion P1 开场
     
     #region P2 沙漠
@@ -305,6 +492,15 @@ public class M6S
         eventCondition: ["HelloayaWorld:asdf"], userControl: true)]
     public void P2_SplitLine(Event ev, ScriptAccessory sa)
     {
+    }
+    
+    [ScriptMethod(name: "P2A - 沙漠 阶段转换", eventType: EventTypeEnum.StartCasting, 
+        eventCondition: ["ActionId:42600"], userControl: Debugging)]
+    public void P2A_PhaseChange(Event ev, ScriptAccessory sa)
+    {
+        _M6sPhase = M6SPhase.P2A_Sand;
+        _pd.Init(sa, $"沙漠安全区", 4);
+        sa.Log.Debug($"当前阶段为：{_M6sPhase}");
     }
     
     [ScriptMethod(name: "P2A - 仙人掌范围(Imgui)", eventType: EventTypeEnum.StartCasting, 
@@ -322,6 +518,77 @@ public class M6S
     public void P2A_SpraySpinRangeRemove(Event ev, ScriptAccessory sa)
     {
         sa.Method.RemoveDraw($"仙人掌钢铁{ev.SourceId}");
+    }
+    
+    [ScriptMethod(name: "P2A - 116分散指路", eventType: EventTypeEnum.StatusAdd, 
+        eventCondition: ["ActionId:4454"], userControl: true)]
+    public void P2A_HeatingUpSpread(Event ev, ScriptAccessory sa)
+    {
+        if (ev.TargetId != sa.Data.Me) return;
+        if (ev.DurationMilliseconds() > 50000) return;
+        var myIndex = sa.GetMyIndex();
+        var flag = 1;
+
+        if (myIndex >= 4) flag *= -1;
+        if (GlobalStrat == StgEnum.CnServer) flag *= -1;
+
+        var bottomLeft = new Vector3(85, 0, 105);
+        var bottomRight = bottomLeft.FoldPointHorizon(Center.X);
+
+        var dp = sa.DrawGuidance(flag > 0 ? bottomLeft : bottomRight, 39000, 4000, $"沙漠分散");
+        sa.Log.Debug($"116分散flag（场基正左负右）：{flag}");
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+    
+    [ScriptMethod(name: "P2A - 116分散指路移除", eventType: EventTypeEnum.ActionEffect, 
+        eventCondition: ["ActionId:42658", "TargetIndex:1"], userControl: Debugging)]
+    public void P2A_HeatingUpSpreadRemove(Event ev, ScriptAccessory sa)
+    {
+        if (ev.TargetId != sa.Data.Me) return;
+        sa.Method.RemoveDraw($"沙漠分散");
+    }
+    
+    [ScriptMethod(name: "P2A - 沙漠四角站位", eventType: EventTypeEnum.StartCasting, 
+        eventCondition: ["ActionId:39468"], userControl: true)]
+    public void P2A_QuickSandCorner(Event ev, ScriptAccessory sa)
+    {
+        if (_bools[0]) return;
+        List<Vector3> corners = Enumerable.Repeat(new Vector3(0, 0, 0), 4).ToList();
+        corners[0] = new Vector3(119, 0, 81);
+        corners[1] = corners[0].RotatePoint(Center, 90f.DegToRad());
+        corners[2] = corners[0].RotatePoint(Center, 180f.DegToRad());
+        corners[3] = corners[0].RotatePoint(Center, 270f.DegToRad());
+
+        lock (_bools)
+        {
+            var spos = ev.SourcePosition;
+            var dangerDir = -1;
+            for (int i = 0; i < 4; i++)
+            {
+                var distance = spos.DistanceTo(corners[i]);
+                if (distance <= 10f)
+                {
+                    dangerDir = i;
+                    break;
+                }
+            }
+            _bools[0] = true;
+            if (dangerDir == -1) return;
+            
+            var myIndex = sa.GetMyIndex();
+            var safeDir = myIndex switch
+            {
+                2 => QuickSandStrat == QuickSandStgEnum.BattleFieldBasis_场基
+                    ? (dangerDir != 3 ? 3 : 2) : ((dangerDir + 3 + 4) % 4),
+                3 => QuickSandStrat == QuickSandStgEnum.BattleFieldBasis_场基
+                    ? (dangerDir != 1 ? 1 : 2) : ((dangerDir + 1 + 4) % 4),
+                _ => QuickSandStrat == QuickSandStgEnum.BattleFieldBasis_场基
+                    ? (dangerDir != 0 ? 0 : 2) : ((dangerDir + 2 + 4) % 4)
+            };
+
+            var dp = sa.DrawGuidance(corners[safeDir], 0, 5000, $"沙漠四角安全区");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
     }
     
     [ScriptMethod(name: "P2B - 飞翔炸弹 阶段转换", eventType: EventTypeEnum.StartCasting, 
@@ -365,8 +632,8 @@ public class M6S
             // A沙坑基准
             // MT/D1普通，ST/D2普通，H1/D3普通，H2/D4普通
             // MT/D1飞行，ST/D2飞行，H1/D3飞行，H2/D4飞行
-            new(95, 0, 90), new(105, 0, 90), new(85, 0, 90), new(115, 0, 90),
-            new(95, 0, 110), new(105, 0, 110), new(85, 0, 110), new(115, 0, 110)
+            new(95, 0, 95), new(105, 0, 95), new(85, 0, 90), new(115, 0, 90),
+            new(95, 0, 105), new(105, 0, 105), new(85, 0, 110), new(115, 0, 110)
         ];
         var myPointIdx = sa.GetMyIndex() % 4 + (isFlyingBomb ? 4 : 0);
         float rotateDeg = _numbers[0] switch
@@ -407,6 +674,75 @@ public class M6S
     {
         sa.Method.TextInfo($"本体正在释放AOE！", 4000, true);
     }
+    
+    // [ScriptMethod(name: "P3A - 小怪 W1提示", eventType: EventTypeEnum.StartCasting, 
+    //     eventCondition: ["ActionId:42662"], userControl: true)]
+    // public void P3A_MobsWave1Hint(Event ev, ScriptAccessory sa)
+    // {
+    //     var hintStr = "";
+    //     var myIndex = sa.GetMyIndex();
+    //     hintStr = myIndex switch
+    //     {
+    //         0 => $"右B准备，拉Boss与松鼠，拉到下C",
+    //         1 => $"左D准备，拉羊",
+    //         6 => $"左D准备，放一段LB，引导猫",
+    //         7 => $"左D准备，放二段LB，引导猫",
+    //         _ => $"左D准备，打羊，引导猫"
+    //     };
+    //     var isWarning = false;
+    //     if (myIndex is 0 or 1)
+    //     {
+    //         var myObj = sa.Data.MyObject;
+    //         if (myObj == null) return;
+    //         if (!myObj.HasStatusAny([1833u, 743u, 79u, 91u]))
+    //         {
+    //             isWarning = true;
+    //             hintStr = $"【开启盾姿】，" + hintStr;
+    //         }
+    //     }
+    //     sa.Method.TextInfo(hintStr, 6000, isWarning);
+    //
+    //     List<DrawPropertiesEdit> dpList =
+    //     [
+    //         sa.DrawGuidance(Center, myIndex == 0 ? new Vector3(110, 0, 100) : new Vector3(90, 0, 100), 0, 10000,
+    //             $"W1指路")
+    //     ];
+    //     if (myIndex == 0)
+    //         dpList.Add(sa.DrawGuidance(new Vector3(110, 0, 100), new Vector3(100, 0, 110), 0, 10000,
+    //             $"W1指路"));
+    //     for (var i = 0; i < dpList.Count; i++)
+    //         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpList[i]);
+    // }
+    //
+    // [ScriptMethod(name: "P3A - 小怪 W2提示", eventType: EventTypeEnum.StartCasting, 
+    //     eventCondition: ["ActionId:42663"], userControl: true)]
+    // public void P3A_MobsWave2Hint(Event ev, ScriptAccessory sa)
+    // {
+    //     sa.Method.RemoveDraw($"W1指路");
+    //     
+    //     var hintStr = "";
+    //     var myIndex = sa.GetMyIndex();
+    //     hintStr = myIndex switch
+    //     {
+    //         0 => $"下C准备，拉松鼠群，至右上鱼、左上鱼",
+    //         1 => $"跟随MT，集火松鼠群与鱼",
+    //         3 => $"右上就位，引导鱼",
+    //         6 => $"左上就位，引导鱼",
+    //         _ => $"跟随MT，集火松鼠群与鱼"
+    //     };
+    //     var isWarning = false;
+    //     if (myIndex is 1)
+    //     {
+    //         var myObj = sa.Data.MyObject;
+    //         if (myObj == null) return;
+    //         if (myObj.HasStatusAny([1833u, 743u, 79u, 91u]))
+    //         {
+    //             isWarning = true;
+    //             hintStr = $"【关启盾姿】，" + hintStr;
+    //         }
+    //     }
+    //     sa.Method.TextInfo(hintStr, 6000, isWarning);
+    // }
     
     #endregion P3 小怪
 
@@ -920,7 +1256,7 @@ public class M6S
     }
     #endregion P4 山川
     
-        public class PriorityDict
+    public class PriorityDict
     {
         // ReSharper disable once NullableWarningSuppressionIsUsed
         public ScriptAccessory sa {get; set;} = null!;
@@ -1119,6 +1455,11 @@ public static class EventExtensions
     {
         return JsonConvert.DeserializeObject<uint>(ev["Flag"]);
     }
+    
+    public static uint DurationMilliseconds(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
+    }
 
 }
 
@@ -1248,6 +1589,66 @@ public static class DirectionCalc
         if (radian < 0)
             radian += 2 * MathF.PI;
         return radian;
+    }
+    
+    /// <summary>
+    /// 将输入点左右折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerX">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointHorizon(this Vector3 point, float centerX)
+    {
+        return point with { X = 2 * centerX - point.X };
+    }
+
+    /// <summary>
+    /// 将输入点上下折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerZ">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointVertical(this Vector3 point, float centerZ)
+    {
+        return point with { Z = 2 * centerZ - point.Z };
+    }
+
+    /// <summary>
+    /// 将输入点中心对称
+    /// </summary>
+    /// <param name="point">输入点</param>
+    /// <param name="center">中心点</param>
+    /// <returns></returns>
+    public static Vector3 PointCenterSymmetry(this Vector3 point, Vector3 center)
+    {
+        return point.RotatePoint(center, float.Pi);
+    }
+
+    /// <summary>
+    /// 将输入点朝某中心点往内/外同角度延伸，默认向内
+    /// </summary>
+    /// <param name="point">待延伸点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="length">延伸长度</param>
+    /// <param name="isOutside">是否向外延伸</param>>
+    /// <returns></returns>
+    public static Vector3 PointInOutside(this Vector3 point, Vector3 center, float length, bool isOutside = false)
+    {
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
+        return targetPos;
+    }
+    
+    /// <summary>
+    /// 获得两点之间距离
+    /// </summary>
+    /// <param name="point"></param>
+    /// <param name="target"></param>
+    /// <returns></returns>
+    public static float DistanceTo(this Vector3 point, Vector3 target)
+    {
+        Vector2 v2 = new(point.X - target.X, point.Z - target.Z);
+        return v2.Length();
     }
     
     /// <summary>
