@@ -36,23 +36,18 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.4
-    默认配置为CNServer攻略
+    v0.0.0.5
+    默认配置为CnServer攻略
     如需使用Game8配置，请于用户设置中调整。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.4";
+    private const string Version = "0.0.0.5";
 
     private const string UpdateInfo =
         """
-        1. 新下载默认配置项改为CNServer，曾经下载的用户请根据需要调整；
-        2. 修复Sticky Mousse MT/ST分摊目标指路错误；
-        3. 调整了沙坑炸弹/飞弹近战组的站位指路；
-        4. 添加Double Style机制指路；
-        5. 添加Color Riot死刑远近提示；
-        6. 添加沙漠阶段116分散、四角分散指路，包含场基与危险基。
+        1. 更改一些配置项说明文字至国服翻译。
         """;
 
     private const bool Debugging = false;
@@ -255,7 +250,7 @@ public class M6S
         sa.Log.Debug($"当前阶段为：{_M6sPhase}");
     }
     
-    [ScriptMethod(name: "P1A 死刑", eventType: EventTypeEnum.StartCasting, 
+    [ScriptMethod(name: "P1A 色彩狂热 死刑", eventType: EventTypeEnum.StartCasting, 
         eventCondition: ["ActionId:regex:^(4264[12])$"], userControl: true)]
     public void P1A_ColorRiot(Event ev, ScriptAccessory sa)
     {
@@ -288,7 +283,7 @@ public class M6S
         sa.Method.TextInfo(flag >= 0 ? $"【靠近】死刑" : $"【远离】死刑", 5000, true);
     }
     
-    [ScriptMethod(name: "---- P1A 粘性炸弹初始化 ----", eventType: EventTypeEnum.StartCasting, 
+    [ScriptMethod(name: "---- P1A 黏黏慕斯怪初始化 ----", eventType: EventTypeEnum.StartCasting, 
         eventCondition: ["ActionId:42645"], userControl: Debugging)]
     public void StickyMousseInit(Event ev, ScriptAccessory sa)
     {
@@ -301,7 +296,7 @@ public class M6S
         sa.Log.Debug($"检测到Sticky Mousse，优先级初始化");
     }
     
-    [ScriptMethod(name: "P1A 粘性炸弹", eventType: EventTypeEnum.ActionEffect, 
+    [ScriptMethod(name: "P1A 黏黏慕斯怪", eventType: EventTypeEnum.ActionEffect, 
         eventCondition: ["ActionId:42646", "TargetIndex:1"], userControl: true)]
     public void StickyMousseTarget(Event ev, ScriptAccessory sa)
     {
@@ -348,7 +343,7 @@ public class M6S
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
     
-    [ScriptMethod(name: "P1A 飞行分摊初始化", eventType: EventTypeEnum.StartCasting, 
+    [ScriptMethod(name: "P1A 双手涂鸦初始化", eventType: EventTypeEnum.StartCasting, 
         eventCondition: ["ActionId:regex:^(4263[57])$"], userControl: Debugging)]
     public void ColorClashStackRecord(Event ev, ScriptAccessory sa)
     {
@@ -360,7 +355,7 @@ public class M6S
         sa.Log.Debug($"记录分摊人数：{_pd.Priorities[4]}人分摊");
     }
     
-    [ScriptMethod(name: "P1A 飞行分摊指路", eventType: EventTypeEnum.Tether, 
+    [ScriptMethod(name: "P1A 双手涂鸦指路", eventType: EventTypeEnum.Tether, 
         eventCondition: ["Id:regex:^(013F|0140)$"], userControl: true)]
     public void ColorClashTetherRecord(Event ev, ScriptAccessory sa)
     {
@@ -476,7 +471,7 @@ public class M6S
         }
     }
     
-    [ScriptMethod(name: "P1A 飞行分摊指路删除", eventType: EventTypeEnum.ActionEffect, 
+    [ScriptMethod(name: "P1A 双手涂鸦指路删除", eventType: EventTypeEnum.ActionEffect, 
         eventCondition: ["ActionId:regex:^(426(39|40))$"], userControl: Debugging)]
     public void ColorClashRemove(Event ev, ScriptAccessory sa)
     {
@@ -548,7 +543,7 @@ public class M6S
         sa.Method.RemoveDraw($"沙漠分散");
     }
     
-    [ScriptMethod(name: "P2A - 沙漠四角站位", eventType: EventTypeEnum.StartCasting, 
+    [ScriptMethod(name: "P2A - 流沙四角站位指路", eventType: EventTypeEnum.StartCasting, 
         eventCondition: ["ActionId:39468"], userControl: true)]
     public void P2A_QuickSandCorner(Event ev, ScriptAccessory sa)
     {
@@ -616,7 +611,7 @@ public class M6S
         sa.Log.Debug($"检测到{ev.Index()} = {ev.Flag()} => {dbgStr}, 赋值 {_numbers[0]}");
     }
 
-    [ScriptMethod(name: "P2B - 炸弹类型提示与指路", eventType: EventTypeEnum.Tether,
+    [ScriptMethod(name: "P2B - 双手涂鸦（炸弹）类型提示与指路", eventType: EventTypeEnum.Tether,
         eventCondition: ["Id:regex:^(013F|0140)$"], userControl: true)]
     public void P2B_FlyingBombTypeHint(Event ev, ScriptAccessory sa)
     {
@@ -782,7 +777,7 @@ public class M6S
         }
     }
     
-    [ScriptMethod(name: "P4A - 雷火分摊", eventType: EventTypeEnum.StartCasting, 
+    [ScriptMethod(name: "P4A - 雷火箭指路", eventType: EventTypeEnum.StartCasting, 
         eventCondition: ["ActionId:regex:^(4263[13])$"], userControl: true)]
     public void P4A_StackOrSpread(Event ev, ScriptAccessory sa)
     {
