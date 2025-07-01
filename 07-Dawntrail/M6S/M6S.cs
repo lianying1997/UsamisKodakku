@@ -36,18 +36,19 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.5
+    v0.0.0.6
     默认配置为CnServer攻略
     如需使用Game8配置，请于用户设置中调整。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.5";
+    private const string Version = "0.0.0.6";
 
     private const string UpdateInfo =
         """
-        1. 更改一些配置项说明文字至国服翻译。
+        1. 修复双手涂鸦后半指路。
+        2. 修复四角仙人掌指路。
         """;
 
     private const bool Debugging = false;
@@ -205,6 +206,46 @@ public class M6S
         sa.Log.Debug($"玩家 {sa.GetPlayerJobByIndex(sa.GetMyIndex())} 的塔为 {tower.TowerIdx}, 在岛 {tower.IslandIdx}");
         var dp = sa.DrawStaticCircle(tower.TowerPos, sa.Data.DefaultSafeColor, 0, 2000, "a", 3f);
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
+    }
+    
+    [ScriptMethod(name: "测试项 四象限安全区", eventType: EventTypeEnum.NpcYell, 
+        eventCondition: ["HelloayaWorld:asdf"], userControl: Debugging)]
+    public void Debug_DrawSafeFlyPoint(Event ev, ScriptAccessory sa)
+    {
+        List<Vector3> safePosList = Enumerable.Repeat(new Vector3(0, 0, 0), 20).ToList();
+        
+        // 飞行位置
+        safePosList[2] = new Vector3(112, 0, 88);
+        safePosList[0] = safePosList[2].RotatePoint(Center, 180f.DegToRad());
+        safePosList[1] = safePosList[2].RotatePoint(Center, 270f.DegToRad());
+        safePosList[3] = safePosList[2].RotatePoint(Center, 90f.DegToRad());
+
+        safePosList[4] = new Vector3(119, 0, 92);   // 第0象限 左
+        safePosList[5] = new Vector3(108, 0, 81);   // 第0象限 右
+        safePosList[6] = new Vector3(112, 0, 88);   // 第0象限 前
+        safePosList[7] = new Vector3(118, 0, 82);   // 第0象限 后
+            
+        safePosList[8] = safePosList[5].FoldPointVertical(Center.Z);    // 第1象限 左
+        safePosList[9] = safePosList[4].FoldPointVertical(Center.Z);    // 第1象限 右
+        safePosList[10] = safePosList[6].FoldPointVertical(Center.Z);   // 第1象限 前
+        safePosList[11] = safePosList[7].FoldPointVertical(Center.Z);   // 第1象限 后
+            
+        safePosList[12] = safePosList[4].PointCenterSymmetry(Center);   // 第2象限 左
+        safePosList[13] = safePosList[5].PointCenterSymmetry(Center);   // 第2象限 右
+        safePosList[14] = safePosList[6].PointCenterSymmetry(Center);   // 第2象限 前
+        safePosList[15] = safePosList[7].PointCenterSymmetry(Center);   // 第2象限 后
+            
+        safePosList[16] = safePosList[5].FoldPointHorizon(Center.X);   // 第3象限 左
+        safePosList[17] = safePosList[4].FoldPointHorizon(Center.X);   // 第3象限 右
+        safePosList[18] = safePosList[6].FoldPointHorizon(Center.X);   // 第3象限 前
+        safePosList[19] = safePosList[7].FoldPointHorizon(Center.X);   // 第3象限 后
+
+        for (int i = 0; i < 20; i++)
+        {
+            var dp = sa.DrawStaticCircle(safePosList[i], sa.Data.DefaultSafeColor, 1000*i, 1000, "a", 1.5f);
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
+        }
+
     }
     
     #endregion 测试项
@@ -430,20 +471,20 @@ public class M6S
             safePosList[6] = new Vector3(112, 0, 88);   // 第0象限 前
             safePosList[7] = new Vector3(118, 0, 82);   // 第0象限 后
             
-            safePosList[8] = safePosList[6].FoldPointVertical(Center.Z);    // 第1象限 左
-            safePosList[9] = safePosList[5].FoldPointVertical(Center.Z);    // 第1象限 右
-            safePosList[10] = safePosList[7].FoldPointVertical(Center.Z);   // 第1象限 前
-            safePosList[11] = safePosList[8].FoldPointVertical(Center.Z);   // 第1象限 后
+            safePosList[8] = safePosList[5].FoldPointVertical(Center.Z);    // 第1象限 左
+            safePosList[9] = safePosList[4].FoldPointVertical(Center.Z);    // 第1象限 右
+            safePosList[10] = safePosList[6].FoldPointVertical(Center.Z);   // 第1象限 前
+            safePosList[11] = safePosList[7].FoldPointVertical(Center.Z);   // 第1象限 后
             
-            safePosList[12] = safePosList[5].PointCenterSymmetry(Center);   // 第2象限 左
-            safePosList[13] = safePosList[6].PointCenterSymmetry(Center);   // 第2象限 右
-            safePosList[14] = safePosList[7].PointCenterSymmetry(Center);   // 第2象限 前
-            safePosList[15] = safePosList[8].PointCenterSymmetry(Center);   // 第2象限 后
+            safePosList[12] = safePosList[4].PointCenterSymmetry(Center);   // 第2象限 左
+            safePosList[13] = safePosList[5].PointCenterSymmetry(Center);   // 第2象限 右
+            safePosList[14] = safePosList[6].PointCenterSymmetry(Center);   // 第2象限 前
+            safePosList[15] = safePosList[7].PointCenterSymmetry(Center);   // 第2象限 后
             
-            safePosList[16] = safePosList[5].PointCenterSymmetry(Center);   // 第3象限 左
-            safePosList[17] = safePosList[6].PointCenterSymmetry(Center);   // 第3象限 右
-            safePosList[18] = safePosList[7].PointCenterSymmetry(Center);   // 第3象限 前
-            safePosList[19] = safePosList[8].PointCenterSymmetry(Center);   // 第3象限 后
+            safePosList[16] = safePosList[5].FoldPointHorizon(Center.X);   // 第3象限 左
+            safePosList[17] = safePosList[4].FoldPointHorizon(Center.X);   // 第3象限 右
+            safePosList[18] = safePosList[6].FoldPointHorizon(Center.X);   // 第3象限 前
+            safePosList[19] = safePosList[7].FoldPointHorizon(Center.X);   // 第3象限 后
             
             // 根据玩家身份建立安全对角位置
             var isPartnerStack = _pd.Priorities[4] == 2;
@@ -567,8 +608,10 @@ public class M6S
                     break;
                 }
             }
-            _bools[0] = true;
+            
+            sa.Log.Debug($"检查{spos}坐标的仙人掌，得到dangerDir: {dangerDir}");
             if (dangerDir == -1) return;
+            _bools[0] = true;
             
             var myIndex = sa.GetMyIndex();
             var safeDir = myIndex switch
