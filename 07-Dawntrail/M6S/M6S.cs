@@ -36,19 +36,17 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.6
-    默认配置为CnServer攻略
-    如需使用Game8配置，请于用户设置中调整。
+    v0.0.0.7
+    请先于用户设置中调整整体策略（Game8/CnServer）。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.6";
+    private const string Version = "0.0.0.7";
 
     private const string UpdateInfo =
         """
-        1. 修复双手涂鸦后半指路。
-        2. 修复四角仙人掌指路。
+        1. 修复沙漠阶段116未起效的问题。
         """;
 
     private const bool Debugging = false;
@@ -557,7 +555,7 @@ public class M6S
     }
     
     [ScriptMethod(name: "P2A - 116分散指路", eventType: EventTypeEnum.StatusAdd, 
-        eventCondition: ["ActionId:4454"], userControl: true)]
+        eventCondition: ["StatusID:4454"], userControl: true)]
     public void P2A_HeatingUpSpread(Event ev, ScriptAccessory sa)
     {
         if (ev.TargetId != sa.Data.Me) return;

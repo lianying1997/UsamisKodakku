@@ -187,12 +187,12 @@
   {
     "Name": "M6S [零式阿卡狄亚 中量级2]",
     "Guid": "4f5decb5-4a78-4e83-96c8-09678761a751",
-    "Version": "0.0.0.6",
+    "Version": "0.0.0.7",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/M6S/M6S.cs",
-    "Note": "v0.0.0.6\r\n默认配置为CnServer攻略\r\n如需使用Game8配置，请于用户设置中调整。\r\n待完善。",
-    "UpdateInfo": "1. 修复双手涂鸦后半指路。\r\n2. 修复四角仙人掌指路。",
+    "Note": "v0.0.0.7\r\n请先于用户设置中调整整体策略（Game8/CnServer）。\r\n待完善。",
+    "UpdateInfo": "1. 修复沙漠阶段116未起效的问题。",
     "TerritoryIds": [
       1259
     ]
