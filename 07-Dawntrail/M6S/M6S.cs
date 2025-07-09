@@ -36,17 +36,18 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.12
+    v0.0.0.13
     请先于用户设置中调整整体策略（Game8/CnServer）。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.12";
+    private const string Version = "0.0.0.13";
 
     private const string UpdateInfo =
         """
-        1. 再再再再次修复火山阶段第二轮塔概率性不指路问题。
+        1. 火山阶段第二轮塔概率性不指路问题无法复现，欢迎提供ARR。
+        2. 修复第一轮塔H1D3反了的问题。
         """;
 
     private const bool Debugging = false;
@@ -1181,8 +1182,8 @@ public class M6S
         _towers.SetTowerPlayer([93], 0);  // 固定值，左上塔，MT
         _towers.SetTowerPlayer([69, 72, 74, 76, 78], GlobalStrat == StgEnum.CnServer ? 7 : 2);    // 左上塔，场基左，Game8 H1, 国服D4
         _towers.SetTowerPlayer([70, 71, 73, 75, 77], GlobalStrat == StgEnum.CnServer ? 3 : 6);    // 左上塔，场基右，Game8 D3, 国服H2
-        _towers.SetTowerPlayer([79, 81, 83, 85, 87], GlobalStrat == StgEnum.CnServer ? 2 : 3);    // 右上塔，场基左，Game8 H2, 国服H1
-        _towers.SetTowerPlayer([80, 82, 84, 86, 88], GlobalStrat == StgEnum.CnServer ? 6 : 7);    // 右上塔，场基右，Game8 D4, 国服D3
+        _towers.SetTowerPlayer([79, 81, 83, 85, 87], GlobalStrat == StgEnum.CnServer ? 6 : 3);    // 右上塔，场基左，Game8 H2, 国服D3
+        _towers.SetTowerPlayer([80, 82, 84, 86, 88], GlobalStrat == StgEnum.CnServer ? 2 : 7);    // 右上塔，场基右，Game8 D4, 国服H1
 
         var myTower = _towers.GetTowerByPlayerIdx(sa.GetMyIndex());
         var dp0 = sa.DrawStaticCircle(myTower.TowerPos, sa.Data.DefaultDangerColor.WithW(1.5f), 0, 8000, $"待踩塔范围", 3f);
@@ -1204,8 +1205,11 @@ public class M6S
         eventCondition: ["ActionId:42614"], userControl: true)]
     public void P4D_FlyingDestination(Event ev, ScriptAccessory sa)
     {
+        sa.Log.Debug($"判断P4D - 飞行方向、目标塔");
         if (_M6sPhase != M6SPhase.P4C_Lava & _M6sPhase != M6SPhase.P4D_FlyLava) return;
+        sa.Log.Debug($"进入P4D - 飞行方向、目标塔");
         _events[0].WaitOne();
+        sa.Log.Debug($"解锁进入P4D - 飞行方向、目标塔");
         _towers.SortTowerListByRotation();
         
         // Game8策略
