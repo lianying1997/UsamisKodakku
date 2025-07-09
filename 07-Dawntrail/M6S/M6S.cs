@@ -36,17 +36,17 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.10
+    v0.0.0.11
     请先于用户设置中调整整体策略（Game8/CnServer）。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.10";
+    private const string Version = "0.0.0.11";
 
     private const string UpdateInfo =
         """
-        1. 再再次修复火山阶段第二轮塔概率性不指路问题。
+        1. 再再再次修复火山阶段第二轮塔概率性不指路问题。
         """;
 
     private const bool Debugging = false;
@@ -1204,8 +1204,8 @@ public class M6S
         eventCondition: ["ActionId:42614"], userControl: true)]
     public void P4D_FlyingDestination(Event ev, ScriptAccessory sa)
     {
-        if (_M6sPhase != M6SPhase.P4D_FlyLava) return;
         _events[0].WaitOne();
+        if (_M6sPhase != M6SPhase.P4D_FlyLava) return;
         _towers.SortTowerListByRotation();
         
         // Game8策略
