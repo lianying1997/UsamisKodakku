@@ -1204,8 +1204,8 @@ public class M6S
         eventCondition: ["ActionId:42614"], userControl: true)]
     public void P4D_FlyingDestination(Event ev, ScriptAccessory sa)
     {
+        if (_M6sPhase != M6SPhase.P4C_Lava & _M6sPhase != M6SPhase.P4D_FlyLava) return;
         _events[0].WaitOne();
-        if (_M6sPhase != M6SPhase.P4D_FlyLava) return;
         _towers.SortTowerListByRotation();
         
         // Game8策略
