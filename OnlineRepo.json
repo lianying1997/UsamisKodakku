@@ -187,12 +187,12 @@
   {
     "Name": "M6S [零式阿卡狄亚 中量级2]",
     "Guid": "4f5decb5-4a78-4e83-96c8-09678761a751",
-    "Version": "0.0.0.13",
+    "Version": "0.0.0.14",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/M6S/M6S.cs",
-    "Note": "v0.0.0.13\r\n请先于用户设置中调整整体策略（Game8/CnServer）。\r\n待完善。",
-    "UpdateInfo": "1. 火山阶段第二轮塔概率性不指路问题无法复现，欢迎提供ARR。\r\n2. 修复第一轮塔H1D3反了的问题。",
+    "Note": "v0.0.0.14\r\n请先于用户设置中调整整体策略（Game8/CnServer）。\r\n待完善。",
+    "UpdateInfo": "1. 再再再再再次尝试修复火山阶段第二轮塔概率性不指路问题。如果还出现欢迎提供ARR。",
     "TerritoryIds": [
       1259
     ]

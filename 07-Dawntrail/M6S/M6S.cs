@@ -36,18 +36,17 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.13
+    v0.0.0.14
     请先于用户设置中调整整体策略（Game8/CnServer）。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.13";
+    private const string Version = "0.0.0.14";
 
     private const string UpdateInfo =
         """
-        1. 火山阶段第二轮塔概率性不指路问题无法复现，欢迎提供ARR。
-        2. 修复第一轮塔H1D3反了的问题。
+        1. 再再再再再次尝试修复火山阶段第二轮塔概率性不指路问题。如果还出现欢迎提供ARR。
         """;
 
     private const bool Debugging = false;
@@ -1201,12 +1200,12 @@ public class M6S
     
 
 
-    [ScriptMethod(name: "P4D - 飞行方向、目标塔", eventType: EventTypeEnum.StartCasting,
+    [ScriptMethod(name: "P4D - 飞行方向、目标塔", eventType: EventTypeEnum.ActionEffect,
         eventCondition: ["ActionId:42614"], userControl: true)]
     public void P4D_FlyingDestination(Event ev, ScriptAccessory sa)
     {
         sa.Log.Debug($"判断P4D - 飞行方向、目标塔");
-        if (_M6sPhase != M6SPhase.P4C_Lava & _M6sPhase != M6SPhase.P4D_FlyLava) return;
+        if (_M6sPhase != M6SPhase.P4D_FlyLava) return;
         sa.Log.Debug($"进入P4D - 飞行方向、目标塔");
         _events[0].WaitOne();
         sa.Log.Debug($"解锁进入P4D - 飞行方向、目标塔");
