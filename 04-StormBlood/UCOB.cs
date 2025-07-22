@@ -454,6 +454,7 @@ public class Ucob
             accessory.Method.SendChat($"/e 拘束器数量到3，位置记录完毕。");
         }
     }
+    
     [ScriptMethod(name: "【全局】刷新黑球点名目标（不可控）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9902"], userControl: false)]
     public void RefreshGenerateTarget(Event @event, ScriptAccessory accessory)
     {
