@@ -133,12 +133,12 @@
   {
     "Name": "ASS [异闻希拉狄哈水道]",
     "Guid": "bdd73dbd-2a93-4232-9324-0c9093d4a646",
-    "Version": "0.0.1.3",
+    "Version": "0.0.1.4",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
     "Note": "请先按需求检查并设置“用户设置”栏目，\r\n并在/KTeam中设置 T>H>近>远。",
-    "UpdateInfo": "1. 修复了Boss2 刚武旋击（钢铁月环）月环范围错误的Bug\r\n2. 修复了Boss2 金银咒象 金银Buff优先级站位错误的Bug",
+    "UpdateInfo": "1. 删除了用户设置中的DebugMode。\r\n2. 再次修复了Boss2 金银咒象 金银Buff站位错误的Bug。",
     "TerritoryIds": [
       1075,
       1076

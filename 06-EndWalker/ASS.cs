@@ -23,7 +23,7 @@ using FFXIVClientStructs;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.3", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.4", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class ASS
 {
@@ -35,13 +35,11 @@ public class ASS
     
     private const string UpdateInfo =
         """
-        1. 修复了Boss2 刚武旋击（钢铁月环）月环范围错误的Bug
-        2. 修复了Boss2 金银咒象 金银Buff优先级站位错误的Bug
+        1. 删除了用户设置中的DebugMode。
+        2. 再次修复了Boss2 金银咒象 金银Buff站位错误的Bug。
         """;
     
-    [UserSetting("Debug模式，非开发用请关闭")]
-    public static bool DebugMode { get; set; } = false;
-
+    private const bool Debugging = false;
     [UserSetting("站位提示圈绘图-普通颜色")]
     public static ScriptColor posColorNormal { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 1.0f, 1.0f) };
 
@@ -160,22 +158,16 @@ public class ASS
         
         accessory.Method.RemoveDraw(".*");
     }
-
-    public static void DebugMsg(string str, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-        accessory.Method.SendChat($"/e [DEBUG] {str}");
-    }
     
     [ScriptMethod(name: "测试项 - 获得玩家位置", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
-        userControl: false)]
+        userControl: Debugging)]
     public void CheckPlayerRole(Event ev, ScriptAccessory sa)
     {
         sa.Log.Debug($"玩家位置：{sa.getMyIndex()}");
     }
     
     [ScriptMethod(name: "测试项 - 获得金银Buff场地", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
-        userControl: false)]
+        userControl: Debugging)]
     public void CheckGoldenSilverField(Event ev, ScriptAccessory sa)
     {
         var a = Boss2_GoldenSilverField;
@@ -193,29 +185,15 @@ public class ASS
     }
     
     [ScriptMethod(name: "测试项 - 获得金银Buff站位", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld"],
-        userControl: false)]
+        userControl: Debugging)]
     public void CheckGoldenSilverSafeField(Event ev, ScriptAccessory sa)
     {
         int[] high = findGoldenSilverIndex(11, true);
         int[] low = findGoldenSilverIndex(11, false);
         sa.Log.Debug($"高优先级金银 {high[0]}行{high[1]}列；低优先级金银 {low[0]}行{low[1]}列");
     }
-
-    [ScriptMethod(name: "随时DEBUG用", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:=TST"], userControl: false)]
-    public void EchoDebug(Event @event, ScriptAccessory accessory)
-    {
-        if (!DebugMode) return;
-
-        // DEBUG CODE
-        for (int i = 0; i<4; i++)
-        {
-            var dp = accessory.drawStatic(Boss3_P3_BaitPos[i], 0, i*1000, 2000, $"a");
-            dp.Scale = new(2f);
-            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
-        }
-    }
     
-    [ScriptMethod(name: "团灭初始化", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:regex:^(1483[47]|14757|14864|14762|14817)$"], userControl: false, suppress: 3000)]
+    [ScriptMethod(name: "团灭初始化", eventType: EventTypeEnum.RemoveCombatant, eventCondition: ["DataId:regex:^(1483[47]|14757|14864|14762|14817)$"], userControl: Debugging, suppress: 3000)]
     public void WipeInit(Event @event, ScriptAccessory accessory)
     {
         var bossId = @event.DataId();
@@ -238,7 +216,7 @@ public class ASS
         };
         
         ParamsInit(accessory);
-        DebugMsg($"检测到{bossName}的刷新，参数初始化。", accessory);
+        accessory.Log.Debug($"检测到{bossName}的刷新，参数初始化。");
     }
 
     #region Mob1
@@ -339,7 +317,7 @@ public class ASS
             ASS_Phase.BOSS1_P4 => ASS_Phase.BOSS1_P5,
             _ => ASS_Phase.BOSS1_P2
         };
-        DebugMsg($"当前阶段为：{phase}", accessory);
+        accessory.Log.Debug($"当前阶段为：{phase}");
     }
 
     [ScriptMethod(name: "BOSS1：泡泡范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3055[567]|3056[89]|30570|3059[012]|3060[345])$"])]
@@ -644,7 +622,7 @@ public class ASS
         // -347, -339, [-335], -331, -323,
         // -43, -42, -41, -40
         int _idx = (int)(spos.X / 8) + 43;
-        DebugMsg($"检测到水壶出现在第{_idx + 1}列", accessory);
+        accessory.Log.Debug($"检测到水壶出现在第{_idx + 1}列");
         Boss1_P4_WaterLine[_idx] = true;
     }
 
@@ -655,7 +633,7 @@ public class ASS
         if (!IbcHelper.isTank(accessory.Data.Me)) return;
         // 没有被清掉的一侧为少
         var _isleft = Boss1_P4_WaterLine.IndexOf(false) > 1;
-        DebugMsg($"第{Boss1_P4_WaterLine.IndexOf(false)}列被移除，T需去{(_isleft ? "左" : "右")}引导。", accessory);
+        accessory.Log.Debug($"第{Boss1_P4_WaterLine.IndexOf(false)}列被移除，T需去{(_isleft ? "左" : "右")}引导。");
         Vector3 _pos = new Vector3(-350, 471, -155);    // 左侧
         if (!_isleft)
             _pos = _pos.FoldPointLR(CENTER_BOSS1.X);
@@ -1022,25 +1000,28 @@ public class ASS
 
     private int[] findGoldenSilverIndex(int value, bool is_first)
     {
+        List<List<int>> priority = [[30, 30, 0, 0], [30, 30, 0, 0], [20, 20, 10, 10], [20, 20, 10, 10]];
+        int[] safeField1 = [4, 4];
+        int[] safeField2 = [4, 4];
         for (int i = 0; i < Boss2_GoldenSilverField.Count; i++)
         {
             for (int j = 0; j < Boss2_GoldenSilverField[i].Count; j++)
             {
-                if (Boss2_GoldenSilverField[i][j] == value)
-                {
-                    if (value != 11)
-                        return [i, j];
-                    else
-                    {
-                        if ((is_first && j < 2) || (!is_first && j > 1))
-                            continue;
-                        else
-                            return [i, j];
-                    }
-                }
+                if (Boss2_GoldenSilverField[i][j] != value) continue;
+                
+                if (value != 11) return [i, j];
+                    
+                if (safeField1.SequenceEqual([4, 4]))
+                    safeField1 = [i, j];
+                else
+                    safeField2 = [i, j];
             }
         }
-        return [0, 0];
+
+        var isSf1HighPiror = priority[safeField1[0]][safeField1[1]] < priority[safeField2[0]][safeField2[1]] ? 1 : -1;
+        var isFirst = is_first ? 1 : -1;
+        
+        return isSf1HighPiror * isFirst > 0 ? safeField1 : safeField2;
     }
 
     [ScriptMethod(name: "Boss2：连线集合提示绘图", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(30(310|632))$"])]
@@ -1204,8 +1185,7 @@ public class ASS
         if (myIndex >= 2 && swap)
             actionJudge[1] = !actionJudge[1];
 
-        DebugMsg($"我{(swap ? "要换" : "不换")}，先{(actionJudge[0] ? "踩塔" : "放圈")}，我是{(actionJudge[1] ? "右上" : "左下")}组。",
-            accessory);
+        accessory.Log.Debug($"我{(swap ? "要换" : "不换")}，先{(actionJudge[0] ? "踩塔" : "放圈")}，我是{(actionJudge[1] ? "右上" : "左下")}组。");
 
         Vector3 tpos1 = (actionJudge[0] ? towerPos : chariotPos)[actionJudge[1] ? 0 : 1];
         Vector3 tpos2 = (actionJudge[0] ? chariotPos : towerPos)[actionJudge[1] ? 2 : 3];
@@ -1233,7 +1213,7 @@ public class ASS
             ASS_Phase.BOSS3_P4 => ASS_Phase.BOSS3_P5,
             _ => ASS_Phase.BOSS3_P1
         };
-        DebugMsg($"当前阶段为：{phase}", accessory);
+        accessory.Log.Debug($"当前阶段为：{phase}");
     }
 
     [ScriptMethod(name: "Boss3：顺劈死刑", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(29869|30404)$"])]
@@ -1408,7 +1388,7 @@ public class ASS
             _ => 0
         };
         
-        DebugMsg($"检测到玩家{tidx}的Buff为{Boss3_P2_PlayerBuff[tidx]}", accessory);
+        accessory.Log.Debug($"检测到玩家{tidx}的Buff为{Boss3_P2_PlayerBuff[tidx]}");
     }
     
     [ScriptMethod(name: "Boss3：咒具二剪线位置指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["Param:regex:^(45[01234567])$"])]
@@ -1426,11 +1406,11 @@ public class ASS
 
         await Task.Delay(100);
         var myIndex = accessory.getMyIndex();
-        DebugMsg($"检测到线{tid}的Buff{(param - 450) % 4 + 1}", accessory);
+        accessory.Log.Debug($"检测到线{tid}的Buff{(param - 450) % 4 + 1}");
         
         if ((param - 450) % 4 + 1 != Boss3_P2_PlayerBuff[myIndex]) return;
         
-        DebugMsg($"检测到线{tid}的Buff与主视角的Buff相同", accessory);
+        accessory.Log.Debug($"检测到线{tid}的Buff与主视角的Buff相同");
 
         var dpl = accessory.drawRect(tid, 4f, 40f, 0, 30000, $"线{tid}");
         dpl.Color = accessory.Data.DefaultSafeColor;
@@ -1442,7 +1422,7 @@ public class ASS
         Drawn[4] = true;
         
         var linePos = FindLineIdx(tpos);
-        DebugMsg($"我在寻找{tpos}位置的线，linePos为{linePos}", accessory);
+        accessory.Log.Debug($"我在寻找{tpos}位置的线，linePos为{linePos}");
         Vector3 cutLinePos;
         if (IsLineAtLeftDownSide(linePos))
             cutLinePos = CENTER_BOSS3 with { X = CENTER_BOSS3.X - 10, Z = CENTER_BOSS3.Z + 10 };
@@ -1537,8 +1517,8 @@ public class ASS
         var row_spos = (int)Math.Floor(spos.Z + 123) / 10;
         Boss3_P3_safeTeleportPos[row_tpos] = _tpos;
         Boss3_P3_safeTeleportPos[row_spos] = spos;
-        DebugMsg($"记录下了第{row_spos}行的安全坐标{spos}", accessory);
-        DebugMsg($"记录下了第{row_tpos}行的安全坐标{_tpos}", accessory);
+        accessory.Log.Debug($"记录下了第{row_spos}行的安全坐标{spos}");
+        accessory.Log.Debug($"记录下了第{row_tpos}行的安全坐标{_tpos}");
         return dp;
     }
 
@@ -1577,7 +1557,7 @@ public class ASS
             _ => 0
         };
         
-        DebugMsg($"我应该去第{Boss3_P3_myRotateRow}行，对应坐标{Boss3_P3_safeTeleportPos[Boss3_P3_myRotateRow-1]}", accessory);
+        accessory.Log.Debug($"我应该去第{Boss3_P3_myRotateRow}行，对应坐标{Boss3_P3_safeTeleportPos[Boss3_P3_myRotateRow-1]}");
         
         drawPlayerPortal(tid, param, 14000, 3000, accessory);
         var dp = accessory.dirPos(Boss3_P3_safeTeleportPos[Boss3_P3_myRotateRow-1], 0, 9000, $"玩家传送{Boss3_P3_myRotateRow}");
@@ -1641,7 +1621,7 @@ public class ASS
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp0);
         }
         
-        DebugMsg($"我应该去第{myBaitRow + 1}行引导斧头，对应坐标{baitPos}", accessory);
+        accessory.Log.Debug($"我应该去第{myBaitRow + 1}行引导斧头，对应坐标{baitPos}");
         var dp = accessory.dirPos(baitPos, 0, 10000, $"引导斧头位置指路{myBaitRow}");
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
     }
