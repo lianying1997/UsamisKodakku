@@ -39,13 +39,12 @@ public class DsrPatch
         """;
     
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.13";
+    private const string Version = "0.0.0.14";
     private const string DebugVersion = "a";
     
     private const string UpdateInfo =
         """
-        重写了P3踩塔逻辑，现在面对预站位错误或临时改变主意的情况有了一定修正能力。
-        移除了DebugMode的开关。
+        修复P7钢铁月环剑判断方法改动。
         """;
     
     private const bool Debugging = false;
@@ -138,6 +137,8 @@ public class DsrPatch
     private ManualResetEvent _nearOrFarInOutEvent = new(false);
     private ManualResetEvent _bladeEvent = new(false);
     private ManualResetEvent _trinityEvent = new(false);
+    
+    private const uint ChariotBlade = 298;
     
     public void Init(ScriptAccessory sa)
     {
@@ -1574,7 +1575,7 @@ public class DsrPatch
     }
     
 
-    [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"], userControl: false)]
+    [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(29[89])$"], userControl: false)]
     public void P7_BossBladeRecord(Event @event, ScriptAccessory accessory)
     {
         var stc = @event.StackCount();
@@ -1799,11 +1800,11 @@ public class DsrPatch
         _p7Exaflare.SetBladeType(bladeType);
         switch (bladeType)
         {
-            case 42:
+            case ChariotBlade:
                 var dp1 = accessory.DrawStaticCircle(_center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"钢铁", 8f);
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
                 break;
-            case 43:
+            case ChariotBlade + 1:
                 var dp2 = accessory.DrawStaticDonut(_center, accessory.Data.DefaultDangerColor.WithW(2f), 0, castTime, $"月环", 50f, 8f);
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp2);
                 break;
@@ -1838,7 +1839,7 @@ public class DsrPatch
         var dp = accessory.DrawDirPos2Pos(_center, bossFace, 0, 7000, $"面相", 7.9f);
         dp.Color = ColorHelper.ColorDark.V4;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-        DebugExaflare(srot, bossRotLogicRad.Logic2Game(), (uint)random.Next(0, 2) + 42, accessory);
+        DebugExaflare(srot, bossRotLogicRad.Logic2Game(), (uint)random.Next(0, 2) + ChariotBlade, accessory);
         // -- DEBUG CODE END --
     }
     
@@ -2447,7 +2448,7 @@ public class DsrExaflare(List<int> scoreList)
 
     private bool IsChariot()
     {
-        const uint chariotFireBlade = 42;
+        const uint chariotFireBlade = 298;
         return BladeType == chariotFireBlade;
     }
 
