@@ -37,7 +37,7 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.10
+        v0.0.0.11
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
         不论MT或ST引导，双T都会收到引导方向提示。
@@ -45,11 +45,11 @@ public class FruPatch
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.10";
+    private const string Version = "0.0.0.11";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        1. P4未来的碎片受击警察，新增找凶手功能（待样本测试，如有冤枉好人请携ARR反馈！）
+        1. P3启示录分散站位选项可被关闭。
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -978,7 +978,7 @@ public class FruPatch
         }
     }
 
-    [ScriptMethod(name: "地火分散位置指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:40288"], userControl: Debugging, suppress: 10000)]
+    [ScriptMethod(name: "地火分散位置指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:40288"], userControl: true, suppress: 10000)]
     public void ApoSpreadGuidance(Event @ev, ScriptAccessory sa)
     {
         if (_fruPhase != FruPhase.P3B_Apocalypse) return;
