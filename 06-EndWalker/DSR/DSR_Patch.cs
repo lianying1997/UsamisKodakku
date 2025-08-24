@@ -39,12 +39,12 @@ public class DsrPatch
         """;
     
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.14";
+    private const string Version = "0.0.0.15";
     private const string DebugVersion = "a";
     
     private const string UpdateInfo =
         """
-        修复P7钢铁月环剑判断方法改动。
+        1. 修复P7地火不指路的问题。
         """;
     
     private const bool Debugging = false;
@@ -1575,11 +1575,12 @@ public class DsrPatch
     }
     
 
-    [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(29[89])$"], userControl: false)]
+    [ScriptMethod(name: "P7：钢铁月环剑记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "Param:regex:^(29[89])$"], userControl: false)]
     public void P7_BossBladeRecord(Event @event, ScriptAccessory accessory)
     {
-        var stc = @event.StackCount();
-        _p7Exaflare?.SetBladeType(stc);
+        var param = @event.Param();
+        accessory.Log.Debug($"钢铁月环剑：{param}（298钢铁，299月环）");
+        _p7Exaflare?.SetBladeType(param);
         if (!IsExaflarePhase()) return;
         _bladeEvent.Set();
     }
@@ -1612,7 +1613,7 @@ public class DsrPatch
         }
     }
     
-    [ScriptMethod(name: "地火特殊解法指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "StackCount:regex:^(4[23])$"])]
+    [ScriptMethod(name: "地火特殊解法指路", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:2056", "Param:regex:^(29[89])$"])]
     public void P7_ExaflareGuidance(Event @event, ScriptAccessory accessory)
     {
         // 记录完钢铁月环后可计算
@@ -2654,6 +2655,11 @@ public static class EventExtensions
     public static uint StackCount(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["StackCount"]);
+    }
+    
+    public static uint Param(this Event @event)
+    {
+        return JsonConvert.DeserializeObject<uint>(@event["Param"]);
     }
 }
 

@@ -119,12 +119,12 @@
   {
     "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
     "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-    "Version": "0.0.0.14",
+    "Version": "0.0.0.15",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
     "Note": "基于K佬绝龙诗绘图的个人向补充，\r\n请先按需求检查并设置“用户设置”栏目。\r\n在忆罪宫输入\"/e =Exaflare\"可以测试地火特殊跑法。\r\n鸭门。",
-    "UpdateInfo": "修复P7钢铁月环剑判断方法改动。",
+    "UpdateInfo": "1. 修复P7地火不指路的问题。",
     "TerritoryIds": [
       968,
       1112
