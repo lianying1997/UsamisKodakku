@@ -2,24 +2,20 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
-using Dalamud.Utility;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Script;
+using KodakkuAssist.Data;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Extensions;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs;
+using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisKodakku.Scripts._06_EndWalker.AMR;
 
@@ -32,17 +28,17 @@ public class Amr
 {
     const string NoteStr =
         """
-        v0.0.0.2
+        v0.0.0.3
         Boss2 不含踩塔运动会2
         Boss3 不含青帝天箭
         """;
 
     private const string Name = "AMR [异闻六根山]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        修复了因团灭导致初始化失败，继而引发的绘图Bug。
+        1. 适配鸭鸭0.5.x.x
         """;
 
     [UserSetting("站位提示圈绘图-普通颜色")]
@@ -1069,8 +1065,10 @@ public class Amr
         dp.Color = accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
 
+        if (accessory.Data.MyObject is null) return;
+        
         // 目标球指路
-        if (IbcHelper.IsHealer(accessory.Data.Me))
+        if (accessory.Data.MyObject.IsHealer())
         {
             var dpGuideToOrb = accessory.DrawGuidance(targetOrb, 0, 5000, $"万宝槌球指路");
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dpGuideToOrb);
@@ -1078,7 +1076,7 @@ public class Amr
 
         // 奶妈挡枪
         var dpWildCharge = accessory.DrawTarget2Target(sid, accessory.Data.PartyList[1], 8, 50, 3000, 5000, $"万宝槌挡枪");
-        if (!IbcHelper.IsDps(accessory.Data.Me))
+        if (accessory.Data.MyObject.IsDps())
         {
             dpWildCharge.Color = accessory.Data.DefaultSafeColor;
         }
@@ -1561,7 +1559,7 @@ public class Amr
             }
             else
             {
-                var chara = IbcHelper.GetById(tid);
+                var chara = accessory.GetById(tid);
                 if (chara != null)
                 {
                     var rotation = chara.Rotation.Game2Logic();
@@ -1753,7 +1751,7 @@ public class Amr
         public void TurnDynamicToStatic(bool bias)
         {
             var name = $"霞斩{_safeRadian}, {_cleaveRadian}";
-            var chara = IbcHelper.GetById(_targetId);
+            var chara = accessory.GetById(_targetId);
             var charaPos = chara.Position;
             charaPos = charaPos.ExtendPoint(chara.Rotation.Game2Logic(), bias ? -3f : -0.5f);
             SetKasumiCastPos(charaPos);
@@ -2507,74 +2505,16 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong id)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
-    }
-
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
-    {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
-
-    public static bool IsTank(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Tank;
-    }
-    public static bool IsHealer(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Healer;
-    }
-    public static bool IsDps(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.DPS;
-    }
-    public static bool AtNorth(uint id, float centerZ)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.Z <= centerZ;
-    }
-    public static bool AtSouth(uint id, float centerZ)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.Z > centerZ;
-    }
-    public static bool AtWest(uint id, float centerX)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.X <= centerX;
-    }
-    public static bool AtEast(uint id, float centerX)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.X > centerX;
+        return sa.Data.Objects.SearchById(id);
     }
 }
 
 public static class DirectionCalc
 {
+    public static float DegToRad(this float deg) => (deg + 360f) % 360f / 180f * float.Pi;
+    public static float RadToDeg(this float rad) => (rad + 2 * float.Pi) % (2 * float.Pi) / float.Pi * 180f;
     // 以北为0建立list
     // Game         List    Logic
     // 0            - 4     pi

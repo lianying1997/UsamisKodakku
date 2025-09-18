@@ -10,17 +10,12 @@ using KodakkuAssist.Extensions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ECommons;
 using System.Numerics;
 using Newtonsoft.Json;
 using System.Linq;
 using System.ComponentModel;
 using System.Xml.Linq;
 using Dalamud.Utility.Numerics;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ImGuiNET;
-using ECommons.MathHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Lumina.Excel.Sheets;
@@ -37,7 +32,7 @@ public class FruPatch
 {
     private const string NoteStr =
         """
-        v0.0.0.11
+        v0.0.0.12
         指挥模式对P3二运有效。
         若开启指挥模式，将执行近战优化标点。（固定MT左与D1右，并非固定MT左与ST右！）
         不论MT或ST引导，双T都会收到引导方向提示。
@@ -45,11 +40,11 @@ public class FruPatch
         """;
 
     private const string Name = "FRU_Patch [光暗未来绝境战 补丁]";
-    private const string Version = "0.0.0.11";
+    private const string Version = "0.0.0.12";
     private const string DebugVersion = "a";
     private const string UpdateInfo =
         """
-        1. P3启示录分散站位选项可被关闭。
+        1. 适配鸭鸭0.5.x.x
         """;
     private const bool Debugging = false;
     private static readonly bool LocalTest = false;
@@ -1068,7 +1063,7 @@ public class FruPatch
         var tpos1 = new Vector3(100, 0, 80).RotatePoint(Center, (_apo.SafePoints[1] * 45f).DegToRad());
         var tpos2 = new Vector3(100, 0, 80).RotatePoint(Center, (_apo.SafePoints[3] * 45f).DegToRad());
 
-        var isTank = sa.IsTank(sa.Data.Me);
+        var isTank = sa.Data.MyObject is { } o && o.IsTank();
 
         sa.Method.TextInfo(isTank ? $"准备引导" : $"避开引导", 3000, true);
 
@@ -1814,88 +1809,7 @@ public static class IbcHelper
         if (chara == null) return "None";
         return fullName ? chara.ClassJob.Value.Name.ToString() : chara.ClassJob.Value.Abbreviation.ToString();
     }
-    public static CombatRole GetRole(this ICharacter c)
-    {
-        ClassJob? valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local1 = ref valueNullable;
-        ClassJob valueOrDefault;
-        byte? nullable1;
-        if (!local1.HasValue)
-        {
-            nullable1 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local1.GetValueOrDefault();
-            nullable1 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable2 = nullable1;
-        if ((nullable2.HasValue ? new int?((int)nullable2.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 1)
-            return CombatRole.Tank;
-        valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local2 = ref valueNullable;
-        byte? nullable3;
-        if (!local2.HasValue)
-        {
-            nullable3 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local2.GetValueOrDefault();
-            nullable3 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable4 = nullable3;
-        if ((nullable4.HasValue ? new int?((int)nullable4.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 2)
-            return CombatRole.DPS;
-        valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local3 = ref valueNullable;
-        byte? nullable5;
-        if (!local3.HasValue)
-        {
-            nullable5 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local3.GetValueOrDefault();
-            nullable5 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable6 = nullable5;
-        if ((nullable6.HasValue ? new int?((int)nullable6.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 3)
-            return CombatRole.DPS;
-        valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local4 = ref valueNullable;
-        byte? nullable7;
-        if (!local4.HasValue)
-        {
-            nullable7 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local4.GetValueOrDefault();
-            nullable7 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable8 = nullable7;
-        return (nullable8.HasValue ? new int?((int)nullable8.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 4 ? CombatRole.Healer : CombatRole.NonCombat;
-    }
 
-    public static bool IsTank(this ScriptAccessory sa, uint id)
-    {
-        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Tank;
-    }
-    public static bool IsHealer(this ScriptAccessory sa, uint id)
-    {
-        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Healer;
-    }
-    public static bool IsDps(this ScriptAccessory sa, uint id)
-    {
-        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.DPS;
-    }
     public static bool AtNorth(this ScriptAccessory sa, uint id, float centerZ)
     {
         var chara = sa.GetById(id);
@@ -1935,6 +1849,8 @@ public static class IbcHelper
 
 public static class DirectionCalc
 {
+    public static float DegToRad(this float deg) => (deg + 360f) % 360f / 180f * float.Pi;
+    public static float RadToDeg(this float rad) => (rad + 2 * float.Pi) % (2 * float.Pi) / float.Pi * 180f;
     // 以北为0建立list
     // Game         List    Logic
     // 0            - 4     pi

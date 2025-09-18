@@ -1,26 +1,24 @@
 using System;
-using System.Linq;
-using System.Numerics;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent.Struct;
+using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Data;
+using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Module.GameOperate;
+using KodakkuAssist.Module.GameEvent.Types;
+using KodakkuAssist.Extensions;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
+using System.Numerics;
 using Newtonsoft.Json;
+using System.Linq;
+using System.ComponentModel;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
-using KodakkuAssist.Script;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Module.Draw;
-using KodakkuAssist.Module.Draw.Manager;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs;
-using KodakkuAssist.Module.Script.Type;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Vfx;
 
 namespace UsamisKodakku.Script._07_DawnTrail.QueenEternal;
 
@@ -548,7 +546,7 @@ public class QueenEternalEx
         {
             var str = $"玩家设定{accessory.GetPlayerJobByIndex(i)}的信息：";
             var id = accessory.Data.PartyList[i];
-            var chara = IbcHelper.GetById(id);
+            var chara = accessory.GetById(id);
 
             if (chara == null || chara.IsDead)
             {
@@ -557,7 +555,8 @@ public class QueenEternalEx
                 return;
             }
 
-            if (!IbcHelper.IsDps(id))
+            if (accessory.Data.MyObject is null) return;
+            if (!accessory.Data.MyObject.IsDps())
             {
                 _intelligentPriority[i] += 1;
                 str += $"为TN(+1)";
@@ -1379,74 +1378,16 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong gameObjectId)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
-    }
-
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
-    {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
-
-    public static bool IsTank(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Tank;
-    }
-    public static bool IsHealer(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Healer;
-    }
-    public static bool IsDps(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.DPS;
-    }
-    public static bool AtNorth(uint id, float centerZ)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.Z <= centerZ;
-    }
-    public static bool AtSouth(uint id, float centerZ)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.Z > centerZ;
-    }
-    public static bool AtWest(uint id, float centerX)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.X <= centerX;
-    }
-    public static bool AtEast(uint id, float centerX)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.Position.X > centerX;
+        return sa.Data.Objects.SearchById(gameObjectId);
     }
 }
 
 public static class DirectionCalc
 {
+    public static float DegToRad(this float deg) => (deg + 360f) % 360f / 180f * float.Pi;
+    public static float RadToDeg(this float rad) => (rad + 2 * float.Pi) % (2 * float.Pi) / float.Pi * 180f;
     // 以北为0建立list
     // Game         List    Logic
     // 0            - 4     pi

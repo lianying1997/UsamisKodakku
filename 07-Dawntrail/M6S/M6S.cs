@@ -11,15 +11,11 @@ using KodakkuAssist.Extensions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using ECommons;
 using System.Numerics;
 using Newtonsoft.Json;
 using System.Linq;
 using System.ComponentModel;
 using Dalamud.Utility.Numerics;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Vfx;
@@ -36,17 +32,17 @@ public class M6S
 {
     const string NoteStr =
     """
-    v0.0.0.14
+    v0.0.0.15
     请先于用户设置中调整整体策略（Game8/CnServer）。
     待完善。
     """;
 
     private const string Name = "M6S [零式阿卡狄亚 中量级2]";
-    private const string Version = "0.0.0.14";
+    private const string Version = "0.0.0.15";
 
     private const string UpdateInfo =
         """
-        1. 再再再再再次尝试修复火山阶段第二轮塔概率性不指路问题。如果还出现欢迎提供ARR。
+        1. 适配鸭鸭0.5.x.x
         """;
 
     private const bool Debugging = false;
@@ -1525,6 +1521,9 @@ public static class IbcHelper
 #region 计算函数
 public static class DirectionCalc
 {
+    public static float DegToRad(this float deg) => (deg + 360f) % 360f / 180f * float.Pi;
+    public static float RadToDeg(this float rad) => (rad + 2 * float.Pi) % (2 * float.Pi) / float.Pi * 180f;
+    
     /// <summary>
     /// 将游戏基角度（以南为0，逆时针增加）转为逻辑基角度（以北为0，顺时针增加）
     /// 算法与Logic2Game完全相同，但为了代码可读性，便于区分。
