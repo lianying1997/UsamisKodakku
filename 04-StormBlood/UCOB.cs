@@ -5,36 +5,19 @@ using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Extensions;
 using Dalamud.Utility.Numerics;
 using System.Numerics;
-using System.Runtime.Intrinsics.Arm;
-using Dalamud.Memory.Exceptions;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using ECommons;
 using System.Linq;
-using ImGuiNET;
-using static Dalamud.Interface.Utility.Raii.ImRaii;
 using KodakkuAssist.Module.GameOperate;
-using System.Security.Cryptography;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.ComponentModel;
-// using System.DirectoryServices.ActiveDirectory;
 using System.Collections;
-using System.ComponentModel.DataAnnotations.Schema;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using KodakkuAssist.Module.Draw.Manager;
-using Dalamud.Game.ClientState.Objects.Types;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
-using System.Runtime;
-using System.Timers;
-// using Lumina.Excel.GeneratedSheets;
-using System.Diagnostics;
-using System.Security.AccessControl;
 
 namespace UsamisScript.StormBlood.Ucob;
 
 [ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d",
-    version: "0.0.2.1", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
+    version: "0.0.2.2", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class Ucob
 {
     // TODO
@@ -50,7 +33,7 @@ public class Ucob
     
     private const string UpdateInfo =
         """
-        1. 尝试修复连击大地摇动引导方向有概率不出现的问题。
+        1. 适配鸭鸭0.5.x.x
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]

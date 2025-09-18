@@ -10,10 +10,6 @@ using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures.InfoProxy;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
@@ -24,19 +20,20 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p8s;
 
-[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088], guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.6", author: "Usami", note: noteStr)]
+[ScriptType(name: "P8S [零式万魔殿 炼净之狱4]", territorys: [1088],
+    guid: "97df6974-c726-4a00-9016-293c184adf5c", version: "0.0.0.7", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class p8s
 {
     const string noteStr =
     """
-    v0.0.0.6
+    v0.0.0.7
     一车设置场中H2，正右ST。
     鸭门。
     """;
 
     private const string UpdateInfo =
     """
-    1. 修正门神一车站位。
+    1. 适配鸭鸭0.5.x.x
     """;
 
     [UserSetting("Debug模式，非开发用请关闭")]

@@ -7,10 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Data;
 using KodakkuAssist.Module.GameEvent;
@@ -39,12 +35,12 @@ public class DsrPatch
         """;
     
     private const string Name = "DSR_Patch [幻想龙诗绝境战 补丁]";
-    private const string Version = "0.0.0.15";
+    private const string Version = "0.0.0.16";
     private const string DebugVersion = "a";
     
     private const string UpdateInfo =
         """
-        1. 修复P7地火不指路的问题。
+        1. 适配鸭鸭0.5.x.x
         """;
     
     private const bool Debugging = false;
@@ -2673,6 +2669,9 @@ public static class IbcHelper
 
 public static class DirectionCalc
 {
+    public static float DegToRad(this float deg) => (deg + 360f) % 360f / 180f * float.Pi;
+    public static float RadToDeg(this float rad) => (rad + 2 * float.Pi) % (2 * float.Pi) / float.Pi * 180f;
+    
     // 以北为0建立list
     // Game         List    Logic
     // 0            - 4     pi

@@ -10,10 +10,6 @@ using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Network.Structures.InfoProxy;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
@@ -24,17 +20,20 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.Zodiark;
 
-[ScriptType(name: "Zodiark [佐迪亚克歼灭战]", territorys: [992], guid: "ed3f32fe-fc12-4485-baa4-bec6c357e70b", version: "0.0.0.2", author: "Usami", note: noteStr)]
+[ScriptType(name: "Zodiark [佐迪亚克歼灭战]", territorys: [992],
+    guid: "ed3f32fe-fc12-4485-baa4-bec6c357e70b", version: "0.0.0.3", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class Zodiark
 {
     const string noteStr =
     """
-    v0.0.0.2:
-    我再也不using Lumina了。
-    
-    v0.0.0.1:
+    v0.0.0.3:
     鸭门。
     """;
+    
+    private const string UpdateInfo =
+        """
+        1. 适配鸭鸭0.5.x.x
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public bool DebugMode { get; set; } = false;

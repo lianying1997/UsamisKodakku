@@ -1,35 +1,43 @@
 using System;
-using System.Linq;
-using System.Numerics;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent.Struct;
+using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Data;
+using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Module.GameOperate;
+using KodakkuAssist.Module.GameEvent.Types;
+using KodakkuAssist.Extensions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
+using System.Numerics;
 using Newtonsoft.Json;
+using System.Linq;
+using System.ComponentModel;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using KodakkuAssist.Script;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Module.Draw;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using System.Runtime.Intrinsics.Arm;
-using System.Formats.Asn1;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Vfx;
+using Lumina.Excel.Sheets;
 
 namespace UsamisScript.EndWalker.Rubicante;
 
-[ScriptType(name: "Rubicante [卢比坎特歼灭战]", territorys: [1095], guid: "dd6bb7eb-c051-4406-8ec3-ff3523c753ee", version: "0.0.0.1", author: "Usami", note: noteStr)]
+[ScriptType(name: "Rubicante [卢比坎特歼灭战]", territorys: [1095],
+    guid: "dd6bb7eb-c051-4406-8ec3-ff3523c753ee", version: "0.0.0.2", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 
 public class Rubicante
 {
     const string noteStr =
     """
-    v0.0.0.1:
+    v0.0.0.2:
     鸭门。
     """;
+    
+    private const string UpdateInfo =
+        """
+        1. 适配鸭鸭0.5.x.x
+        """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
     public static bool DebugMode { get; set; } = false;
@@ -168,7 +176,7 @@ public class Rubicante
         if (!isCaptured[_idx])
         {
             isCaptured[_idx] = true;
-            InnerCircleId[_idx] = IbcHelper.GetById(tid);
+            InnerCircleId[_idx] = (IBattleChara?)accessory.GetById(tid);
             DebugMsg($"确定{_pos}ID：{tid}", accessory);
         }
 
@@ -501,27 +509,11 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong id)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchById(id);
     }
 
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IBattleChara> GetByDataId(uint dataId)
-    {
-        return (IEnumerable<IBattleChara>)Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
 }
 
 public static class DirectionCalc

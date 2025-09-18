@@ -2,12 +2,12 @@
   {
     "Name": "P8S [零式万魔殿 炼净之狱4]",
     "Guid": "97df6974-c726-4a00-9016-293c184adf5c",
-    "Version": "0.0.0.6",
+    "Version": "0.0.0.7",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p8s.cs",
-    "Note": "v0.0.0.6\n一车设置场中H2，正右ST。\n鸭门。",
-    "UpdateInfo": "1. 修正门神一车站位。",
+    "Note": "v0.0.0.7\r\n一车设置场中H2，正右ST。\r\n鸭门。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       1088
     ]
@@ -15,12 +15,12 @@
   {
     "Name": "P12S [零式万魔殿 荒天之狱4]",
     "Guid": "563bd710-59b8-46de-bbac-f1527d7c0803",
-    "Version": "0.0.0.10",
+    "Version": "0.0.0.11",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p12s.cs",
     "Note": "请先按需求检查并设置“用户设置”栏目。\r\n门神到超链后对话，本体到黑白塔。\r\n鸭门。",
-    "UpdateInfo": "适配新版鸭鸭(4.0.0.0)做了代码修正。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       1154
     ]
@@ -28,12 +28,12 @@
   {
     "Name": "P4S [零式万魔殿 边境之狱4]",
     "Guid": "de9e31e6-d040-48e3-bf0b-aa4e2643f79d",
-    "Version": "0.0.0.3",
+    "Version": "0.0.0.5",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/p4s.cs",
-    "Note": "请先按需求检查并设置“用户设置”栏目。\r\n“逃课”即为黑糖荔枝攻略演示。\r\n门神仅线毒提示，本体到二运。\r\nv0.0.0.3\r\n为了7.1编译成功的尝试。\r\n\r\nv0.0.0.2\r\n1. 初版完成。\r\n鸭门。",
-    "UpdateInfo": "",
+    "Note": "请先按需求检查并设置“用户设置”栏目。\r\n“逃课”即为黑糖荔枝攻略演示。\r\n门神仅线毒提示，本体到二运。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       1009
     ]
@@ -41,12 +41,12 @@
   {
     "Name": "Lv87 [创造环境极北造物院]",
     "Guid": "8d4e4a9c-b144-4ec2-82cd-46b38867e4e6",
-    "Version": "0.0.0.1",
+    "Version": "0.0.0.2",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/06-EndWalker/Lv87_KtisisHyperboreia.cs",
-    "Note": "",
-    "UpdateInfo": "仅老二老三。",
+    "Note": "仅老二老三，别吃dot了别吃dot了！",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       974
     ]
@@ -54,12 +54,12 @@
   {
     "Name": "UCOB [巴哈姆特绝境战]",
     "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-    "Version": "0.0.2.1",
+    "Version": "0.0.2.2",
     "Author": "Joshua and Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
     "Note": "基于@Joshua的巴哈初版程序改写扩充，\r\n感谢合作者@KnightRider，@Meva。\r\n请先按需求检查并设置“用户设置”栏目。\r\n鸭门。",
-    "UpdateInfo": "1. 尝试修复连击大地摇动引导方向有概率不出现的问题。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       733
     ]
@@ -67,12 +67,12 @@
   {
     "Name": "Zodiark-Ex [佐迪亚克暝暗歼灭战]",
     "Guid": "e24a0c8b-5c41-4e58-87c3-355f1f925986",
-    "Version": "0.0.0.5",
+    "Version": "0.0.0.6",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ZodiarkEx.cs",
-    "Note": "",
-    "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。",
+    "Note": "v0.0.0.6:\r\n鸭门。",
+    "UpdateInfo": "",
     "TerritoryIds": [
       993
     ]
@@ -80,12 +80,12 @@
   {
     "Name": "Rubicante-Ex [卢比坎特歼殛战]",
     "Guid": "a5f70ab7-b79a-468c-9ffe-3c7e5091d71d",
-    "Version": "0.0.0.3",
+    "Version": "0.0.0.4",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/RubicanteEx.cs",
-    "Note": "",
-    "UpdateInfo": "1. 修改了一个不影响绘图的程序编写bug。\n2. 修改了中圈旋转时可能不绘图的bug。",
+    "Note": "v0.0.0.4:\r\n很遗憾，大转盘必须Imgui。\r\n鸭门。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       1096
     ]
@@ -93,12 +93,12 @@
   {
     "Name": "Rubicante [卢比坎特歼灭战]",
     "Guid": "dd6bb7eb-c051-4406-8ec3-ff3523c753ee",
-    "Version": "0.0.0.1",
+    "Version": "0.0.0.2",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Rubicante.cs",
-    "Note": "",
-    "UpdateInfo": "大转盘必须Imgui。鸭门。",
+    "Note": "v0.0.0.2:\r\n鸭门。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       1095
     ]
@@ -106,12 +106,12 @@
   {
     "Name": "Zodiark [佐迪亚克歼灭战]",
     "Guid": "ed3f32fe-fc12-4485-baa4-bec6c357e70b",
-    "Version": "0.0.0.2",
+    "Version": "0.0.0.3",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/Zodiark.cs",
-    "Note": "",
-    "UpdateInfo": "为了7.1编译成功的尝试。\n我再也不using Lumina了。",
+    "Note": "v0.0.0.3:\r\n鸭门。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       992
     ]
@@ -119,12 +119,12 @@
   {
     "Name": "DSR_Patch [幻想龙诗绝境战 补丁]",
     "Guid": "cc6fb606-ff7b-4739-81aa-4861b204ab1e",
-    "Version": "0.0.0.15",
+    "Version": "0.0.0.16",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/DSR/DSR_Patch.cs",
     "Note": "基于K佬绝龙诗绘图的个人向补充，\r\n请先按需求检查并设置“用户设置”栏目。\r\n在忆罪宫输入\"/e =Exaflare\"可以测试地火特殊跑法。\r\n鸭门。",
-    "UpdateInfo": "1. 修复P7地火不指路的问题。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       968,
       1112
@@ -133,12 +133,12 @@
   {
     "Name": "ASS [异闻希拉狄哈水道]",
     "Guid": "bdd73dbd-2a93-4232-9324-0c9093d4a646",
-    "Version": "0.0.1.4",
+    "Version": "0.0.1.5",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/ASS.cs",
     "Note": "请先按需求检查并设置“用户设置”栏目，\r\n并在/KTeam中设置 T>H>近>远。",
-    "UpdateInfo": "1. 删除了用户设置中的DebugMode。\r\n2. 再次修复了Boss2 金银咒象 金银Buff站位错误的Bug。",
+    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
     "TerritoryIds": [
       1075,
       1076

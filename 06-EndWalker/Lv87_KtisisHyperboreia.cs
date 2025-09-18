@@ -1,35 +1,37 @@
 using System;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent.Struct;
 using KodakkuAssist.Module.Draw;
-using Dalamud.Utility.Numerics;
-using System.Numerics;
-using System.Runtime.Intrinsics.Arm;
-using Dalamud.Memory.Exceptions;
-using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using ECommons;
-using System.Linq;
-using ImGuiNET;
-using static Dalamud.Interface.Utility.Raii.ImRaii;
-using KodakkuAssist.Module.GameOperate;
-using System.Security.Cryptography;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using System.ComponentModel;
-// using System.DirectoryServices.ActiveDirectory;
-using System.Collections;
-using System.ComponentModel.DataAnnotations.Schema;
-using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using KodakkuAssist.Data;
 using KodakkuAssist.Module.Draw.Manager;
-using Dalamud.Game.ClientState.Objects.Types;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using KodakkuAssist.Module.GameOperate;
+using KodakkuAssist.Module.GameEvent.Types;
+using KodakkuAssist.Extensions;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Numerics;
+using Newtonsoft.Json;
+using System.Linq;
+using System.ComponentModel;
+using Dalamud.Utility.Numerics;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Vfx;
+using Lumina.Excel.Sheets;
 
 namespace UsamisScript;
 
-[ScriptType(name: "Lv87 [创造环境极北造物院]", territorys: [974], guid: "8d4e4a9c-b144-4ec2-82cd-46b38867e4e6", version: "0.0.0.1", author: "Usami", note: "仅老二老三，别吃dot了别吃dot了！")]
+[ScriptType(name: "Lv87 [创造环境极北造物院]", territorys: [974],
+    guid: "8d4e4a9c-b144-4ec2-82cd-46b38867e4e6", version: "0.0.0.2", author: "Usami", note: "仅老二老三，别吃dot了别吃dot了！", updateInfo: UpdateInfo)]
 public class KtisisHyperboreia
 {
+    private const string UpdateInfo =
+        """
+        1. 适配鸭鸭0.5.x.x
+        """;
+    
     // [UserSetting("启用本体一运塔[小队频道]发宏")]
     // public bool HC1_ChatGuidance { get; set; } = false;
 

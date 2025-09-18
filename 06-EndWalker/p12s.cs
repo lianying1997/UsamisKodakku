@@ -7,10 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
@@ -22,7 +18,7 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace UsamisScript.EndWalker.p12s;
 
-[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.10", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "P12S [零式万魔殿 荒天之狱4]", territorys: [1154], guid: "563bd710-59b8-46de-bbac-f1527d7c0803", version: "0.0.0.11", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 
 public class p12s
 {
@@ -35,7 +31,7 @@ public class p12s
     
     private const string UpdateInfo =
         """
-        适配新版鸭鸭(4.0.0.0)做了代码修正。
+        1. 适配鸭鸭0.5.x.x
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]

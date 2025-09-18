@@ -1,30 +1,29 @@
 using System;
-using System.Linq;
-using System.Numerics;
+using KodakkuAssist.Module.GameEvent;
+using KodakkuAssist.Script;
+using KodakkuAssist.Module.GameEvent.Struct;
+using KodakkuAssist.Module.Draw;
+using KodakkuAssist.Data;
+using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Module.GameOperate;
+using KodakkuAssist.Module.GameEvent.Types;
+using KodakkuAssist.Extensions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Numerics;
 using Newtonsoft.Json;
-using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using KodakkuAssist.Script;
-using KodakkuAssist.Data;
-using KodakkuAssist.Module.GameEvent;
-using KodakkuAssist.Module.Draw;
-using KodakkuAssist.Module.Draw.Manager;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs;
-using FFXIVClientStructs.FFXIV.Client.UI.Misc;
-using System.Drawing;
-using System.Security.AccessControl;
+using System.Linq;
 using System.ComponentModel;
+using Dalamud.Utility.Numerics;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Vfx;
 using Lumina.Excel.Sheets;
 
 namespace UsamisScript.EndWalker.p4s;
 
-[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.4", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "P4S [零式万魔殿 边境之狱4]", territorys: [1009], guid: "de9e31e6-d040-48e3-bf0b-aa4e2643f79d", version: "0.0.0.5", author: "Usami", note: noteStr, updateInfo: UpdateInfo)]
 
 public class p4s
 {
@@ -37,7 +36,7 @@ public class p4s
     
     private const string UpdateInfo =
         """
-        适配新版鸭鸭(4.0.0.0)做了代码修正。
+        1. 适配鸭鸭0.5.x.x
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -201,18 +200,18 @@ public class p4s
 
         IPlayerCharacter? me = (IPlayerCharacter?)accessory.GetMe();
         if (me == null) return;
-        var myRole = me.GetRole();
+        var isTank = me.IsTank();
 
         var dp1 = accessory.drawCenterOrder(sid, 1, 0, 5000, $"死刑1");
         dp1.CentreResolvePattern = _isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
         dp1.Scale = new(5f);
-        dp1.Color = myRole == CombatRole.Tank ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+        dp1.Color = isTank ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
 
         var dp2 = accessory.drawCenterOrder(sid, 2, 0, 5000, $"死刑2");
         dp2.CentreResolvePattern = _isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
         dp2.Scale = new(5f);
-        dp2.Color = myRole == CombatRole.Tank ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+        dp2.Color = isTank ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
         accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
     }
 
@@ -432,7 +431,8 @@ public class p4s
             isNorth = true;
         if (act2sol.FireTargets.Contains(myIndex))
         {
-            if (accessory.IsDps(accessory.Data.PartyList[myIndex]))
+            
+            if (accessory.Data.MyObject is { } o && o.IsDps())
             {
                 isWestDown = true;
                 isEastDown = true;
@@ -512,8 +512,7 @@ public class p4s
     {
         Vector3 UPLEFT = CENTER.ExtendPoint((act2sol.isLRSafeFirst ? 45f : -45f).angle2Rad(), 15);
         float _rot_radian;
-        var _myid = accessory.Data.Me;
-        if (accessory.IsTank(_myid))
+        if (accessory.Data.MyObject is { } o && o.IsTank())
             _rot_radian = 0;
         else
             _rot_radian = float.Pi;
@@ -526,8 +525,7 @@ public class p4s
     private static void drawDarkTargetTowerFirst(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
     {
         int _tower_idx;
-        var _myid = accessory.Data.Me;
-        if (accessory.IsTank(_myid))
+        if (accessory.Data.MyObject is { } o && o.IsTank())
             _tower_idx = 0;
         else
             _tower_idx = 2;
@@ -544,9 +542,9 @@ public class p4s
         int _circle_idx;
         var _myid = accessory.Data.Me;
 
-        if (!accessory.IsDps(_myid))
+        if (accessory.Data.MyObject is { } o && !o.IsDps())
         {
-            if (accessory.IsTank(_myid))
+            if (accessory.Data.MyObject.IsTank())
                 _circle_idx = 0;
             else
                 _circle_idx = 2;
@@ -615,11 +613,11 @@ public class p4s
     {
         // 暗TH在右汇合，H踩塔T分摊
         int _pos_idx = 1;
-        var _myid = accessory.Data.Me;
         if (act2sol.isLRSafeFirst)
             _pos_idx++;
 
-        var _target_pos = accessory.IsTank(_myid) ? act2sol.CirclePos[_pos_idx] : act2sol.TowerPos[_pos_idx];
+        var isTank = accessory.Data.MyObject is { } o && o.IsTank();            
+        var _target_pos = isTank ? act2sol.CirclePos[_pos_idx] : act2sol.TowerPos[_pos_idx];
         var dp = accessory.dirPos(_target_pos, 0, 10000, $"二运暗2{isPreparing}{myIndex}");
         dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
@@ -641,12 +639,11 @@ public class p4s
     private static void drawFireTargetRouteSecond(Act2Solution act2sol, int myIndex, bool isPreparing, ScriptAccessory accessory)
     {
         int _pos_idx;
-        var _myid = accessory.Data.Me;
 
-        if (!accessory.IsDps(_myid))
+        if (accessory.Data.MyObject is { } o && !o.IsDps())
         {
             // 火T在右侧分摊
-            if (accessory.IsTank(_myid))
+            if (accessory.Data.MyObject.IsTank())
                 _pos_idx = 1;
             // 火H在左侧踩塔
             else
@@ -664,7 +661,8 @@ public class p4s
         if (act2sol.isLRSafeFirst)
             _pos_idx = _pos_idx == 3 ? 0 : _pos_idx + 1;
 
-        var _target_pos = accessory.IsHealer(_myid) ? act2sol.TowerPos[_pos_idx] : act2sol.CirclePos[_pos_idx];
+        var isHealer = accessory.Data.MyObject is { } o2 && o2.IsHealer();
+        var _target_pos = isHealer ? act2sol.TowerPos[_pos_idx] : act2sol.CirclePos[_pos_idx];
         var dp = accessory.dirPos(_target_pos, 0, 10000, $"二运火2{isPreparing}{myIndex}");
         dp.Color = isPreparing ? accessory.Data.DefaultDangerColor : accessory.Data.DefaultSafeColor;
         accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
@@ -841,88 +839,6 @@ public static class IbcHelper
     public static IGameObject? GetMe(this ScriptAccessory sa)
     {
         return sa.Data.Objects.LocalPlayer;
-    }
-
-    public static bool IsTank(this ScriptAccessory sa, uint id)
-    {
-        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Tank;
-    }
-    public static bool IsHealer(this ScriptAccessory sa, uint id)
-    {
-        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Healer;
-    }
-    public static bool IsDps(this ScriptAccessory sa, uint id)
-    {
-        IPlayerCharacter? chara = (IPlayerCharacter?)sa.GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.DPS;
-    }
-    public static CombatRole GetRole(this ICharacter c)
-    {
-        ClassJob? valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local1 = ref valueNullable;
-        ClassJob valueOrDefault;
-        byte? nullable1;
-        if (!local1.HasValue)
-        {
-            nullable1 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local1.GetValueOrDefault();
-            nullable1 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable2 = nullable1;
-        if ((nullable2.HasValue ? new int?((int)nullable2.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 1)
-            return CombatRole.Tank;
-        valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local2 = ref valueNullable;
-        byte? nullable3;
-        if (!local2.HasValue)
-        {
-            nullable3 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local2.GetValueOrDefault();
-            nullable3 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable4 = nullable3;
-        if ((nullable4.HasValue ? new int?((int)nullable4.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 2)
-            return CombatRole.DPS;
-        valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local3 = ref valueNullable;
-        byte? nullable5;
-        if (!local3.HasValue)
-        {
-            nullable5 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local3.GetValueOrDefault();
-            nullable5 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable6 = nullable5;
-        if ((nullable6.HasValue ? new int?((int)nullable6.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 3)
-            return CombatRole.DPS;
-        valueNullable = c.ClassJob.ValueNullable;
-        ref ClassJob? local4 = ref valueNullable;
-        byte? nullable7;
-        if (!local4.HasValue)
-        {
-            nullable7 = new byte?();
-        }
-        else
-        {
-            valueOrDefault = local4.GetValueOrDefault();
-            nullable7 = new byte?(valueOrDefault.Role);
-        }
-        byte? nullable8 = nullable7;
-        return (nullable8.HasValue ? new int?((int)nullable8.GetValueOrDefault()) : new int?()).GetValueOrDefault() == 4 ? CombatRole.Healer : CombatRole.NonCombat;
     }
 }
 

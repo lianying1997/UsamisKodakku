@@ -5,25 +5,20 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Game.Network.Structures.InfoProxy;
 using Newtonsoft.Json;
 using Dalamud.Utility.Numerics;
-using ECommons;
-using ECommons.DalamudServices;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Script;
+using KodakkuAssist.Data;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Extensions;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs;
 
 namespace UsamisScript.EndWalker.ASS;
 
-[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.4", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "ASS [异闻希拉狄哈水道]", territorys: [1075, 1076], guid: "bdd73dbd-2a93-4232-9324-0c9093d4a646", version: "0.0.1.5", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class ASS
 {
@@ -35,8 +30,7 @@ public class ASS
     
     private const string UpdateInfo =
         """
-        1. 删除了用户设置中的DebugMode。
-        2. 再次修复了Boss2 金银咒象 金银Buff站位错误的Bug。
+        1. 适配鸭鸭0.5.x.x
         """;
     
     private const bool Debugging = false;
@@ -511,7 +505,7 @@ public class ASS
         await Task.Delay(100);  // 等待集合数值改变
         if (Boss1_P2_FieldBubbleProperty.Count(x => x == WIND) != 2) return;
 
-        var _spec_idx = Boss1_P2_FieldBubbleProperty.IndexOf(x => x != WIND);
+        var _spec_idx = Boss1_P2_FieldBubbleProperty.FindIndex(x => x != WIND);
         int _tidx;
         if (Boss1_P2_FieldBubbleProperty[_spec_idx] == ICE)
             // 剩冰球，去下半场另一只染色
@@ -630,7 +624,7 @@ public class ASS
     public void Boss1_P4_TankBusterDir(Event @event, ScriptAccessory accessory)
     {
         if (phase != ASS_Phase.BOSS1_P4) return;
-        if (!IbcHelper.isTank(accessory.Data.Me)) return;
+        if (accessory.Data.MyObject is not { } o || !o.IsTank()) return;
         // 没有被清掉的一侧为少
         var _isleft = Boss1_P4_WaterLine.IndexOf(false) > 1;
         accessory.Log.Debug($"第{Boss1_P4_WaterLine.IndexOf(false)}列被移除，T需去{(_isleft ? "左" : "右")}引导。");
@@ -1830,47 +1824,10 @@ public static class EventExtensions
 
 public static class IbcHelper
 {
-    public static IBattleChara? GetById(uint id)
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong gameObjectId)
     {
-        return (IBattleChara?)Svc.Objects.SearchByEntityId(id);
+        return sa.Data.Objects.SearchById(gameObjectId);
     }
-
-    public static IBattleChara? GetMe()
-    {
-        return Svc.ClientState.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(uint dataId)
-    {
-        return Svc.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static uint GetCharHpcur(uint id)
-    {
-        // 如果null，返回0
-        var hp = GetById(id)?.CurrentHp ?? 0;
-        return hp;
-    }
-
-    public static bool isTank(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Tank;
-    }
-    public static bool isHealer(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.Healer;
-    }
-    public static bool isDps(uint id)
-    {
-        var chara = GetById(id);
-        if (chara == null) return false;
-        return chara.GetRole() == CombatRole.DPS;
-    }
-
 }
 
 public static class DirectionCalc
