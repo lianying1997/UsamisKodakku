@@ -38,14 +38,14 @@ public class NecronEx
     
     const string NoteStr =
         """
-        v0.0.0.1
+        v0.0.0.2
         初版，鸭门。
         """;
     
     const string UpdateInfo =
         """
-        v0.0.0.1
-        初版，鸭门。
+        v0.0.0.2
+        修复大十字踩塔和分散的问题。
         """;
 
     private const bool
@@ -1007,6 +1007,7 @@ public class NecronEx
     public void 大十字踩塔指路删除(Event ev, ScriptAccessory sa)
     {
         _bools[9] = false;
+        _numbers[8] = 0;
         sa.Log.Debug($"踩塔判定，删除大十字踩塔指路");
         sa.Method.RemoveDraw($"大十字踩塔分散");
     }
