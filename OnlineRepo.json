@@ -200,12 +200,12 @@
   {
     "Name": "NecronEx [永恒之暗悲惶歼灭战]",
     "Guid": "1829f7d6-9e64-4cf7-9be4-e5d8a2e03d21",
-    "Version": "0.0.0.1",
+    "Version": "0.0.0.2",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/Necron/NecronEx.cs",
-    "Note": "v0.0.0.1\r\n初版，鸭门。",
-    "UpdateInfo": "v0.0.0.1\r\n初版，鸭门。",
+    "Note": "v0.0.0.2\r\n初版，鸭门。",
+    "UpdateInfo": "v0.0.0.2\r\n修复大十字踩塔和分散的问题。",
     "TerritoryIds": [
       1296
     ]

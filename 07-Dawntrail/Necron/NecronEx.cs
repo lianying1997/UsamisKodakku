@@ -33,7 +33,7 @@ public class NecronEx
 {
     private const string
         Name = "NecronEx [永恒之暗悲惶歼灭战]",
-        Version = "0.0.0.1",
+        Version = "0.0.0.2",
         DebugVersion = "a";
     
     const string NoteStr =
