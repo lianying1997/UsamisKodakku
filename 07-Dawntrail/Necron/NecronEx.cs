@@ -33,19 +33,20 @@ public class NecronEx
 {
     private const string
         Name = "NecronEx [永恒之暗悲惶歼灭战]",
-        Version = "0.0.0.2",
+        Version = "0.0.0.3",
         DebugVersion = "a";
     
     const string NoteStr =
-        """
-        v0.0.0.2
+        $"""
+        {Version}
         初版，鸭门。
         """;
     
     const string UpdateInfo =
-        """
-        v0.0.0.2
-        修复大十字踩塔和分散的问题。
+        $"""
+        {Version}
+        1. 再次修复大十字踩塔和分散的问题。
+        2. 修复青之波潮可能出现的指路错误问题。
         """;
 
     private const bool
@@ -580,16 +581,16 @@ public class NecronEx
         // 青之多重波，对目标分摊绘图（此处选择TH）
         var myPartIdx = partnerJudge[sa.GetMyIndex()];
         sa.DrawFan(ev.SourceId, sa.Data.PartyList[2], 0, 20000, $"青之多重波分摊 H1",
-            (isPartnerStack ? 20f : 30f).DegToRad(), 0, 100, 0, isPartnerStack ? myPartIdx == partnerJudge[2] : myPartIdx < 10);
+            (isPartnerStack ? 20f : 25f).DegToRad(), 0, 100, 0, isPartnerStack ? myPartIdx == partnerJudge[2] : myPartIdx < 10);
         sa.DrawFan(ev.SourceId, sa.Data.PartyList[3], 0, 20000, $"青之多重波分摊 H2",
-            (isPartnerStack ? 20f : 30f).DegToRad(), 0, 100, 0, isPartnerStack ? myPartIdx == partnerJudge[3] : myPartIdx > 10);
+            (isPartnerStack ? 20f : 25f).DegToRad(), 0, 100, 0, isPartnerStack ? myPartIdx == partnerJudge[3] : myPartIdx > 10);
 
         if (isPartnerStack)
         {
             sa.DrawFan(ev.SourceId, sa.Data.PartyList[0], 0, 20000, $"青之多重波分摊 MT",
-                (isPartnerStack ? 20f : 30f).DegToRad(), 0, 100, 0, myPartIdx == partnerJudge[0]);
+                (isPartnerStack ? 20f : 25f).DegToRad(), 0, 100, 0, myPartIdx == partnerJudge[0]);
             sa.DrawFan(ev.SourceId, sa.Data.PartyList[1], 0, 20000, $"青之多重波分摊 ST",
-                (isPartnerStack ? 20f : 30f).DegToRad(), 0, 100, 0, myPartIdx == partnerJudge[1]);
+                (isPartnerStack ? 20f : 25f).DegToRad(), 0, 100, 0, myPartIdx == partnerJudge[1]);
         }
         sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波范围绘图完毕，释放锁");
     }
@@ -835,6 +836,7 @@ public class NecronEx
     public void 青之多重波潮指路(Event ev, ScriptAccessory sa)
     {
         _bools[7] = true;
+        _events[5].WaitOne(10000);
         var isPartnerStack = _bools[5];
         
         // 青之多重波，指路
@@ -1008,6 +1010,7 @@ public class NecronEx
     {
         _bools[9] = false;
         _numbers[8] = 0;
+        _events[7].Reset();
         sa.Log.Debug($"踩塔判定，删除大十字踩塔指路");
         sa.Method.RemoveDraw($"大十字踩塔分散");
     }
@@ -1242,181 +1245,6 @@ public class NecronEx
     
     #endregion 群体恐慌 Mass Macabre
     
-    [ScriptMethod(name: "阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:12345"],
-        userControl: Debugging)]
-    public void PhaseChange(Event ev, ScriptAccessory sa)
-    {
-        // _phase = Phase.P2;
-        // sa.Log.Debug($"当前阶段为：{_phase}");
-    }
-
-    #region 优先级字典 类
-    public class PriorityDict
-    {
-        // ReSharper disable once NullableWarningSuppressionIsUsed
-        public ScriptAccessory sa {get; set;} = null!;
-        // ReSharper disable once NullableWarningSuppressionIsUsed
-        public Dictionary<int, int> Priorities {get; set;} = null!;
-        public string Annotation { get; set; } = "";
-        public int ActionCount { get; set; } = 0;
-        
-        public void Init(ScriptAccessory accessory, string annotation, int partyNum = 8, bool refreshActionCount = true)
-        {
-            sa = accessory;
-            Priorities = new Dictionary<int, int>();
-            for (var i = 0; i < partyNum; i++)
-            {
-                Priorities.Add(i, 0);
-            }
-            Annotation = annotation;
-            if (refreshActionCount)
-                ActionCount = 0;
-        }
-
-        /// <summary>
-        /// 为特定Key增加优先级
-        /// </summary>
-        /// <param name="idx">key</param>
-        /// <param name="priority">优先级数值</param>
-        public void AddPriority(int idx, int priority)
-        {
-            Priorities[idx] += priority;
-        }
-        
-        /// <summary>
-        /// 从Priorities中找到前num个数值最小的，得到新的Dict返回
-        /// </summary>
-        /// <param name="num"></param>
-        /// <returns></returns>
-        public List<KeyValuePair<int, int>> SelectSmallPriorityIndices(int num)
-        {
-            return SelectMiddlePriorityIndices(0, num);
-        }
-
-        /// <summary>
-        /// 从Priorities中找到前num个数值最大的，得到新的Dict返回
-        /// </summary>
-        /// <param name="num"></param>
-        /// <returns></returns>
-        public List<KeyValuePair<int, int>> SelectLargePriorityIndices(int num)
-        {
-            return SelectMiddlePriorityIndices(0, num, true);
-        }
-        
-        /// <summary>
-        /// 从Priorities中找到升序排列中间的数值，得到新的Dict返回
-        /// </summary>
-        /// <param name="skip">跳过skip个元素。若从第二个开始取，skip=1</param>
-        /// <param name="num"></param>
-        /// <param name="descending">降序排列，默认为false</param>
-        /// <returns></returns>
-        public List<KeyValuePair<int, int>> SelectMiddlePriorityIndices(int skip, int num, bool descending = false)
-        {
-            if (Priorities.Count < skip + num)
-                return new List<KeyValuePair<int, int>>();
-
-            IEnumerable<KeyValuePair<int, int>> sortedPriorities;
-            if (descending)
-            {
-                // 根据值从大到小降序排序，并取前num个键
-                sortedPriorities = Priorities
-                    .OrderByDescending(pair => pair.Value) // 先根据值排列
-                    .ThenBy(pair => pair.Key) // 再根据键排列
-                    .Skip(skip) // 跳过前skip个元素
-                    .Take(num); // 取前num个键值对
-            }
-            else
-            {
-                // 根据值从小到大升序排序，并取前num个键
-                sortedPriorities = Priorities
-                    .OrderBy(pair => pair.Value) // 先根据值排列
-                    .ThenBy(pair => pair.Key) // 再根据键排列
-                    .Skip(skip) // 跳过前skip个元素
-                    .Take(num); // 取前num个键值对
-            }
-            
-            return sortedPriorities.ToList();
-        }
-        
-        /// <summary>
-        /// 从Priorities中找到升序排列第idx位的数据，得到新的Dict返回
-        /// </summary>
-        /// <param name="idx"></param>
-        /// <param name="descending">降序排列，默认为false</param>
-        /// <returns></returns>
-        public KeyValuePair<int, int> SelectSpecificPriorityIndex(int idx, bool descending = false)
-        {
-            var sortedPriorities = SelectMiddlePriorityIndices(0, Priorities.Count, descending);
-            return sortedPriorities[idx];
-        }
-
-        /// <summary>
-        /// 从Priorities中找到对应key的数据，得到其Value排序后位置返回
-        /// </summary>
-        /// <param name="key"></param>
-        /// <param name="descending">降序排列，默认为false</param>
-        /// <returns></returns>
-        public int FindPriorityIndexOfKey(int key, bool descending = false)
-        {
-            var sortedPriorities = SelectMiddlePriorityIndices(0, Priorities.Count, descending);
-            var i = 0;
-            foreach (var dict in sortedPriorities)
-            {
-                if (dict.Key == key) return i;
-                i++;
-            }
-
-            return i;
-        }
-        
-        /// <summary>
-        /// 一次性增加优先级数值
-        /// 通常适用于特殊优先级（如H-T-D-H）
-        /// </summary>
-        /// <param name="priorities"></param>
-        public void AddPriorities(List<int> priorities)
-        {
-            if (Priorities.Count != priorities.Count)
-                throw new ArgumentException("输入的列表与内部设置长度不同");
-
-            for (var i = 0; i < Priorities.Count; i++)
-                AddPriority(i, priorities[i]);
-        }
-
-        /// <summary>
-        /// 输出优先级字典的Key与优先级
-        /// </summary>
-        /// <returns></returns>
-        public string ShowPriorities(bool showJob = true)
-        {
-            var str = $"{Annotation} ({ActionCount}-th) 优先级字典：\n";
-            if (Priorities.Count == 0)
-            {
-                str += $"PriorityDict Empty.\n";
-                return str;
-            }
-            foreach (var pair in Priorities)
-            {
-                str += $"Key {pair.Key} {(showJob ? $"({Role[pair.Key]})" : "")}, Value {pair.Value}\n";
-            }
-
-            return str;
-        }
-
-        public PriorityDict DeepCopy()
-        {
-            return JsonConvert.DeserializeObject<PriorityDict>(JsonConvert.SerializeObject(this)) ?? new PriorityDict();
-        }
-
-        public void AddActionCount(int count = 1)
-        {
-            ActionCount += count;
-        }
-
-    }
-
-    #endregion 优先级字典 类
-
 }
 
 #region 函数集
@@ -1443,10 +1271,6 @@ public static class EventExtensions
         return ParseHexId(@event["Id"], out var id) ? id : 0;
     }
     
-    public static uint Index(this Event ev)
-    {
-        return JsonConvert.DeserializeObject<uint>(ev["Index"]);
-    }
 }
 
 public static class IbcHelper
@@ -1455,33 +1279,7 @@ public static class IbcHelper
     {
         return sa.Data.Objects.SearchById(gameObjectId);
     }
-    
-    public static IGameObject? GetMe(this ScriptAccessory sa)
-    {
-        return sa.Data.Objects.LocalPlayer;
-    }
 
-    public static IEnumerable<IGameObject?> GetByDataId(this ScriptAccessory sa, uint dataId)
-    {
-        return sa.Data.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static string GetPlayerJob(this ScriptAccessory sa, IPlayerCharacter? playerObject, bool fullName = false)
-    {
-        if (playerObject == null) return "None";
-        return fullName ? playerObject.ClassJob.Value.Name.ToString() : playerObject.ClassJob.Value.Abbreviation.ToString();
-    }
-
-    public static float GetStatusRemainingTime(this ScriptAccessory sa, IBattleChara? battleChara, uint statusId)
-    {
-        if (battleChara == null || !battleChara.IsValid()) return 0;
-        unsafe
-        {
-            BattleChara* charaStruct = (BattleChara*)battleChara.Address;
-            var statusIdx = charaStruct->GetStatusManager()->GetStatusIndex(statusId);
-            return charaStruct->GetStatusManager()->GetRemainingTime(statusIdx);
-        }
-    }
 }
 #region 计算函数
 
@@ -1595,18 +1393,6 @@ public static class MathTools
 public static class IndexHelper
 {
     /// <summary>
-    /// 输入玩家dataId，获得对应的位置index
-    /// </summary>
-    /// <param name="pid">玩家SourceId</param>
-    /// <param name="sa"></param>
-    /// <returns>该玩家对应的位置index</returns>
-    public static int GetPlayerIdIndex(this ScriptAccessory sa, uint pid)
-    {
-        // 获得玩家 IDX
-        return sa.Data.PartyList.IndexOf(pid);
-    }
-
-    /// <summary>
     /// 获得主视角玩家对应的位置index
     /// </summary>
     /// <param name="sa"></param>
@@ -1614,20 +1400,6 @@ public static class IndexHelper
     public static int GetMyIndex(this ScriptAccessory sa)
     {
         return sa.Data.PartyList.IndexOf(sa.Data.Me);
-    }
-
-    /// <summary>
-    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
-    /// </summary>
-    /// <param name="pid">玩家SourceId</param>
-    /// <param name="sa"></param>
-    /// <returns>该玩家对应的位置称呼</returns>
-    public static string GetPlayerJobById(this ScriptAccessory sa, uint pid)
-    {
-        // 获得玩家职能简称，无用处，仅作DEBUG输出
-        var idx = sa.Data.PartyList.IndexOf(pid);
-        var str = sa.GetPlayerJobByIndex(idx);
-        return str;
     }
 
     /// <summary>
@@ -1644,24 +1416,6 @@ public static class IndexHelper
         if (idx < 0 || idx >= 8 || (fourPeople && idx >= 4))
             return "Unknown";
         return fourPeople ? role4[idx] : role8[idx];
-    }
-    
-    /// <summary>
-    /// 将List内信息转换为字符串。
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="myList"></param>
-    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
-    /// <typeparam name="T"></typeparam>
-    /// <returns></returns>
-    public static string BuildListStr<T>(this ScriptAccessory sa, List<T> myList, bool isJob = false)
-    {
-        return string.Join(", ", myList.Select(item =>
-        {
-            if (isJob && item != null && item is int i)
-                return sa.GetPlayerJobByIndex(i);
-            return item?.ToString() ?? "";
-        }));
     }
 }
 #endregion 位置序列函数
@@ -1867,41 +1621,6 @@ public static class DrawTools
         object ownerObj, int delay, int destroy, string name, float rotation,
         float width, float length, bool isSafe = false, bool byTime = false, bool byY = false, bool draw = true)
         => sa.DrawRect(ownerObj, 0, delay, destroy, name, rotation, width, length, isSafe, byTime, byY, draw);
-    
-    /// <summary>
-    /// 返回背对绘图
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="targetObj">目标</param>
-    /// <param name="delay">延时</param>
-    /// <param name="destroy">消失时间</param>
-    /// <param name="name">绘图名字</param>
-    /// <param name="isSafe">是否安全色</param>
-    /// <param name="draw">是否直接绘制</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory sa,
-        object targetObj, int delay, int destroy, string name, bool isSafe = true, bool draw = true)
-        => sa.DrawOwnerBase(sa.Data.Me, targetObj, delay, destroy, name, 0, 0, 0, 0, 0, 0,
-            DrawModeEnum.Default, DrawTypeEnum.SightAvoid, isSafe, false, false, draw);
-
-    /// <summary>
-    /// 返回击退绘图
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="targetObj">击退源</param>
-    /// <param name="delay">延时</param>
-    /// <param name="destroy">消失时间</param>
-    /// <param name="name">绘图名字</param>
-    /// <param name="width">箭头宽</param>
-    /// <param name="length">箭头长</param>
-    /// <param name="isSafe">是否安全色</param>
-    /// <param name="draw">是否直接绘制</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory sa,
-        object targetObj, int delay, int destroy, string name, float width, float length,
-        bool isSafe = false, bool draw = true)
-        => sa.DrawOwnerBase(sa.Data.Me, targetObj, delay, destroy, name, 0, float.Pi, width, length, 0, 0,
-            DrawModeEnum.Default, DrawTypeEnum.Displacement, isSafe, false, false, draw);
 
     /// <summary>
     /// 返回线型绘图
@@ -1925,42 +1644,7 @@ public static class DrawTools
         float width, float length, bool isSafe = false, bool byTime = false, bool byY = false, bool draw = true)
         => sa.DrawOwnerBase(ownerObj, targetObj, delay, destroy, name, 1, rotation, width, length, 0, 0,
             DrawModeEnum.Default, DrawTypeEnum.Line, isSafe, byTime, byY, draw);
-    
-    /// <summary>
-    /// 返回两对象间连线绘图
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="ownerObj">起始源</param>
-    /// <param name="targetObj">目标源</param>
-    /// <param name="delay">延时</param>
-    /// <param name="destroy">消失时间</param>
-    /// <param name="name">绘图名字</param>
-    /// <param name="width">线宽</param>
-    /// <param name="isSafe">是否安全色</param>
-    /// <param name="draw">是否直接绘制</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawConnection(this ScriptAccessory sa, object ownerObj, object targetObj,
-        int delay, int destroy, string name, float width = 1f, bool isSafe = false, bool draw = true)
-        => sa.DrawOwnerBase(ownerObj, targetObj, delay, destroy, name, 0, 0, width, width,
-            0, 0, DrawModeEnum.Imgui, DrawTypeEnum.Line, isSafe, false, true, draw);
 
-    /// <summary>
-    /// 赋予输入的dp以ownerId为源的远近目标绘图
-    /// </summary>
-    /// <param name="self"></param>
-    /// <param name="isNearOrder">从owner计算，近顺序或远顺序</param>
-    /// <param name="orderIdx">从1开始</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit SetOwnersDistanceOrder(this DrawPropertiesEdit self, bool isNearOrder,
-        uint orderIdx)
-    {
-        self.CentreResolvePattern = isNearOrder
-            ? PositionResolvePatternEnum.PlayerNearestOrder
-            : PositionResolvePatternEnum.PlayerFarestOrder;
-        self.CentreOrderIndex = orderIdx;
-        return self;
-    }
-    
     /// <summary>
     /// 赋予输入的dp以ownerId为源的仇恨顺序绘图
     /// </summary>
@@ -1990,124 +1674,9 @@ public static class DrawTools
         self.TargetOrderIndex = orderIdx;
         return self;
     }
-    
-    /// <summary>
-    /// 赋予输入的dp以ownerId施法目标为源的绘图
-    /// </summary>
-    /// <param name="self"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit SetOwnersTarget(this DrawPropertiesEdit self)
-    {
-        self.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
-        return self;
-    }
 }
 
 #endregion 绘图函数
-
-#region 特殊函数
-
-public static class SpecialFunction
-{
-    public static void SetTargetable(this ScriptAccessory sa, IGameObject? obj, bool targetable)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            if (targetable)
-            {
-                if (obj.IsDead || obj.IsTargetable) return;
-                charaStruct->TargetableStatus |= ObjectTargetableFlags.IsTargetable;
-            }
-            else
-            {
-                if (!obj.IsTargetable) return;
-                charaStruct->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
-            }
-        }
-        sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
-    }
-
-    public static void ScaleModify(this ScriptAccessory sa, IGameObject? obj, float scale)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->Scale = scale;
-            charaStruct->DisableDraw();
-            charaStruct->EnableDraw();
-        }
-        sa.Log.Debug($"ScaleModify => {obj.Name.TextValue} | {obj} => {scale}");
-    }
-
-    public static void SetRotation(this ScriptAccessory sa, IGameObject? obj, float radian, bool show = false)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->SetRotation(radian);
-        }
-        sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.EntityId} => {radian.RadToDeg()}");
-        
-        if (!show) return;
-        var ownerObj = sa.GetById(obj.EntityId);
-        if (ownerObj == null) return;
-        var dp = sa.DrawGuidance(ownerObj, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", radian, draw: false);
-        dp.FixRotation = true;
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
-        
-    }
-    
-    public static unsafe float GetRotation(this ScriptAccessory sa, IGameObject? obj)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return 0;
-        }
-        GameObject* charaStruct = (GameObject*)obj.Address;
-        var rotation = charaStruct->Rotation;
-        sa.Log.Debug($"GetRotation => {obj.Name.TextValue} | {obj} => {rotation}");
-        return rotation;
-    }
-
-    public static void SetPosition(this ScriptAccessory sa, IGameObject? obj, Vector3 position, bool show = false)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->SetPosition(position.X, position.Y, position.Z);
-        }
-        sa.Log.Debug($"改变位置 => {obj.Name.TextValue} | {obj.EntityId} => {position}");
-        
-        if (!show) return;
-        var dp = sa.DrawCircle(position, 0, 2000, $"传送点 {obj.Name.TextValue}", 0.5f, true, draw: false);
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
-        
-    }
-}
-
-#endregion 特殊函数
 
 #endregion 函数集
 
