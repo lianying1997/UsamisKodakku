@@ -33,7 +33,7 @@ public class NecronEx
 {
     private const string
         Name = "NecronEx [永恒之暗悲惶歼灭战]",
-        Version = "0.0.0.3",
+        Version = "0.0.0.4",
         DebugVersion = "a";
     
     const string NoteStr =
@@ -45,23 +45,17 @@ public class NecronEx
     const string UpdateInfo =
         $"""
         {Version}
-        1. 再次修复大十字踩塔和分散的问题。
-        2. 修复青之波潮可能出现的指路错误问题。
+        1. 从效果上，是延后了死刑第二段的出现时间。
+        2. 大十字阶段赶走了讨厌的魂块。
+        3. 删掉了向xllog的泄洪。
         """;
 
     private const bool
         Debugging = false;
 
     private static readonly
-        List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
-    private static readonly
         Vector3 Center = new Vector3(100, 0, 100);
     
-    private enum NecronPhase
-    {
-        Init,               // 初始
-    }
-
     private volatile List<bool> _bools = new bool[20].ToList();      // 被记录flag
     private List<int> _numbers = Enumerable.Repeat(0, 8).ToList();
     private static List<ManualResetEvent> _events = Enumerable
@@ -94,7 +88,7 @@ public class NecronEx
     {
         RefreshParams();
         RefreshCastTimeParams();
-        sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.");
+        // sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.");
         sa.Method.RemoveDraw(".*");
         _initHint = false;
     }
@@ -140,6 +134,20 @@ public class NecronEx
         RefreshParams();
     }
     
+    [ScriptMethod(name: "消失吧", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 消失吧(Event ev, ScriptAccessory sa)
+    {
+        sa.WriteInvisible(sa.Data.MyObject);
+    }
+    
+    [ScriptMethod(name: "回来吧", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 回来吧(Event ev, ScriptAccessory sa)
+    {
+        sa.WriteVisible(sa.Data.MyObject);
+    }
+    
     [ScriptMethod(name: "初始提示", eventType: EventTypeEnum.Chat, eventCondition: ["Message:regex:^(肉体无法摆脱死亡的束缚。\n这就是你们的局限性。)$"],
         userControl: true)]
     public void 初始提示(Event ev, ScriptAccessory sa)
@@ -163,11 +171,11 @@ public class NecronEx
         userControl: true)]
     public void 青之冲击绘图(Event ev, ScriptAccessory sa)
     {
-        var dp = sa.DrawFan(ev.SourceId, 0, 10000, $"青之冲击", 100f.DegToRad(), 0, 100, 0, draw: false);
+        var dp = sa.DrawFan(ev.SourceId, 5000, 5000, $"青之冲击", 100f.DegToRad(), 0, 100, 0, draw: false);
         dp.SetOwnersEnmityOrder(1);
         dp.Color = new Vector4(1, 0, 0, 1);
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Fan, dp);
-        sa.Log.Debug($"绘图 青之冲击");
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        // sa.Log.Debug($"绘图 青之冲击");
     }
     
     [ScriptMethod(name: "青之冲击判定", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(44593)$", "TargetIndex:1"],
@@ -175,10 +183,10 @@ public class NecronEx
     public void 青之冲击判定(Event ev, ScriptAccessory sa)
     {
         _numbers[0]++;
-        sa.Log.Debug($"青之冲击计数 {_numbers[0]}");
+        // sa.Log.Debug($"青之冲击计数 {_numbers[0]}");
         if (_numbers[0] % 2 != 0) return;
         sa.Method.RemoveDraw($"青之冲击");
-        sa.Log.Debug($"删除青之冲击绘图，计数初始化");
+        // sa.Log.Debug($"删除青之冲击绘图，计数初始化");
         _numbers[0] = 0;
     }
     
@@ -195,12 +203,12 @@ public class NecronEx
     public void 死之恐惧(Event ev, ScriptAccessory sa)
     {
         _castTime_FoD++;
-        sa.Log.Debug($"读条死之恐惧 #{_castTime_FoD}");
+        // sa.Log.Debug($"读条死之恐惧 #{_castTime_FoD}");
         _judging_FoD = true;
         
         _numbers[1] = 0;
         _bools[0] = true;
-        sa.Log.Debug($"死之恐惧 #{_castTime_FoD} 添加事件 _events[0]，直至记录完毕手与指路");
+        // sa.Log.Debug($"死之恐惧 #{_castTime_FoD} 添加事件 _events[0]，直至记录完毕手与指路");
         _events[0].Set();
         
         // switch (_castTime_FoD)
@@ -210,7 +218,7 @@ public class NecronEx
         //     case 3:
         //         _numbers[1] = 0;
         //         _bools[0] = true;
-        //         sa.Log.Debug($"死之恐惧 #{_castTime_FoD} 添加事件 _events[0]，直至记录完毕手与指路");
+        //         // sa.Log.Debug($"死之恐惧 #{_castTime_FoD} 添加事件 _events[0]，直至记录完毕手与指路");
         //         _events[0].Set();
         //         break;
         //     default:
@@ -231,7 +239,7 @@ public class NecronEx
             // 记录位置
             _poses[_numbers[1]] = ev.SourcePosition;
             _numbers[1]++;
-            sa.Log.Debug($"记录下 手 #{_numbers[1]} 的泥坑位置 {ev.SourcePosition}");
+            // sa.Log.Debug($"记录下 手 #{_numbers[1]} 的泥坑位置 {ev.SourcePosition}");
         }
         
         // 记录全后，排序
@@ -252,7 +260,7 @@ public class NecronEx
             if (sa.GetMyIndex() != playerIdx[i]) continue;
             var downSide = i % 2 == 1;
             sa.DrawGuidance(_poses[i] + new Vector3(0, 0, downSide ? 4 : -4), 0, 20000, $"泥坑指路{i}");
-            sa.Log.Debug($"指路向泥坑 #{i}（从左至右、从上至下），泥坑在{(downSide ? "下" : "上")}");
+            // sa.Log.Debug($"指路向泥坑 #{i}（从左至右、从上至下），泥坑在{(downSide ? "下" : "上")}");
         }
 
     }
@@ -263,7 +271,7 @@ public class NecronEx
     {
         if (!_judging_FoD) return;
         _events[0].Reset();
-        sa.Log.Debug($"死之恐惧泥坑判定，绘图删除，释放锁");
+        // sa.Log.Debug($"死之恐惧泥坑判定，绘图删除，释放锁");
         sa.Method.RemoveDraw($"泥坑.*");
     }
     
@@ -273,7 +281,7 @@ public class NecronEx
     {
         if (!_judging_FoD) return;
         if (!_bools[0]) return;
-        sa.Log.Debug($"进行引导压溃绘图");
+        // sa.Log.Debug($"进行引导压溃绘图");
         List<int> playerIdx = [0, 2, 4, 6, 5, 7, 1, 3];
         for (int i = 0; i < 8; i++)
         {
@@ -291,7 +299,7 @@ public class NecronEx
     public void 死之恐惧压溃绘图删除(Event ev, ScriptAccessory sa)
     {
         if (!_judging_FoD) return;
-        sa.Log.Debug($"死之恐惧压溃判定，绘图删除");
+        // sa.Log.Debug($"死之恐惧压溃判定，绘图删除");
         sa.Method.RemoveDraw($"引导压溃.*");
         _judging_FoD = false;
     }
@@ -311,12 +319,12 @@ public class NecronEx
     public void 暗之死腕(Event ev, ScriptAccessory sa)
     {
         _castTime_CG++;
-        sa.Log.Debug($"读条暗之死腕 #{_castTime_CG}");
+        // sa.Log.Debug($"读条暗之死腕 #{_castTime_CG}");
         _judging_CG = true;
         
         _bools[1] = true;
         _bools[2] = ev.ActionId == 44553;   // 左安全
-        sa.Log.Debug($"暗之死腕 #{_castTime_CG} 添加事件 _events[1]，直至完成一段绘图");
+        // sa.Log.Debug($"暗之死腕 #{_castTime_CG} 添加事件 _events[1]，直至完成一段绘图");
         _events[1].Set();
         
         // switch (_castTime_CG)
@@ -326,7 +334,7 @@ public class NecronEx
         //     case 3:
         //         _bools[1] = true;
         //         _bools[2] = ev.ActionId == 44553;   // 左安全
-        //         sa.Log.Debug($"暗之死腕 #{_castTime_CG} 添加事件 _events[1]，直至完成一段绘图");
+        //         // sa.Log.Debug($"暗之死腕 #{_castTime_CG} 添加事件 _events[1]，直至完成一段绘图");
         //         _events[1].Set();
         //         break;
         //     default:
@@ -343,7 +351,7 @@ public class NecronEx
         if (!_judging_CG) return;
 
         var isLeftSafe = _bools[2];
-        sa.Log.Debug($"暗之死腕 {(isLeftSafe ? "左" : "右")}安全，进行一段绘图");
+        // sa.Log.Debug($"暗之死腕 {(isLeftSafe ? "左" : "右")}安全，进行一段绘图");
 
         sa.DrawRect(new Vector3(88, 0, 85), 0, 6000, $"暗之死腕一段", 0, 12, 100);
         sa.DrawRect(new Vector3(112, 0, 85), 0, 6000, $"暗之死腕一段", 0, 12, 100);
@@ -366,7 +374,7 @@ public class NecronEx
         if (!_judging_CG) return;
         if (!_bools[1]) return;
         var isLeftSafe = _bools[2];
-        sa.Log.Debug($"暗之死腕 {(isLeftSafe ? "左" : "右")}安全，一段判定，进行二段绘图");
+        // sa.Log.Debug($"暗之死腕 {(isLeftSafe ? "左" : "右")}安全，一段判定，进行二段绘图");
         sa.Method.RemoveDraw($"暗之死腕一段.*");
         sa.DrawRect(new Vector3(isLeftSafe ? 106 : 94, 0, 85), 0, 6000, $"暗之死腕二段", 0, 24, 100);
     }
@@ -377,7 +385,7 @@ public class NecronEx
     {
         if (!_judging_CG) return;
         _events[1].Reset();
-        sa.Log.Debug($"暗之死腕二段判定，绘图删除，释放锁_events[1]");
+        // sa.Log.Debug($"暗之死腕二段判定，绘图删除，释放锁_events[1]");
         sa.Method.RemoveDraw($"暗之死腕.*");
         _judging_CG = false;
     }
@@ -397,29 +405,14 @@ public class NecronEx
     public void 死亡警告(Event ev, ScriptAccessory sa)
     {
         _castTime_MmM++;
-        sa.Log.Debug($"读条死亡警告 #{_castTime_MmM}");
+        // sa.Log.Debug($"读条死亡警告 #{_castTime_MmM}");
         _judging_MmM = true;
         
         _bools[2] = true;
         _numbers[2] = 0;    // 安全行
         _numbers[6] = 0;    // 手计数
-        sa.Log.Debug($"死亡警告 #{_castTime_MmM} 添加事件 _events[2]，直至确定安全行");
+        // sa.Log.Debug($"死亡警告 #{_castTime_MmM} 添加事件 _events[2]，直至确定安全行");
         _events[2].Set();
-        
-        // switch (_castTime_MmM)
-        // {
-        //     case 1: 
-        //     case 2: 
-        //     case 3:
-        //         _bools[2] = true;
-        //         _numbers[2] = 0;    // 安全行
-        //         _numbers[6] = 0;    // 手计数
-        //         sa.Log.Debug($"死亡警告 #{_castTime_MmM} 添加事件 _events[2]，直至确定安全行");
-        //         _events[2].Set();
-        //         break;
-        //     default:
-        //         break;
-        // }
     }
 
     [ScriptMethod(name: "死亡警告中直线绘图", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4456[56])$"],
@@ -432,7 +425,7 @@ public class NecronEx
         sa.DrawRect(ev.SourceId, 0, 20000, $"死亡警告中线", 0, 12, 100);
         _bools[3] = ev.ActionId == 44565;   // 44565 左少右多
         var isLeftLess = _bools[3];
-        sa.Log.Debug($"死亡警告 {(isLeftLess ? "左" : "右")}少，进行绘图");
+        // sa.Log.Debug($"死亡警告 {(isLeftLess ? "左" : "右")}少，进行绘图");
     }
     
     [ScriptMethod(name: "死亡警告手绘图", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(18700)$"],
@@ -450,21 +443,21 @@ public class NecronEx
             var isLeftLess = _bools[3];
             // 左少，则找面向左，rotation为270（-90）；右少则找面向右，rotation为90
             var rotation = ev.SourceRotation.RadToDeg();
-            sa.Log.Debug($"找到 rotation 为 {rotation} 的手 #{_numbers[6]} {ev.SourcePosition} ");
+            // sa.Log.Debug($"找到 rotation 为 {rotation} 的手 #{_numbers[6]} {ev.SourcePosition} ");
 
             if ((isLeftLess && rotation > 180f) || (!isLeftLess && rotation < 180f))
             {
                 // Z轴为88 94 100 106 112，可通过(pos.z - 87) / 6 得到所在安全行并保存
                 _numbers[2] = (int)Math.Floor((ev.SourcePosition.Z - 87) / 6);
-                sa.Log.Debug($"死亡警告 {_castTime_MmM} 得到安全行 {_numbers[2]}");
+                // sa.Log.Debug($"死亡警告 {_castTime_MmM} 得到安全行 {_numbers[2]}");
             }
 
             if (_numbers[6] != 5) return;
-            sa.Log.Debug($"死亡警告 {_castTime_MmM} 捕捉手完毕，释放锁 _events[2]");
+            // sa.Log.Debug($"死亡警告 {_castTime_MmM} 捕捉手完毕，释放锁 _events[2]");
             _numbers[6] = 0;
             _events[2].Reset();
             
-            sa.Log.Debug($"死亡警告 {_castTime_MmM} 添加事件 _events[3]，直至完成绘图指路");
+            // sa.Log.Debug($"死亡警告 {_castTime_MmM} 添加事件 _events[3]，直至完成绘图指路");
             _events[3].Set();
         }
     }
@@ -488,7 +481,7 @@ public class NecronEx
         // 若为第二次死亡警告，忽略
         if (_castTime_MmM == 2)
         {
-            sa.Log.Debug($"死亡警告 {_castTime_MmM} 忽略，释放锁 _events[3]");
+            // sa.Log.Debug($"死亡警告 {_castTime_MmM} 忽略，释放锁 _events[3]");
             _events[3].Reset();
             return;
         }
@@ -509,7 +502,7 @@ public class NecronEx
             _ => new Vector3(100f, 0, 100f),
         };
         sa.DrawGuidance(safePos, 0, 20000, $"死亡警告指路");
-        sa.Log.Debug($"死亡警告 {_castTime_MmM} 指路完毕，释放锁 _events[3]");
+        // sa.Log.Debug($"死亡警告 {_castTime_MmM} 指路完毕，释放锁 _events[3]");
         
         _events[3].Reset();
     }
@@ -519,7 +512,7 @@ public class NecronEx
     public void 死亡警告绘图删除(Event ev, ScriptAccessory sa)
     {
         if (!_judging_MmM) return;
-        sa.Log.Debug($"死亡警告 {_castTime_MmM} 手 压溃 判定，绘图删除");
+        // sa.Log.Debug($"死亡警告 {_castTime_MmM} 手 压溃 判定，绘图删除");
         sa.Method.RemoveDraw($"死亡警告.*");
         _judging_MmM = false;
     }
@@ -540,7 +533,7 @@ public class NecronEx
     {
         var id = ev.Id0();
         _aetherBlightRec.Add(id);
-        sa.Log.Debug($"青魂 {id} 记录(#{_aetherBlightRec.Count})，604 钢铁、605 月环、606 打两侧、607 打中间");
+        // sa.Log.Debug($"青魂 {id} 记录(#{_aetherBlightRec.Count})，604 钢铁、605 月环、606 打两侧、607 打中间");
     }
     
     [ScriptMethod(name: "青之波潮连线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:regex:^(015[BCDE])$"],
@@ -548,7 +541,7 @@ public class NecronEx
     public void 青之波潮连线记录(Event ev, ScriptAccessory sa)
     {
         _aetherBlightSourceRec.Add(ev.SourceId);
-        sa.Log.Debug($"检测到青之波潮连线 #{_aetherBlightSourceRec.Count}，连线 {ev.SourceId}，位于 {ev.SourcePosition}");
+        // sa.Log.Debug($"检测到青之波潮连线 #{_aetherBlightSourceRec.Count}，连线 {ev.SourceId}，位于 {ev.SourcePosition}");
     }
     
     [ScriptMethod(name: "青之多重波", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4455[78]|4516[78])$"],
@@ -564,9 +557,9 @@ public class NecronEx
         _bools[5] = ev.ActionId is 44558 or 45168;  // 是二二分摊
 
         _bools[4] = true;
-        sa.Log.Debug($"青之多重{(_bools[8] ? "波潮" : "波")}准备绘图，共绘图 {_numbers[4]} 次");
+        // sa.Log.Debug($"青之多重{(_bools[8] ? "波潮" : "波")}准备绘图，共绘图 {_numbers[4]} 次");
         _events[4].Set();
-        sa.Log.Debug($"青之多重{(_bools[8] ? "波潮" : "波")} 添加事件 _events[4]");
+        // sa.Log.Debug($"青之多重{(_bools[8] ? "波潮" : "波")} 添加事件 _events[4]");
     }
     
     [ScriptMethod(name: "青之多重波分摊绘图", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4455[78])$"],
@@ -592,7 +585,7 @@ public class NecronEx
             sa.DrawFan(ev.SourceId, sa.Data.PartyList[1], 0, 20000, $"青之多重波分摊 ST",
                 (isPartnerStack ? 20f : 25f).DegToRad(), 0, 100, 0, myPartIdx == partnerJudge[1]);
         }
-        sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波范围绘图完毕，释放锁");
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波范围绘图完毕，释放锁");
     }
     
     [ScriptMethod(name: "青之多重波场地绘图", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4455[78])$"],
@@ -615,26 +608,26 @@ public class NecronEx
             case 606:
                 sa.DrawRect(new Vector3(88, 0, 85), 0, 5500, $"青之多重波打两侧", 0, 12, 100);
                 sa.DrawRect(new Vector3(112, 0, 85), 0, 5500, $"青之多重波打两侧", 0, 12, 100);
-                sa.Log.Debug($"青之多重波 打两侧 绘图完毕");
+                // sa.Log.Debug($"青之多重波 打两侧 绘图完毕");
                 break;
             
             case 607:
                 sa.DrawRect(new Vector3(100, 0, 78), 0, 5500, $"青之多重波打中间", 0, 12, 100);
-                sa.Log.Debug($"青之多重波 打中间 绘图完毕");
+                // sa.Log.Debug($"青之多重波 打中间 绘图完毕");
                 break;
             
             case 604:
                 sa.DrawCircle(new Vector3(100, 0, 78), 0, 5500, $"青之多重波钢铁", 20);
-                sa.Log.Debug($"青之多重波 钢铁 绘图完毕");
+                // sa.Log.Debug($"青之多重波 钢铁 绘图完毕");
                 break;
             
             case 605:
                 sa.DrawDonut(new Vector3(100, 0, 78), 0, 5500, $"青之多重波月环", 60, 16);
-                sa.Log.Debug($"青之多重波 月环 绘图完毕");
+                // sa.Log.Debug($"青之多重波 月环 绘图完毕");
                 break;
         }
         
-        sa.Log.Debug($"青之多重波绘图完毕");
+        // sa.Log.Debug($"青之多重波绘图完毕");
     }
     
     [ScriptMethod(name: "青之多重波指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4455[78])$"],
@@ -653,7 +646,7 @@ public class NecronEx
         var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之多重波指路");
         
-        sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 指路 {_markerPos[myPosIdx]} 绘图完毕，释放锁");
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 指路 {_markerPos[myPosIdx]} 绘图完毕，释放锁");
     }
     
     [ScriptMethod(name: "青之多重波绘图删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4455[78])$"],
@@ -663,7 +656,7 @@ public class NecronEx
         _aetherBlightRec = [];
         _aetherBlightSourceRec = [];
         _events[4].Reset();
-        sa.Log.Debug($"青之多重波判定，清空矩阵，绘图删除，释放锁_events[4]");
+        // sa.Log.Debug($"青之多重波判定，清空矩阵，绘图删除，释放锁_events[4]");
         sa.Method.RemoveDraw($"青之多重波.*");
     }
     
@@ -687,7 +680,7 @@ public class NecronEx
         }
         _numbers[3] = startIdx;
         _numbers[5] = 0;
-        sa.Log.Debug($"经遍历，最低单位index为 {startIdx}，id为 {_aetherBlightSourceRec[startIdx]}，高度为 {lowestY}");
+        // sa.Log.Debug($"经遍历，最低单位index为 {startIdx}，id为 {_aetherBlightSourceRec[startIdx]}，高度为 {lowestY}");
         _events[5].Set();
     }
     
@@ -714,22 +707,22 @@ public class NecronEx
             case 606:
                 sa.DrawRect(new Vector3(88, 0, 85), 0, 15000, $"青之波潮0 打两侧", 0, 12, 100);
                 sa.DrawRect(new Vector3(112, 0, 85), 0, 15000, $"青之波潮0 打两侧", 0, 12, 100);
-                sa.Log.Debug($"青之波潮0 打两侧 绘图完毕");
+                // sa.Log.Debug($"青之波潮0 打两侧 绘图完毕");
                 break;
             
             case 607:
                 sa.DrawRect(new Vector3(100, 0, 78), 0, 15000, $"青之波潮0 打中间", 0, 12, 100);
-                sa.Log.Debug($"青之波潮0 打中间 绘图完毕");
+                // sa.Log.Debug($"青之波潮0 打中间 绘图完毕");
                 break;
             
             case 604:
                 sa.DrawCircle(new Vector3(100, 0, 78), 0, 15000, $"青之波潮0 钢铁", 20);
-                sa.Log.Debug($"青之波潮0 钢铁 绘图完毕");
+                // sa.Log.Debug($"青之波潮0 钢铁 绘图完毕");
                 break;
             
             case 605:
                 sa.DrawDonut(new Vector3(100, 0, 78), 0, 15000, $"青之波潮0 月环", 60, 16);
-                sa.Log.Debug($"青之波潮0 月环 绘图完毕");
+                // sa.Log.Debug($"青之波潮0 月环 绘图完毕");
                 break;
         }
     }
@@ -741,7 +734,7 @@ public class NecronEx
         _events[4].WaitOne(10000);
         if (!_bools[8]) return;
         _numbers[5]++;
-        sa.Log.Debug($"青之波潮计数器增加 至 #{_numbers[5]}，添加锁 _events[6] ");
+        // sa.Log.Debug($"青之波潮计数器增加 至 #{_numbers[5]}，添加锁 _events[6] ");
         _events[6].Set();
     }
     
@@ -754,7 +747,7 @@ public class NecronEx
         _events[6].WaitOne(500);
         
         await Task.Delay(500);
-        sa.Log.Debug($"青之多重波潮计数器 _events[6] 解锁");
+        // sa.Log.Debug($"青之多重波潮计数器 _events[6] 解锁");
         _events[6].Reset();
     }
 
@@ -771,7 +764,7 @@ public class NecronEx
             sa.Log.Error($"绘图总次数 {drawTotalCount} 与记录List Count {_aetherBlightRec.Count} 不符，停止绘图。");
             return;
         }
-        sa.Log.Debug($"删除青之波潮{drawCount-1} 绘图");
+        // sa.Log.Debug($"删除青之波潮{drawCount-1} 绘图");
         sa.Method.RemoveDraw($"青之波潮{drawCount-1}.*");
         if (drawCount >= drawTotalCount) return;
         
@@ -784,22 +777,22 @@ public class NecronEx
             case 606:
                 sa.DrawRect(new Vector3(88, 0, 85), 0, 15000, $"青之波潮{drawCount} 打两侧", 0, 12, 100);
                 sa.DrawRect(new Vector3(112, 0, 85), 0, 15000, $"青之波潮{drawCount} 打两侧", 0, 12, 100);
-                sa.Log.Debug($"青之波潮{drawCount} 打两侧 绘图完毕");
+                // sa.Log.Debug($"青之波潮{drawCount} 打两侧 绘图完毕");
                 break;
             
             case 607:
                 sa.DrawRect(new Vector3(100, 0, 78), 0, 15000, $"青之波潮{drawCount} 打中间", 0, 12, 100);
-                sa.Log.Debug($"青之波潮{drawCount} 打中间 绘图完毕");
+                // sa.Log.Debug($"青之波潮{drawCount} 打中间 绘图完毕");
                 break;
             
             case 604:
                 sa.DrawCircle(new Vector3(100, 0, 78), 0, 15000, $"青之波潮{drawCount} 钢铁", 20);
-                sa.Log.Debug($"青之波潮{drawCount} 钢铁 绘图完毕");
+                // sa.Log.Debug($"青之波潮{drawCount} 钢铁 绘图完毕");
                 break;
             
             case 605:
                 sa.DrawDonut(new Vector3(100, 0, 78), 0, 15000, $"青之波潮{drawCount} 月环", 60, 16);
-                sa.Log.Debug($"青之波潮{drawCount} 月环 绘图完毕");
+                // sa.Log.Debug($"青之波潮{drawCount} 月环 绘图完毕");
                 break;
         }
     }
@@ -828,7 +821,7 @@ public class NecronEx
             sa.DrawFan(new Vector3(100, 0, 78), sa.Data.PartyList[1], 0, 20000, $"青之波潮分摊 ST",
                 (isPartnerStack ? 20f : 30f).DegToRad(), 0, 100, 0, myPartIdx == partnerJudge[1]);
         }
-        sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 范围绘图完毕");
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 范围绘图完毕");
     }
     
     [ScriptMethod(name: "青之多重波潮指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4516[78])$"],
@@ -851,7 +844,7 @@ public class NecronEx
 
         var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之波潮指路 #{drawCount}");
-        sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
     }
     
     [ScriptMethod(name: "青之多重波潮指路后续", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4518[345]|44608)$", "TargetIndex:1"],
@@ -874,12 +867,12 @@ public class NecronEx
         if (drawCount >= drawTotalCount) return;
         var isInsideSafe = _aetherBlightRec[drawIdx] is 605 or 606;
         
-        sa.Log.Debug($"删除青之波潮{drawCount-1} 指路");
+        // sa.Log.Debug($"删除青之波潮{drawCount-1} 指路");
         sa.Method.RemoveDraw($"青之波潮指路 #{drawCount-1}.*");
 
         var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之波潮指路 #{drawCount}");
-        sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
     }
     
     [ScriptMethod(name: "青之多重波潮绘图删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4518[345]|44608)$", "TargetIndex:1"],
@@ -895,9 +888,9 @@ public class NecronEx
         // _aetherBlightRec = [];
         // _aetherBlightSourceRec = [];
         // _events[4].Reset();
-        // sa.Log.Debug($"青之多重波潮判定，清空矩阵，绘图删除，释放锁_events[4]");
+        // // sa.Log.Debug($"青之多重波潮判定，清空矩阵，绘图删除，释放锁_events[4]");
         RefreshParams();
-        sa.Log.Debug($"青之多重波潮判定，刷新参数");
+        // sa.Log.Debug($"青之多重波潮判定，刷新参数");
         sa.Method.RemoveDraw($"青之波潮.*");
     }
     
@@ -915,7 +908,7 @@ public class NecronEx
         userControl: Debugging)]
     public void 大十字刷新参数(Event ev, ScriptAccessory sa)
     {
-        sa.Log.Debug($"读条大十字，刷新参数");
+        // sa.Log.Debug($"读条大十字，刷新参数");
         RefreshParams();
     }
     
@@ -940,6 +933,9 @@ public class NecronEx
         var obj1 = sa.GetById(ev.SourceId);
         var obj2 = sa.GetById(ev.TargetId);
         
+        sa.WriteInvisible(obj1);
+        sa.WriteInvisible(obj2);
+        
         if (obj1 is null || obj2 is null) return;
 
         var isFast = obj1.DataId == 18761;
@@ -949,15 +945,15 @@ public class NecronEx
         var dp = sa.DrawRect(startPos, targetPos, 0, 15000,
             $"大十字激光 {ev.SourceId}", 0, 5, 40, draw: false);
         dp.Color = new Vector4(1, 0, 0, 1);
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Rect, dp);
-        sa.Log.Debug($"预测大十字激光 {(isFast ? "快" : "慢")} {ev.SourceId}，{startPos} 到 {targetPos}，绘图");
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        // sa.Log.Debug($"预测大十字激光 {(isFast ? "快" : "慢")} {ev.SourceId}，{startPos} 到 {targetPos}，绘图");
     }
     
     [ScriptMethod(name: "大十字激光消失", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(4541)$"],
         userControl: Debugging)]
     public void 大十字激光消失(Event ev, ScriptAccessory sa)
     {
-        sa.Log.Debug($"魂块{ev.TargetId}开始转动，大十字激光消失");
+        // sa.Log.Debug($"魂块{ev.TargetId}开始转动，大十字激光消失");
         sa.Method.RemoveDraw($"大十字激光 {ev.TargetId}");
     }
     
@@ -971,7 +967,7 @@ public class NecronEx
             _bools[9] |= ev.TargetId == sa.Data.Me;
             if (_numbers[8] < 4) return;
             _events[7].Set();
-            sa.Log.Debug($"记录点名完毕，玩家{(_bools[9] ? "不踩塔" : "踩塔")}");
+            // sa.Log.Debug($"记录点名完毕，玩家{(_bools[9] ? "不踩塔" : "踩塔")}");
         }
     }
 
@@ -983,7 +979,7 @@ public class NecronEx
 
         var pos = ev.SourcePosition.GetRadian(Center).RadianToRegion(8, 0, true, false);
         var isDiagTower = pos % 2 == 1;
-        sa.Log.Debug($"检测到塔方位 {pos}, {(isDiagTower ? "是" : "不是")} 斜点塔");
+        // sa.Log.Debug($"检测到塔方位 {pos}, {(isDiagTower ? "是" : "不是")} 斜点塔");
 
         List<int> rot = [2, 1, 3, 0];
         var myIndex = sa.GetMyIndex() % 4;
@@ -993,13 +989,13 @@ public class NecronEx
         {
             sa.DrawGuidance(new Vector3(100, 0, 105.5f).RotateAndExtend(Center, (rot[myIndex] * 90f + (isDiagTower ? 45f : 0f)).DegToRad(), 0),
                 0, 5000, $"大十字踩塔分散");
-            sa.Log.Debug($"踩塔指路完毕");
+            // sa.Log.Debug($"踩塔指路完毕");
         }
         else
         {
             sa.DrawGuidance(new Vector3(100, 0, 105.5f).RotateAndExtend(Center, (rot[myIndex] * 90f + (isDiagTower ? 0f : 45f)).DegToRad(), 0),
                 0, 5000, $"大十字踩塔分散");
-            sa.Log.Debug($"分散指路完毕");
+            // sa.Log.Debug($"分散指路完毕");
         }
 
     }
@@ -1011,7 +1007,7 @@ public class NecronEx
         _bools[9] = false;
         _numbers[8] = 0;
         _events[7].Reset();
-        sa.Log.Debug($"踩塔判定，删除大十字踩塔指路");
+        // sa.Log.Debug($"踩塔判定，删除大十字踩塔指路");
         sa.Method.RemoveDraw($"大十字踩塔分散");
     }
     
@@ -1053,7 +1049,7 @@ public class NecronEx
         userControl: Debugging)]
     public void 转场刷新参数(Event ev, ScriptAccessory sa)
     {
-        sa.Log.Debug($"读条转场永恒之暗，刷新参数");
+        // sa.Log.Debug($"读条转场永恒之暗，刷新参数");
         RefreshParams();
     }
 
@@ -1082,7 +1078,7 @@ public class NecronEx
         {
             var rowIdx = (int)Math.Floor((ev.SourcePosition.Z - 79) / 10);
             _numbers[10] += (int)Math.Pow(10, rowIdx - 1);
-            sa.Log.Debug($"场边暗之巨腕 第 {rowIdx} 行危险（1起），计数值 {_numbers[10]}");
+            // sa.Log.Debug($"场边暗之巨腕 第 {rowIdx} 行危险（1起），计数值 {_numbers[10]}");
         }
     }
     
@@ -1094,7 +1090,7 @@ public class NecronEx
         {
             var rowIdx = (int)Math.Floor((ev.SourcePosition.Z - 79) / 10);
             _numbers[10] -= (int)Math.Pow(10, rowIdx - 1);
-            sa.Log.Debug($"场边暗之巨腕 第 {rowIdx} 行判定，绘图删除，计数值 {_numbers[10]}");
+            // sa.Log.Debug($"场边暗之巨腕 第 {rowIdx} 行判定，绘图删除，计数值 {_numbers[10]}");
             sa.Method.RemoveDraw($"场边暗之巨腕{ev.SourceId}拖入");
         }
     }
@@ -1110,7 +1106,7 @@ public class NecronEx
         {
             if (_numbers[10].GetDecimalDigit(i + 1) != 0) continue;
             safeRow = i + 1;
-            sa.Log.Debug($"找到暗之巨腕安全行 {safeRow}");
+            // sa.Log.Debug($"找到暗之巨腕安全行 {safeRow}");
         }
         
         var baitPos = new Vector3(88f, 0, 87f);
@@ -1135,7 +1131,7 @@ public class NecronEx
         userControl: Debugging, suppress: 2000)]
     public void 引导之翼指路删除(Event ev, ScriptAccessory sa)
     {
-        sa.Log.Debug($"黑手释放压溃，引导之翼相关指路删除");
+        // sa.Log.Debug($"黑手释放压溃，引导之翼相关指路删除");
         sa.Method.RemoveDraw($"引导之翼.*");
     }
     
@@ -1179,7 +1175,7 @@ public class NecronEx
         userControl: Debugging)]
     public void 群体恐慌刷新参数(Event ev, ScriptAccessory sa)
     {
-        sa.Log.Debug($"读条群体恐慌，刷新参数");
+        // sa.Log.Debug($"读条群体恐慌，刷新参数");
         RefreshParams();
     }
     
@@ -1189,7 +1185,7 @@ public class NecronEx
     {
         var myIndex = sa.GetMyIndex();
         var isMelee = myIndex is 0 or 1 or 4 or 5;
-        sa.Log.Debug($"群体恐慌塔1 指路");
+        // sa.Log.Debug($"群体恐慌塔1 指路");
         sa.DrawGuidance(new Vector3(100, 0, isMelee ? 94 : 106), 0, 10000, $"群体恐慌塔1");
     }
     
@@ -1199,7 +1195,7 @@ public class NecronEx
     {
         if (ev.TargetId != sa.Data.Me) return;
         _numbers[7]++;
-        sa.Log.Debug($"完成群体恐慌踩塔，计数 {_numbers[7]}");
+        // sa.Log.Debug($"完成群体恐慌踩塔，计数 {_numbers[7]}");
         sa.Method.RemoveDraw($"群体恐慌塔{_numbers[7]}.*");
 
         var myIndex = sa.GetMyIndex();
@@ -1209,7 +1205,7 @@ public class NecronEx
                 var mySecondTower = new Vector3(85f, 0, 103f);
                 if (myIndex is 4 or 5 or 6 or 7) mySecondTower = mySecondTower.FoldPointVertical(Center.Z);
                 if (myIndex is 1 or 3 or 4 or 5) mySecondTower = mySecondTower.FoldPointHorizon(Center.X);
-                sa.Log.Debug($"向 塔#2 {mySecondTower} 指路");
+                // sa.Log.Debug($"向 塔#2 {mySecondTower} 指路");
                 sa.DrawGuidance(mySecondTower, 0, 4000, $"群体恐慌塔2预备", isSafe: false);
                 sa.DrawGuidance(mySecondTower, 4000, 6000, $"群体恐慌塔2", isSafe: true);
                 break;
@@ -1221,7 +1217,7 @@ public class NecronEx
                     0 => new Vector3(82.5f, 0, 85.5f),
                     1 => new Vector3(82.5f, 0, 85.5f).FoldPointHorizon(Center.X),
                 };
-                sa.Log.Debug($"向 塔#3 {myThirdTower} 或 死刑点 指路");
+                // sa.Log.Debug($"向 塔#3 {myThirdTower} 或 死刑点 指路");
                 sa.DrawGuidance(myThirdTower, 0, 4000, $"群体恐慌塔3预备", isSafe: false);
                 sa.DrawGuidance(myThirdTower, 4000, 6000, $"群体恐慌塔3", isSafe: true);
                 break;
@@ -1234,7 +1230,7 @@ public class NecronEx
                     0 => new Vector3(82.5f, 0, 85.5f),
                     1 => new Vector3(82.5f, 0, 85.5f).FoldPointHorizon(Center.X),
                 };
-                sa.Log.Debug($"向 塔#4 {myFourthTower} 或 死刑点 指路");
+                // sa.Log.Debug($"向 塔#4 {myFourthTower} 或 死刑点 指路");
                 sa.DrawGuidance(myFourthTower, 0, 4000, $"群体恐慌塔4预备", isSafe: false);
                 sa.DrawGuidance(myFourthTower, 4000, 6000, $"群体恐慌塔4", isSafe: true);
                 break;
@@ -1677,6 +1673,54 @@ public static class DrawTools
 }
 
 #endregion 绘图函数
+
+#region 特殊函数
+
+public static class SpecialFunc
+{
+    [Flags]
+    public enum DrawState : uint
+    {
+        Invisibility      = 0x00_00_00_02,
+        IsLoading         = 0x00_00_08_00,
+        SomeNpcFlag       = 0x00_00_01_00,
+        MaybeCulled       = 0x00_00_04_00,
+        MaybeHiddenMinion = 0x00_00_80_00,
+        MaybeHiddenSummon = 0x00_80_00_00,
+    }
+    
+    public static unsafe DrawState* ActorDrawState(IGameObject actor)
+        => (DrawState*)(&((GameObject*)actor.Address)->RenderFlags);
+    
+    public static unsafe void WriteInvisible(this ScriptAccessory sa, IGameObject? actor)
+    {
+        try
+        {
+            // Invisibility      = 0x00_00_00_02,
+            *ActorDrawState(actor!) |= DrawState.Invisibility;
+        }
+        catch (Exception e)
+        {
+            sa.Log.Error(e.ToString());
+            throw;
+        }
+    }
+    
+    public static unsafe void WriteVisible(this ScriptAccessory sa, IGameObject? actor)
+    {
+        try
+        {
+            *ActorDrawState(actor!) &= ~DrawState.Invisibility;
+        }
+        catch (Exception e)
+        {
+            sa.Log.Error(e.ToString());
+            throw;
+        }
+    }
+}
+
+#endregion 特殊函数
 
 #endregion 函数集
 
