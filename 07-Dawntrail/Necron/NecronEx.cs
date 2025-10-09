@@ -844,7 +844,17 @@ public class NecronEx
 
         var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之波潮指路 #{drawCount}");
-        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
+
+        var str = _aetherBlightRec[drawIdx] switch
+        {
+            604 => "钢铁",
+            605 => "月环",
+            606 => "打两侧",
+            607 => "打中间",
+            _ => "未知",
+        };
+        
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 {str}({_aetherBlightRec[drawIdx]}) 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
     }
     
     [ScriptMethod(name: "青之多重波潮指路后续", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4518[345]|44608)$", "TargetIndex:1"],
@@ -872,7 +882,16 @@ public class NecronEx
 
         var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之波潮指路 #{drawCount}");
-        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
+        
+        var str = _aetherBlightRec[drawIdx] switch
+        {
+            604 => "钢铁",
+            605 => "月环",
+            606 => "打两侧",
+            607 => "打中间"
+        };
+        
+        // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 重波潮 {str}({_aetherBlightRec[drawIdx]}) 指路 #{drawCount} {_markerPos[myPosIdx]} 绘图完毕");
     }
     
     [ScriptMethod(name: "青之多重波潮绘图删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(4518[345]|44608)$", "TargetIndex:1"],
