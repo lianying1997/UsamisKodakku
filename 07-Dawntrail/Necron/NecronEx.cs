@@ -33,7 +33,7 @@ public class NecronEx
 {
     private const string
         Name = "NecronEx [永恒之暗悲惶歼灭战]",
-        Version = "0.0.0.4",
+        Version = "0.0.0.5",
         DebugVersion = "a";
     
     const string NoteStr =
@@ -45,9 +45,7 @@ public class NecronEx
     const string UpdateInfo =
         $"""
         {Version}
-        1. 从效果上，是延后了死刑第二段的出现时间。
-        2. 大十字阶段赶走了讨厌的魂块。
-        3. 删掉了向xllog的泄洪。
+        1. 修复死亡警告H1、H2在安全行为第四行时，指路偏后的错误。
         """;
 
     private const bool
@@ -74,8 +72,8 @@ public class NecronEx
          new Vector3(97.66f, 0, 89.95f), new Vector3(101.94f, 0, 89.98f)];
 
     private static int
-        _castTime_FoD = 0,      // Fear of Death 死之恐惧
-        _castTime_CG = 0,       // Cold Grip 暗之死腕
+        // _castTime_FoD = 0,      // Fear of Death 死之恐惧
+        // _castTime_CG = 0,       // Cold Grip 暗之死腕
         _castTime_MmM = 0;      // Memento Mori
 
     private static bool
@@ -110,8 +108,8 @@ public class NecronEx
     private void RefreshCastTimeParams()
     {
         // 技能释放次数初始化
-        _castTime_FoD = 0;
-        _castTime_CG = 0;
+        // _castTime_FoD = 0;
+        // _castTime_CG = 0;
         _castTime_MmM = 0;
         
         // 技能中初始化
@@ -202,7 +200,7 @@ public class NecronEx
         userControl: Debugging)]
     public void 死之恐惧(Event ev, ScriptAccessory sa)
     {
-        _castTime_FoD++;
+        // _castTime_FoD++;
         // sa.Log.Debug($"读条死之恐惧 #{_castTime_FoD}");
         _judging_FoD = true;
         
@@ -318,7 +316,7 @@ public class NecronEx
         userControl: Debugging)]
     public void 暗之死腕(Event ev, ScriptAccessory sa)
     {
-        _castTime_CG++;
+        // _castTime_CG++;
         // sa.Log.Debug($"读条暗之死腕 #{_castTime_CG}");
         _judging_CG = true;
         
@@ -497,8 +495,10 @@ public class NecronEx
             7 => new Vector3(93.5f, 0, 114.5f) + new Vector3(24f * reverseBias, 0, 0),
             0 => new Vector3(106.5f, 0, 85.5f + safeRow * 6) + new Vector3(-24f * reverseBias, 0, 0),
             1 => new Vector3(117.5f, 0, 85.5f + safeRow * 6) + new Vector3(-24f * reverseBias, 0, 0),
-            2 => new Vector3(82.5f, 0, 85.5f + (safeRow + 1) * 6) + new Vector3(24f * reverseBias, 0, 0),
-            3 => new Vector3(93.5f, 0, 85.5f + (safeRow + 1) * 6) + new Vector3(24f * reverseBias, 0, 0),
+            2 => new Vector3(82.5f, 0, 85.5f + (safeRow + 1) * 6) + new Vector3(24f * reverseBias, 0, 0) +
+                 new Vector3(0, 0, safeRow >= 3 ? -7 : 0),
+            3 => new Vector3(93.5f, 0, 85.5f + (safeRow + 1) * 6) + new Vector3(24f * reverseBias, 0, 0) +
+                 new Vector3(0, 0, safeRow >= 3 ? -7 : 0),
             _ => new Vector3(100f, 0, 100f),
         };
         sa.DrawGuidance(safePos, 0, 20000, $"死亡警告指路");

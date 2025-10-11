@@ -200,12 +200,12 @@
   {
     "Name": "NecronEx [永恒之暗悲惶歼灭战]",
     "Guid": "1829f7d6-9e64-4cf7-9be4-e5d8a2e03d21",
-    "Version": "0.0.0.4",
+    "Version": "0.0.0.5",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/Necron/NecronEx.cs",
-    "Note": "0.0.0.4\r\n初版，鸭门。",
-    "UpdateInfo": "0.0.0.4\r\n1. 从效果上，是延后了死刑第二段的出现时间。\r\n2. 大十字阶段赶走了讨厌的魂块。\r\n3. 删掉了向xllog的泄洪。",
+    "Note": "0.0.0.5\r\n初版，鸭门。",
+    "UpdateInfo": "0.0.0.5\r\n1. 修复死亡警告H1、H2在安全行为第四行时，指路偏后的错误。",
     "TerritoryIds": [
       1296
     ]
