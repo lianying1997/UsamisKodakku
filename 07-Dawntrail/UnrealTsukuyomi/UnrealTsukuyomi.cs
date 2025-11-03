@@ -279,7 +279,7 @@ public class UnrealTsukuyomi
     }
     
     [ScriptMethod(name: "[转阶段] 极月读阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11952)$"],
-        userControl: true)]
+        userControl: Debugging)]
     public void PhaseChange_Selenomancy(Event ev, ScriptAccessory sa)
     {
         _phase = 1f;
