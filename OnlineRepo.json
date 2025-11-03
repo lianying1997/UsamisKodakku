@@ -145,20 +145,6 @@
     ]
   },
   {
-    "Name": "AMR [异闻六根山]",
-    "Guid": "f08d6d7e-05fe-4267-a6fc-aa2355ab3e45",
-    "Version": "0.0.0.3",
-    "Author": "Usami",
-    "Repo": "",
-    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/AMR/AMR.cs",
-    "Note": "v0.0.0.3\r\nBoss2 不含踩塔运动会2\r\nBoss3 不含青帝天箭",
-    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
-    "TerritoryIds": [
-      1155,
-      1156
-    ]
-  },
-  {
     "Name": "QueenEternalEx [永恒女王忆想歼灭战]",
     "Guid": "45fff289-e23d-41ab-9039-71cd310668e4",
     "Version": "0.0.0.9",
