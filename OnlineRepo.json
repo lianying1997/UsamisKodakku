@@ -209,5 +209,18 @@
     "TerritoryIds": [
       1296
     ]
+  },
+  {
+    "Name": "Tsukuyomi-Ur [月读幻巧战]",
+    "Guid": "93036a00-ec46-4897-a97c-66ee03089e66",
+    "Version": "0.0.0.1",
+    "Author": "Usami",
+    "Repo": "",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UnrealTsukuyomi/UnrealTsukuyomi.cs",
+    "Note": "0.0.0.1\r\n初版，目前可用于极神。\r\n等待幻巧更新以适配。",
+    "UpdateInfo": "0.0.0.1\r\n初版，目前可用于极神。\r\n等待幻巧更新以适配。",
+    "TerritoryIds": [
+      779
+    ]
   }
 ]
