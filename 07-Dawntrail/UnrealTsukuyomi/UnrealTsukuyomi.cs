@@ -337,6 +337,7 @@ public class UnrealTsukuyomi
             _swapColorFirstInit = true;
             _swapColorFirstLastUpsideClose = isCloseToUpside;
         }
+        
         _swapColorFirstFw = sa.Method.RegistFrameworkUpdateAction(Action);
     }
     

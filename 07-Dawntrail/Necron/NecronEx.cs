@@ -33,7 +33,7 @@ public class NecronEx
 {
     private const string
         Name = "NecronEx [永恒之暗悲惶歼灭战]",
-        Version = "0.0.0.5",
+        Version = "0.0.0.6",
         DebugVersion = "a";
     
     const string NoteStr =
@@ -45,7 +45,7 @@ public class NecronEx
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复死亡警告H1、H2在安全行为第四行时，指路偏后的错误。
+        1. 修复青之波潮指路错误。
         """;
 
     private const bool
@@ -643,7 +643,9 @@ public class NecronEx
         var myIndex = sa.GetMyIndex();
         var isInsideSafe = _aetherBlightRec[0] is 605 or 606;
 
-        var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
+        var myPosIdx = myIndex % 4 + (isInsideSafe ? 4 : 0);
+        if (isPartnerStack && myPosIdx % 4 <= 2) myPosIdx += 2;
+        sa.Log.Debug($"是分组分摊：{isPartnerStack}，是内安全：{isInsideSafe}，我的位置：{myPosIdx}");
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之多重波指路");
         
         // sa.Log.Debug($"青之 {(isPartnerStack ? "四" : "二")} 指路 {_markerPos[myPosIdx]} 绘图完毕，释放锁");
@@ -842,7 +844,9 @@ public class NecronEx
        
         var isInsideSafe = _aetherBlightRec[drawIdx] is 605 or 606;
 
-        var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
+        // var myPosIdx = myIndex % 4 + (isPartnerStack ? 0 : 2) + (isInsideSafe ? 4 : 0);
+        var myPosIdx = myIndex % 4 + (isInsideSafe ? 4 : 0);
+        if (isPartnerStack && myPosIdx % 4 <= 2) myPosIdx += 2;
         sa.DrawGuidance(_markerPos[myPosIdx], 0, 20000, $"青之波潮指路 #{drawCount}");
 
         var str = _aetherBlightRec[drawIdx] switch
