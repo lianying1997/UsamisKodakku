@@ -44,8 +44,8 @@ public class TopReborn
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.1";
-    private const string DebugVersion = "g";
+    private const string Version = "0.0.0.2";
+    private const string DebugVersion = "a";
 
     private const bool Debugging = false;
 
@@ -107,8 +107,6 @@ public class TopReborn
         {
             foreach (var obj in objEnums)
             {
-                int* flagsPtr = &((GameObject*)obj?.Address)->RenderFlags;
-                // // sa.Log.Debug($"Obj: {obj.GameObjectId:X} flag val: {*flagsPtr:X}");
                 sa.WriteVisible(obj, true);
             }
         }
@@ -5623,11 +5621,11 @@ public static class SpecialFunction
     
     public static unsafe void WriteVisible(this ScriptAccessory sa, IGameObject? actor, bool visible)
     {
-        const int VISIBLE_FLAG = 0x00000000;
-        const int INVISIBILITY_FLAG = 0x00000002;
+        const VisibilityFlags VISIBLE_FLAG = VisibilityFlags.None;
+        const VisibilityFlags INVISIBILITY_FLAG = VisibilityFlags.Model;
         try
         {
-            int* flagsPtr = &((GameObject*)actor?.Address)->RenderFlags;
+            var flagsPtr = &((GameObject*)actor?.Address)->RenderFlags;
             *flagsPtr = visible ? VISIBLE_FLAG : INVISIBILITY_FLAG;
         }
         catch (Exception e)
