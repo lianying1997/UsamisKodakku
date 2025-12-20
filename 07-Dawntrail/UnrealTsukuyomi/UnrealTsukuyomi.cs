@@ -17,7 +17,7 @@ using KodakkuAssist.Module.Script.Type;
 
 namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.UnrealTsukuyomi;
 
-[ScriptType(name: Name, territorys: [779], guid: "93036a00-ec46-4897-a97c-66ee03089e66",
+[ScriptType(name: Name, territorys: [779, 1318], guid: "93036a00-ec46-4897-a97c-66ee03089e66",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class UnrealTsukuyomi
@@ -25,19 +25,17 @@ public class UnrealTsukuyomi
     const string NoteStr =
         $"""
         {Version}
-        初版，目前可用于极神。
-        等待幻巧更新以适配。
+        初版，可用于极神/幻巧。
         """;
     
     const string UpdateInfo =
         $"""
          {Version}
-         初版，目前可用于极神。
-         等待幻巧更新以适配。
+         初版，可用于极神/幻巧。
          """;
 
     private const string Name = "Tsukuyomi-Ur [月读幻巧战]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
     private const bool Debugging = false;
 
@@ -68,7 +66,7 @@ public class UnrealTsukuyomi
     
     public void Init(ScriptAccessory sa)
     {
-        // sa.Log.Debug($"月读幻巧战 {Version}{DebugVersion} 刷新");
+        sa.Log.Debug($"月读幻巧战 {Version}{DebugVersion} 刷新");
         RefreshParams();
         sa.Method.RemoveDraw(".*");
         sa.Method.ClearFrameworkUpdateAction(this);
@@ -107,81 +105,31 @@ public class UnrealTsukuyomi
         sa.Method.ClearFrameworkUpdateAction(this);
     }
     
-    [ScriptMethod(name: "测试项 极月读安全点", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void SelenomancySafeSpot(Event ev, ScriptAccessory sa)
-    {
-        var basePoint = new Vector3(106.5f, 0, 106.5f);
-        Vector3[] safePoints =
-        [
-            basePoint, basePoint.FoldPointHorizon(Center.X), basePoint.FoldPointVertical(Center.Z),
-            basePoint.PointCenterSymmetry(Center)
-        ];
-        foreach (var safePoint in safePoints)
-        {
-            sa.DrawCircle(safePoint, 0, 2000, "safePoint", 1f);
-        }
-    }
-    
-    [ScriptMethod(name: "测试项 找到半场圆心", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void FindHalfMoonCenter(Event ev, ScriptAccessory sa)
-    {
-        sa.DrawCircle(Center + new Vector3(-15, 0, 0), 0, 2000, "a", 25);
-    }
-    
-    [ScriptMethod(name: "测试项 读取盈亏", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void GetMoonPhase(Event ev, ScriptAccessory sa)
-    {
-        // sa.Log.Debug($"盈亏值 {_moonPhaseWhite}, {(_moonPhaseWhite > 0 ? "白" : "黑")}多。");
-    }
-    
-    [ScriptMethod(name: "测试项 在地板上画线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void DrawLineTest(Event ev, ScriptAccessory sa)
-    {
-        sa.DrawLine(new Vector3(90, 0, 100), new Vector3(100, 0, 115), 0, 2000, "a", 0, 30f, 1, byY: true);
-    }
-    
-    [ScriptMethod(name: "测试项 删除某个扇子", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void RemoveFan(Event ev, ScriptAccessory sa)
-    {
-        sa.WriteVisible(sa.GetById(0x40001816), false);
-    }
-    
-    [ScriptMethod(name: "测试项 让某个扇子回来", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void CallBackFan(Event ev, ScriptAccessory sa)
-    {
-        sa.WriteVisible(sa.GetById(0x40001816), true);
-    }
-    
     [ScriptMethod(name: "---- 深宵换装 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: true)]
     public void SplitLine_Start(Event ev, ScriptAccessory sa)
     {
     }
     
-    [ScriptMethod(name: "深宵换装指路点计算", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1119[67])$"],
+    [ScriptMethod(name: "深宵换装指路点计算", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1119[67]|4536[01])$"],
         userControl: Debugging)]
     public void CalcNightFallGuide(Event ev, ScriptAccessory sa)
     {
-        // 11197 黄圈之枪三连 11199
-        // 11196 黄圈之弹分摊 11198
+        uint[] STACK = [11196, 45360];
+        
         var bossObj = sa.GetById(ev.SourceId);
         var bossPos = bossObj.Position;
         var bossRot = bossObj.Rotation;
         
-        var rotate = ev.ActionId == 11196 ? 180f :
+        // var rotate = ev.ActionId == 11196 ? 180f :
+        var rotate = STACK.Contains(ev.ActionId) ? 180f :
             sa.Data.MyObject.IsTank() ? 0f :
             sa.Data.MyObject.IsHealer() ? 90f : 180f;
         _nightFallGuidancePos = (bossPos + new Vector3(0, 0, 3.5f)).RotateAndExtend(bossPos, bossRot + rotate.DegToRad(), 0);
         _nightFallAutoEvent.Set();
     }
     
-    [ScriptMethod(name: "开场深宵换装指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1119[67])$"],
+    [ScriptMethod(name: "开场深宵换装指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1119[67]|4536[01])$"],
         userControl: true)]
     public void NightFallGuide(Event ev, ScriptAccessory sa)
     {
@@ -190,7 +138,7 @@ public class UnrealTsukuyomi
         sa.DrawGuidance(_nightFallGuidancePos, 2000, 12000, $"深宵换装指路");
     }
     
-    [ScriptMethod(name: "深宵换装职能刀范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197)$"],
+    [ScriptMethod(name: "深宵换装职能刀范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197|45361)$"],
         userControl: true)]
     public void NightFallFanRange(Event ev, ScriptAccessory sa)
     {
@@ -213,7 +161,7 @@ public class UnrealTsukuyomi
         }
     }
     
-    [ScriptMethod(name: "深宵换装职能刀连线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197)$"],
+    [ScriptMethod(name: "深宵换装职能刀连线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197|45361)$"],
         userControl: true)]
     public void NightFallFanConnect(Event ev, ScriptAccessory sa)
     {
@@ -236,7 +184,7 @@ public class UnrealTsukuyomi
         }
     }
     
-    [ScriptMethod(name: "深宵换装分摊", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11196)$"],
+    [ScriptMethod(name: "深宵换装分摊", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11196|45360)$"],
         userControl: true)]
     public void NightFallStack(Event ev, ScriptAccessory sa)
     {
@@ -245,7 +193,7 @@ public class UnrealTsukuyomi
         sa.DrawRect(ev.SourceId, sa.Data.Me, 2000, 10000, $"深宵换装分摊", 0, 8, 40, true);
     }
     
-    [ScriptMethod(name: "深宵换装分摊绘图删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11198)$"],
+    [ScriptMethod(name: "深宵换装分摊绘图删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11198|45362)$"],
         userControl: Debugging)]
     public void NightFallStackRemove(Event ev, ScriptAccessory sa)
     {
@@ -253,16 +201,16 @@ public class UnrealTsukuyomi
         _nightFallAutoEvent.Reset();
     }
     
-    [ScriptMethod(name: "深宵换装职能刀计数器初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197)$"],
+    [ScriptMethod(name: "深宵换装职能刀计数器初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197|45361)$"],
         userControl: Debugging)]
     public void NightFallCountInit(Event ev, ScriptAccessory sa)
     {
         _nightFallCounter = 0;
-        // sa.Log.Debug($"深宵换装职能刀计数器初始化");
+        sa.Log.Debug($"深宵换装职能刀计数器初始化");
     }
     
     [ScriptMethod(name: "深宵换装职能刀计数与绘图删除", eventType: EventTypeEnum.ActionEffect,
-        eventCondition: ["ActionId:regex:^(11199)$", "TargetIndex:1"],
+        eventCondition: ["ActionId:regex:^(11199|45363)$", "TargetIndex:1"],
         userControl: Debugging)]
     public void NightFallFanRemove(Event ev, ScriptAccessory sa)
     {
@@ -278,12 +226,13 @@ public class UnrealTsukuyomi
     {
     }
     
-    [ScriptMethod(name: "[转阶段] 极月读阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11952)$"],
+    [ScriptMethod(name: "[转阶段] 极月读阶段转换", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11952|45417)$"],
         userControl: Debugging)]
     public void PhaseChange_Selenomancy(Event ev, ScriptAccessory sa)
     {
         _phase = 1f;
-        // sa.Log.Debug($"阶段转换为 极月读 {_phase}");
+        _swapColorGuideTriggered = false;
+        sa.Log.Debug($"阶段转换为 极月读 {_phase}");
     }
     
     [ScriptMethod(name: "初始换色危险区", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(153[89])$", "StackCount:4"],
@@ -294,9 +243,11 @@ public class UnrealTsukuyomi
         if (ev.TargetId != sa.Data.Me) return;
         if (_swapColorRangeTriggered) return;
 
+        const uint WHITE_BUFF = 1538;
+        
         _swapColorRangeTriggered = true;
-        var isWhiteBuff = ev.StatusId == 1538;
-        // sa.Log.Debug($"获得状态 {(isWhiteBuff ? "白月" : "黑月")} {ev.StatusStackCount} 层");
+        var isWhiteBuff = ev.StatusId == WHITE_BUFF;
+        sa.Log.Debug($"获得状态 {(isWhiteBuff ? "白月" : "黑月")} {ev.StatusStackCount} 层");
 
         var dp = sa.DrawFan(Center, 0, 5000, $"极月读危险区",
             180f.DegToRad(), (isWhiteBuff ? -90f : 90f).DegToRad(), 20, 0, draw: false);
@@ -313,10 +264,12 @@ public class UnrealTsukuyomi
         
         _swapColorGuideTriggered = true;
         // 必定左白右黑，白buff去右
-        var isWhiteBuff = ev.StatusId == 1538;
+        const uint WHITE_BUFF = 1538;
+        
+        var isWhiteBuff = ev.StatusId == WHITE_BUFF;
         var safePosUpside = new Vector3(isWhiteBuff ? 106.5f : 93.5f, 0, 93.5f);
         var safePosDownSide = safePosUpside.FoldPointVertical(Center.Z);
-        // sa.Log.Debug($"开启 极月读初始换色指路 FrameWorkUpdateAction");
+        sa.Log.Debug($"开启 极月读初始换色指路 FrameWorkUpdateAction");
         
         void Action()
         {
@@ -342,14 +295,14 @@ public class UnrealTsukuyomi
     }
     
     [ScriptMethod(name: "[转阶段] 删除初始换色范围与指路，阶段转换，盈亏检索初始化",
-        eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11222)$", "TargetIndex:1"],
+        eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11222|45386)$", "TargetIndex:1"],
         userControl: Debugging, suppress: 2000)]
     public void SwapColorFirstRemove(Event ev, ScriptAccessory sa)
     {
         if (_phase > 1f) return;
         _phase = 1.1f;
-        // sa.Log.Debug($"关闭 极月读初始换色指路 FrameWorkUpdateAction");
-        // sa.Log.Debug($"阶段转换为 极月读：盈亏 {_phase}，检索值初始化");
+        sa.Log.Debug($"关闭 极月读初始换色指路 FrameWorkUpdateAction");
+        sa.Log.Debug($"阶段转换为 极月读：盈亏 {_phase}，检索值初始化");
         _swapColorFirstInit = false;
         _swapColorFirstLastUpsideClose = false;
         sa.Method.RemoveDraw($"极月读危险区");
@@ -381,30 +334,30 @@ public class UnrealTsukuyomi
             {
                 // 异常情况：靠近白，获得黑，盈亏靠近黑
                 _moonPhaseWhite -= 3;
-                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心近，获得黑Buff，盈亏靠近黑 {_moonPhaseWhite}");
+                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心近，获得黑Buff，盈亏靠近黑 {_moonPhaseWhite}");
             }
             else if (!isCloseToWhite && isWhiteBuff)
             {
                 // 异常情况：靠近黑，获得白，盈亏靠近白
                 _moonPhaseWhite += 3;
-                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心远，获得白Buff，盈亏靠近白 {_moonPhaseWhite}");
+                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心远，获得白Buff，盈亏靠近白 {_moonPhaseWhite}");
             }
             else if (!isWhiteBuff && distanceToWhite > 25f)
             {
                 // 极端情况：非常靠近黑，获得黑，盈亏靠近白
                 _moonPhaseWhite += 1;
-                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很远，获得黑Buff，倾向于盈亏靠近白 {_moonPhaseWhite}");
+                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很远，获得黑Buff，倾向于盈亏靠近白 {_moonPhaseWhite}");
             }
             else if (isWhiteBuff && distanceToBlack > 25f)
             {
                 // 极端情况：非常靠近白，获得白，盈亏靠近黑
                 _moonPhaseWhite -= 1;
-                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很近，获得白Buff，倾向于盈亏靠近黑 {_moonPhaseWhite}");
+                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很近，获得白Buff，倾向于盈亏靠近黑 {_moonPhaseWhite}");
             }
         }
     }
     
-    [ScriptMethod(name: "极月读深宵换装指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1119[67])$"],
+    [ScriptMethod(name: "极月读深宵换装指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1119[67]|4536[01])$"],
         userControl: true)]
     public void SelenomancyNightFallGuide(Event ev, ScriptAccessory sa)
     {
@@ -412,11 +365,14 @@ public class UnrealTsukuyomi
         // 11196 黄圈之弹分摊 11198
         if (_phase is < 1f or >= 2f) return;
         
+        uint[] STACK = [11196, 45360];
+        var isStack = STACK.Contains(ev.ActionId);
+        
         // 极月读情况下直接指向方位
         var isMoonPhaseWhite = _moonPhaseWhite > 0;
-        // sa.Log.Debug(
-            // $"检索到盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}，" +
-            // $"Boss 靠近 {(isMoonPhaseWhite ? "右" : "左")}，侧边需指向 {(isMoonPhaseWhite ? "左" : "右")}");
+        sa.Log.Debug(
+            $"检索到盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}，" +
+            $"Boss 靠近 {(isMoonPhaseWhite ? "右" : "左")}，侧边需指向 {(isMoonPhaseWhite ? "左" : "右")}");
 
         var bossPos = sa.GetById(ev.SourceId).Position;
         var guidanceData = new[]
@@ -430,9 +386,12 @@ public class UnrealTsukuyomi
         foreach (var guide in guidanceData)
         {
             // 若为分摊，不画指路线，指路箭头向背后
-            var startPos = basePos.RotateAndExtend(bossPos, ev.ActionId == 11197 ? guide.Rotate.DegToRad() : 0f, 0);
+            // var startPos = basePos.RotateAndExtend(bossPos, ev.ActionId == 11197 ? guide.Rotate.DegToRad() : 0f, 0);
+            var startPos = basePos.RotateAndExtend(bossPos, isStack ? 0f : guide.Rotate.DegToRad(), 0);
             sa.DrawLine(startPos, guide.MeteorPos,
-                0, 12000, $"极月读深宵换装指路线", 0, 30f, 10, guide.Condition, byY: true, draw: ev.ActionId == 11197);
+                0, 12000, $"极月读深宵换装指路线", 0, 30f, 10, guide.Condition, byY: true, draw: !isStack);
+            // sa.DrawLine(startPos, guide.MeteorPos,
+            //     0, 12000, $"极月读深宵换装指路线", 0, 30f, 10, guide.Condition, byY: true, draw: ev.ActionId == 11197);
             if (!guide.Condition) continue;
             sa.DrawGuidance(startPos, 0, 12000, $"极月读深宵换装指路");
         }
@@ -450,7 +409,7 @@ public class UnrealTsukuyomi
             sa.Data.MyObject.IsDps() ? new Vector3(isMoonPhaseWhite ? 103 : 97, 0, 119) :
             new Vector3(isMoonPhaseWhite ? 81 : 119, 0, 100);
         sa.DrawGuidance(targetPos, 0, 10000, $"极月读放陨石");
-        // sa.Log.Debug($"玩家要放陨石，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
+        sa.Log.Debug($"玩家要放陨石，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
     }
     
     [ScriptMethod(name: "陨石点名删除深宵换装指路", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0083)$"],
@@ -467,10 +426,10 @@ public class UnrealTsukuyomi
     public void PhaseChange_Meteor(Event ev, ScriptAccessory sa)
     {
         _phase = 1.2f;
-        // sa.Log.Debug($"阶段转换为 极月读：陨石 {_phase}");
+        sa.Log.Debug($"阶段转换为 极月读：陨石 {_phase}");
     }
     
-    [ScriptMethod(name: "陨石后删除深宵换装与放陨石指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11217)$"],
+    [ScriptMethod(name: "陨石后删除深宵换装与放陨石指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11217|45381)$"],
         userControl: Debugging)]
     public void PlaceMeteorGuideRemove(Event ev, ScriptAccessory sa)
     {
@@ -480,30 +439,30 @@ public class UnrealTsukuyomi
         sa.Method.RemoveDraw("极月读深宵换装指路线");
     }
     
-    [ScriptMethod(name: "极月读陨石后集合指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11217)$"],
+    [ScriptMethod(name: "极月读陨石后集合指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11217|45381)$"],
         userControl: true, suppress: 2000)]
     public void AfterPlaceMeteorGuide(Event ev, ScriptAccessory sa)
     {
         var isMoonPhaseWhite = _moonPhaseWhite > 0;
         var targetPos = new Vector3(isMoonPhaseWhite ? 119 : 81, 0, 100);
-        sa.DrawGuidance(targetPos, 0, 10000, $"极月读陨石后集合指路");
-        // sa.Log.Debug($"放完陨石后集合，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
+        sa.DrawGuidance(targetPos, 0, 6000, $"极月读陨石后集合指路");
+        sa.Log.Debug($"放完陨石后集合，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
     }
     
-    [ScriptMethod(name: "[转阶段] 月食转阶段", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11214)$"],
+    [ScriptMethod(name: "[转阶段] 月食转阶段", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11214|45378)$"],
         userControl: Debugging, suppress: 2000)]
     public void PhaseChange_LunarEclipse(Event ev, ScriptAccessory sa)
     {
         _phase = 1.3f;
-        // sa.Log.Debug($"阶段转换为 极月读：月食 {_phase}");
+        sa.Log.Debug($"阶段转换为 极月读：月食 {_phase}");
     }
     
-    [ScriptMethod(name: "[转阶段] 月下美人转阶段", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11224)$"],
+    [ScriptMethod(name: "[转阶段] 月下美人转阶段", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11224|45388)$"],
         userControl: Debugging)]
     public void PhaseChange_Antitwilight(Event ev, ScriptAccessory sa)
     {
         _phase = 2f;
-        // sa.Log.Debug($"阶段转换为 月下美人 {_phase}");
+        sa.Log.Debug($"阶段转换为 月下美人 {_phase}");
     }
     
     [ScriptMethod(name: "---- 月下美人 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -512,7 +471,7 @@ public class UnrealTsukuyomi
     {
     }
     
-    [ScriptMethod(name: "死刑", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11195|11954)$"],
+    [ScriptMethod(name: "死刑", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11195|11954|45359|45418)$"],
         userControl: true)]
     public void TankBuster(Event ev, ScriptAccessory sa)
     {
@@ -520,7 +479,7 @@ public class UnrealTsukuyomi
             $"死刑", 90f.DegToRad(), 0, 15, 0);
     }
     
-    [ScriptMethod(name: "月下美人宴会游乐指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11205)$"],
+    [ScriptMethod(name: "月下美人宴会游乐指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11205|45369)$"],
         userControl: true)]
     public void ZashikiAsobiAntitwilight(Event ev, ScriptAccessory sa)
     {
@@ -532,7 +491,7 @@ public class UnrealTsukuyomi
         sa.DrawGuidance(startPos, _nightFallGuidancePos, 0, 10000, $"宴会游乐第二步准备", isSafe: false);
     }
     
-    [ScriptMethod(name: "月下美人宴会游乐指路后续1", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11206)$"],
+    [ScriptMethod(name: "月下美人宴会游乐指路后续1", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11206|45370)$"],
         userControl: Debugging, suppress: 10000)]
     public void ZashikiAsobiAntitwilightAfter1(Event ev, ScriptAccessory sa)
     {
@@ -543,7 +502,7 @@ public class UnrealTsukuyomi
         sa.DrawGuidance(startPos, 0, 10000, $"宴会游乐第一步", isSafe: true);
     }
     
-    [ScriptMethod(name: "月下美人宴会游乐指路后续2", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11206)$"],
+    [ScriptMethod(name: "月下美人宴会游乐指路后续2", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11206|45370)$"],
         userControl: Debugging, suppress: 10000)]
     public void ZashikiAsobiAntitwilightAfter2(Event ev, ScriptAccessory sa)
     {
@@ -554,12 +513,11 @@ public class UnrealTsukuyomi
         sa.DrawGuidance(_nightFallGuidancePos, 0, 10000, $"深宵换装宴会游乐第二步");
     }
     
-    [ScriptMethod(name: "*月下美人宴会游乐删除舞扇判定动画", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11206)$", "TargetIndex:1"],
+    [ScriptMethod(name: "*删除舞扇判定动画", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11206|45370)$", "TargetIndex:1"],
         userControl: true)]
     public void ZashikiAsobiAntitwilightRemoveFan(Event ev, ScriptAccessory sa)
     {
-        if (_phase > 2f) return;
-
+        // if (_phase > 2f) return;
         var fanObj = sa.GetById(ev.SourceId);
         sa.WriteVisible(fanObj, false);
     }
@@ -570,21 +528,25 @@ public class UnrealTsukuyomi
     {
     }
     
-    [ScriptMethod(name: "[转阶段] 黄泉之舞转阶段", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11472)$", "TargetIndex:1"],
+    [ScriptMethod(name: "[转阶段] 黄泉之舞转阶段", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11472|45406)$", "TargetIndex:1"],
         userControl: Debugging)]
     public void PhaseChange_DeadDance(Event ev, ScriptAccessory sa)
     {
         _phase = 3f;
-        // sa.Log.Debug($"阶段转换为 黄泉之舞 {_phase}");
+        sa.Log.Debug($"阶段转换为 黄泉之舞 {_phase}");
     }
     
-    [ScriptMethod(name: "月刀左右斩与钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1122[67])$"],
+    [ScriptMethod(name: "月刀左右斩与钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1122[67]|4539[01])$"],
         userControl: true)]
     public unsafe void LunarBlade(Event ev, ScriptAccessory sa)
     {
         var bossObj = sa.GetById(ev.SourceId);
-        var isLeftBlade = ev.ActionId == 11227;
-        var isChariot = ((IBattleChara?)bossObj).HasStatus(1535);
+        
+        uint[] LEFT_BLADE = [11227, 45391];
+        const uint CHARIOT_STATUS = 1535;
+        
+        var isLeftBlade = LEFT_BLADE.Contains(ev.ActionId);
+        var isChariot = ((IBattleChara?)bossObj).HasStatus(CHARIOT_STATUS);
 
         if (LunarBladeDrawSafeRegion)
         {
@@ -606,7 +568,7 @@ public class UnrealTsukuyomi
         }
     }
     
-    [ScriptMethod(name: "黄泉之舞扇子记录", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(8755)$"],
+    [ScriptMethod(name: "黄泉之舞扇子记录", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(8755|19066)$"],
         userControl: Debugging)]
     public void DeadDanceFanRecord(Event ev, ScriptAccessory sa)
     {
@@ -617,7 +579,7 @@ public class UnrealTsukuyomi
         }
     }
     
-    [ScriptMethod(name: "黄泉之舞扇子记录初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11195|11954|11194)$"],
+    [ScriptMethod(name: "黄泉之舞扇子记录初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11195|11954|11194|45359|45418|45358)$"],
         userControl: Debugging)]
     public void DeadDanceFanRecordInit(Event ev, ScriptAccessory sa)
     {
@@ -626,19 +588,20 @@ public class UnrealTsukuyomi
         _deadDanceFanPos = [];
     }
     
-    [ScriptMethod(name: "月下缭乱连续分摊范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11228)$"],
+    // TODO 两个月下缭乱？45392 45396
+    [ScriptMethod(name: "月下缭乱连续分摊范围", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11228|45392)$"],
         userControl: true)]
     public void LunacyStack(Event ev, ScriptAccessory sa)
     {
         sa.DrawCircle(ev.TargetId, 0, 8000, $"月下缭乱", 6, true);
     }
     
-    [ScriptMethod(name: "黄泉之舞九连环指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11228)$"],
+    [ScriptMethod(name: "黄泉之舞九连环指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11228|45392)$"],
         userControl: true)]
     public void ShivaRoundGuidance(Event ev, ScriptAccessory sa)
     {
         var fanCount = _deadDanceFanPos.Count;
-        // sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
+        sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
         if (fanCount < 4) return;   // 不够判断
         
         // 九连环，找第2、3个坐标，判断方位
@@ -648,7 +611,7 @@ public class UnrealTsukuyomi
         // 顺逆时针判断
         var safePosAtCw = (region2 - region3 + 8) % 8 == 7; // 扇子逆时针增加，前一个减后一个取余后得7，安全点在顺时针方向
         var safeRegion = (region2 + (safePosAtCw ? -1 : 1) + 8) % 8; 
-        // sa.Log.Debug($"第2枚在方位{region2}，第3枚在方位{region3}，安全区是{(safePosAtCw ? "顺" : "逆")}时针方向，在方位{safeRegion}");
+        sa.Log.Debug($"第2枚在方位{region2}，第3枚在方位{region3}，安全区是{(safePosAtCw ? "顺" : "逆")}时针方向，在方位{safeRegion}");
 
         var basePoint = new Vector3(100, 0, 111);
         var startPoint = basePoint.RotateAndExtend(Center, safeRegion * 45f.DegToRad(), 0);
@@ -671,12 +634,12 @@ public class UnrealTsukuyomi
         sa.DrawCircle(ev.TargetId, 0, 8000, $"破月", 6, isSameRole);
     }
     
-    [ScriptMethod(name: "黄泉之舞破月指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11548)$"],
+    [ScriptMethod(name: "黄泉之舞破月指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11548|45413)$"],
         userControl: true)]
     public void HagetsuGuidance(Event ev, ScriptAccessory sa)
     {
         var fanCount = _deadDanceFanPos.Count;
-        // sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
+        sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
         if (fanCount < 6) return;   // 不够判断
 
         // 0 2 4 8 => 1 10 100 1000
@@ -688,10 +651,10 @@ public class UnrealTsukuyomi
             var region = fanPos.GetRadian(Center).RadianToRegion(8, 0, true);
             if (region % 2 != 0) continue;
             safeRegionFlag -= (int)Math.Pow(10, region / 2);
-            // sa.Log.Debug($"{region} {region % 2} {safeRegionFlag}");
+            sa.Log.Debug($"{region} {region % 2} {safeRegionFlag}");
         }
         var safeRegion = (int)Math.Log10(safeRegionFlag) * 2;
-        // sa.Log.Debug($"基于标志 {safeRegionFlag}，破月安全正点方位为 {safeRegion}");
+        sa.Log.Debug($"基于标志 {safeRegionFlag}，破月安全正点方位为 {safeRegion}");
         
         var guidanceData = new[]
         {
@@ -1106,25 +1069,14 @@ public static class DrawTools
 
 public static class SpecialFunction
 {
-    [Flags]
-    public enum DrawState : uint
-    {
-        Invisibility      = 0x00_00_00_02,
-        IsLoading         = 0x00_00_08_00,
-        SomeNpcFlag       = 0x00_00_01_00,
-        MaybeCulled       = 0x00_00_04_00,
-        MaybeHiddenMinion = 0x00_00_80_00,
-        MaybeHiddenSummon = 0x00_80_00_00,
-    }
-    
-    public static unsafe DrawState* ActorDrawState(IGameObject actor)
-        => (DrawState*)(&((GameObject*)actor.Address)->RenderFlags);
-    
     public static unsafe void WriteVisible(this ScriptAccessory sa, IGameObject? actor, bool visible)
     {
+        const VisibilityFlags VISIBLE_FLAG = VisibilityFlags.None;
+        const VisibilityFlags INVISIBILITY_FLAG = VisibilityFlags.Model;
         try
         {
-            *ActorDrawState(actor!) |= visible ? ~DrawState.Invisibility : DrawState.Invisibility;
+            var flagsPtr = &((GameObject*)actor?.Address)->RenderFlags;
+            *flagsPtr = visible ? VISIBLE_FLAG : INVISIBILITY_FLAG;
         }
         catch (Exception e)
         {
