@@ -199,12 +199,12 @@
   {
     "Name": "Tsukuyomi-Ur [月读幻巧战]",
     "Guid": "93036a00-ec46-4897-a97c-66ee03089e66",
-    "Version": "0.0.0.2",
+    "Version": "0.0.0.3",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UnrealTsukuyomi/UnrealTsukuyomi.cs",
-    "Note": "0.0.0.2\r\n初版，可用于极神/幻巧。",
-    "UpdateInfo": "0.0.0.2\r\n初版，可用于极神/幻巧。",
+    "Note": "0.0.0.3\r\n初版，可用于极神/幻巧。",
+    "UpdateInfo": "0.0.0.3\r\n修复月下美人阶段宴会游乐指路错误问题。",
     "TerritoryIds": [
       779,
       1318

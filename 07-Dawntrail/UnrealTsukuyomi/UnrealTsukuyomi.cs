@@ -31,18 +31,18 @@ public class UnrealTsukuyomi
     const string UpdateInfo =
         $"""
          {Version}
-         初版，可用于极神/幻巧。
+         修复月下美人阶段宴会游乐指路错误问题。
          """;
 
     private const string Name = "Tsukuyomi-Ur [月读幻巧战]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private const bool Debugging = false;
 
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
 
     // Params
-    private float _phase = 0;
+    private int _phase = 0;
     private int _nightFallCounter = 0;  // 黄泉之枪计数器，3次消失
     private int _moonPhaseWhite = 0;    // 盈亏，大于0代表白多 
     private Vector3 _nightFallGuidancePos = Vector3.Zero;
@@ -52,6 +52,7 @@ public class UnrealTsukuyomi
     private bool _swapColorRangeTriggered = false;
     private bool _swapColorGuideTriggered = false;
     private bool _zashikiAsobiAntitwilightEnabled = false;
+    private bool _antitwilightNightFallUpsideSafe = false;
     
     // Framework Guid
     private string _swapColorFirstFw = "";
@@ -60,13 +61,14 @@ public class UnrealTsukuyomi
     
     // AutoResetEvents
     private AutoResetEvent _nightFallAutoEvent = new AutoResetEvent(false);
+    private AutoResetEvent _antitwilightNightFallAutoEvent = new AutoResetEvent(false);
 
     [UserSetting("月刀左右斩与钢铁月环画安全区")]
     public static bool LunarBladeDrawSafeRegion { get; set; } = true;
     
     public void Init(ScriptAccessory sa)
     {
-        sa.Log.Debug($"月读幻巧战 {Version}{DebugVersion} 刷新");
+        // sa.Log.Debug($"月读幻巧战 {Version}{DebugVersion} 刷新");
         RefreshParams();
         sa.Method.RemoveDraw(".*");
         sa.Method.ClearFrameworkUpdateAction(this);
@@ -83,12 +85,13 @@ public class UnrealTsukuyomi
         _swapColorRangeTriggered = false;
         _swapColorGuideTriggered = false;
         _zashikiAsobiAntitwilightEnabled = false;
+        _antitwilightNightFallUpsideSafe = false;
         
         _swapColorFirstLastUpsideClose = false;
         _swapColorFirstInit = false;
         
         _nightFallAutoEvent = new AutoResetEvent(false);
-        
+        _antitwilightNightFallAutoEvent = new AutoResetEvent(false);
     }
 
     [ScriptMethod(name: "---- 测试项 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -133,7 +136,7 @@ public class UnrealTsukuyomi
         userControl: true)]
     public void NightFallGuide(Event ev, ScriptAccessory sa)
     {
-        if (_phase >= 1f) return;
+        if (_phase != 1) return;
         _nightFallAutoEvent.WaitOne();
         sa.DrawGuidance(_nightFallGuidancePos, 2000, 12000, $"深宵换装指路");
     }
@@ -199,6 +202,7 @@ public class UnrealTsukuyomi
     {
         sa.Method.RemoveDraw($"深宵换装.*");
         _nightFallAutoEvent.Reset();
+        _antitwilightNightFallAutoEvent.Reset();
     }
     
     [ScriptMethod(name: "深宵换装职能刀计数器初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11197|45361)$"],
@@ -206,7 +210,7 @@ public class UnrealTsukuyomi
     public void NightFallCountInit(Event ev, ScriptAccessory sa)
     {
         _nightFallCounter = 0;
-        sa.Log.Debug($"深宵换装职能刀计数器初始化");
+        // sa.Log.Debug($"深宵换装职能刀计数器初始化");
     }
     
     [ScriptMethod(name: "深宵换装职能刀计数与绘图删除", eventType: EventTypeEnum.ActionEffect,
@@ -218,6 +222,7 @@ public class UnrealTsukuyomi
         if (_nightFallCounter < 3) return;
         sa.Method.RemoveDraw($"深宵换装.*");
         _nightFallAutoEvent.Reset();
+        _antitwilightNightFallAutoEvent.Reset();
     }
     
     [ScriptMethod(name: "---- 极月读 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -230,16 +235,16 @@ public class UnrealTsukuyomi
         userControl: Debugging)]
     public void PhaseChange_Selenomancy(Event ev, ScriptAccessory sa)
     {
-        _phase = 1f;
+        _phase = 10;
         _swapColorGuideTriggered = false;
-        sa.Log.Debug($"阶段转换为 极月读 {_phase}");
+        // sa.Log.Debug($"阶段转换为 极月读 {_phase}");
     }
     
     [ScriptMethod(name: "初始换色危险区", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(153[89])$", "StackCount:4"],
         userControl: true)]
     public void SwapColorRangeFirst(Event ev, ScriptAccessory sa)
     {
-        if (_phase < 1f) return;
+        if (_phase != 10) return;
         if (ev.TargetId != sa.Data.Me) return;
         if (_swapColorRangeTriggered) return;
 
@@ -247,7 +252,7 @@ public class UnrealTsukuyomi
         
         _swapColorRangeTriggered = true;
         var isWhiteBuff = ev.StatusId == WHITE_BUFF;
-        sa.Log.Debug($"获得状态 {(isWhiteBuff ? "白月" : "黑月")} {ev.StatusStackCount} 层");
+        // sa.Log.Debug($"获得状态 {(isWhiteBuff ? "白月" : "黑月")} {ev.StatusStackCount} 层");
 
         var dp = sa.DrawFan(Center, 0, 5000, $"极月读危险区",
             180f.DegToRad(), (isWhiteBuff ? -90f : 90f).DegToRad(), 20, 0, draw: false);
@@ -258,7 +263,7 @@ public class UnrealTsukuyomi
         userControl: true)]
     public void SwapColorGuideFirst(Event ev, ScriptAccessory sa)
     {
-        if (_phase < 1f) return;
+        if (_phase != 10) return;
         if (ev.TargetId != sa.Data.Me) return;
         if (_swapColorGuideTriggered) return;
         
@@ -269,7 +274,7 @@ public class UnrealTsukuyomi
         var isWhiteBuff = ev.StatusId == WHITE_BUFF;
         var safePosUpside = new Vector3(isWhiteBuff ? 106.5f : 93.5f, 0, 93.5f);
         var safePosDownSide = safePosUpside.FoldPointVertical(Center.Z);
-        sa.Log.Debug($"开启 极月读初始换色指路 FrameWorkUpdateAction");
+        // sa.Log.Debug($"开启 极月读初始换色指路 FrameWorkUpdateAction");
         
         void Action()
         {
@@ -299,10 +304,10 @@ public class UnrealTsukuyomi
         userControl: Debugging, suppress: 2000)]
     public void SwapColorFirstRemove(Event ev, ScriptAccessory sa)
     {
-        if (_phase > 1f) return;
-        _phase = 1.1f;
-        sa.Log.Debug($"关闭 极月读初始换色指路 FrameWorkUpdateAction");
-        sa.Log.Debug($"阶段转换为 极月读：盈亏 {_phase}，检索值初始化");
+        if (_phase != 10) return;
+        _phase = 11;
+        // sa.Log.Debug($"关闭 极月读初始换色指路 FrameWorkUpdateAction");
+        // sa.Log.Debug($"阶段转换为 极月读：盈亏 {_phase}，检索值初始化");
         _swapColorFirstInit = false;
         _swapColorFirstLastUpsideClose = false;
         sa.Method.RemoveDraw($"极月读危险区");
@@ -316,7 +321,7 @@ public class UnrealTsukuyomi
         userControl: Debugging)]
     public void MoonPhaseCalculation(Event ev, ScriptAccessory sa)
     {
-        if (_phase is > 1.1f or < 1f) return;
+        if (_phase != 11) return;
         lock (this)
         {
             var whiteCenter = new Vector3(85, 0, 100);
@@ -334,25 +339,25 @@ public class UnrealTsukuyomi
             {
                 // 异常情况：靠近白，获得黑，盈亏靠近黑
                 _moonPhaseWhite -= 3;
-                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心近，获得黑Buff，盈亏靠近黑 {_moonPhaseWhite}");
+                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心近，获得黑Buff，盈亏靠近黑 {_moonPhaseWhite}");
             }
             else if (!isCloseToWhite && isWhiteBuff)
             {
                 // 异常情况：靠近黑，获得白，盈亏靠近白
                 _moonPhaseWhite += 3;
-                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心远，获得白Buff，盈亏靠近白 {_moonPhaseWhite}");
+                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心远，获得白Buff，盈亏靠近白 {_moonPhaseWhite}");
             }
             else if (!isWhiteBuff && distanceToWhite > 25f)
             {
                 // 极端情况：非常靠近黑，获得黑，盈亏靠近白
                 _moonPhaseWhite += 1;
-                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很远，获得黑Buff，倾向于盈亏靠近白 {_moonPhaseWhite}");
+                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很远，获得黑Buff，倾向于盈亏靠近白 {_moonPhaseWhite}");
             }
             else if (isWhiteBuff && distanceToBlack > 25f)
             {
                 // 极端情况：非常靠近白，获得白，盈亏靠近黑
                 _moonPhaseWhite -= 1;
-                sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很近，获得白Buff，倾向于盈亏靠近黑 {_moonPhaseWhite}");
+                // sa.Log.Debug($"{sa.GetPlayerJobById((uint)ev.TargetId)} 距离白中心很近，获得白Buff，倾向于盈亏靠近黑 {_moonPhaseWhite}");
             }
         }
     }
@@ -363,16 +368,16 @@ public class UnrealTsukuyomi
     {
         // 11197 黄圈之枪三连 11199
         // 11196 黄圈之弹分摊 11198
-        if (_phase is < 1f or >= 2f) return;
+        if (_phase is < 10 or >= 20) return;
         
         uint[] STACK = [11196, 45360];
         var isStack = STACK.Contains(ev.ActionId);
         
         // 极月读情况下直接指向方位
         var isMoonPhaseWhite = _moonPhaseWhite > 0;
-        sa.Log.Debug(
-            $"检索到盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}，" +
-            $"Boss 靠近 {(isMoonPhaseWhite ? "右" : "左")}，侧边需指向 {(isMoonPhaseWhite ? "左" : "右")}");
+        // sa.Log.Debug(
+            // $"检索到盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}，" +
+            // $"Boss 靠近 {(isMoonPhaseWhite ? "右" : "左")}，侧边需指向 {(isMoonPhaseWhite ? "左" : "右")}");
 
         var bossPos = sa.GetById(ev.SourceId).Position;
         var guidanceData = new[]
@@ -409,7 +414,7 @@ public class UnrealTsukuyomi
             sa.Data.MyObject.IsDps() ? new Vector3(isMoonPhaseWhite ? 103 : 97, 0, 119) :
             new Vector3(isMoonPhaseWhite ? 81 : 119, 0, 100);
         sa.DrawGuidance(targetPos, 0, 10000, $"极月读放陨石");
-        sa.Log.Debug($"玩家要放陨石，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
+        // sa.Log.Debug($"玩家要放陨石，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
     }
     
     [ScriptMethod(name: "陨石点名删除深宵换装指路", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0083)$"],
@@ -425,8 +430,8 @@ public class UnrealTsukuyomi
         userControl: Debugging, suppress: 2000)]
     public void PhaseChange_Meteor(Event ev, ScriptAccessory sa)
     {
-        _phase = 1.2f;
-        sa.Log.Debug($"阶段转换为 极月读：陨石 {_phase}");
+        _phase = 12;
+        // sa.Log.Debug($"阶段转换为 极月读：陨石 {_phase}");
     }
     
     [ScriptMethod(name: "陨石后删除深宵换装与放陨石指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11217|45381)$"],
@@ -446,23 +451,23 @@ public class UnrealTsukuyomi
         var isMoonPhaseWhite = _moonPhaseWhite > 0;
         var targetPos = new Vector3(isMoonPhaseWhite ? 119 : 81, 0, 100);
         sa.DrawGuidance(targetPos, 0, 6000, $"极月读陨石后集合指路");
-        sa.Log.Debug($"放完陨石后集合，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
+        // sa.Log.Debug($"放完陨石后集合，盈亏 {_moonPhaseWhite} 靠近 {(isMoonPhaseWhite ? "白" : "黑")}");
     }
     
     [ScriptMethod(name: "[转阶段] 月食转阶段", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(11214|45378)$"],
         userControl: Debugging, suppress: 2000)]
     public void PhaseChange_LunarEclipse(Event ev, ScriptAccessory sa)
     {
-        _phase = 1.3f;
-        sa.Log.Debug($"阶段转换为 极月读：月食 {_phase}");
+        _phase = 13;
+        // sa.Log.Debug($"阶段转换为 极月读：月食 {_phase}");
     }
     
     [ScriptMethod(name: "[转阶段] 月下美人转阶段", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11224|45388)$"],
         userControl: Debugging)]
     public void PhaseChange_Antitwilight(Event ev, ScriptAccessory sa)
     {
-        _phase = 2f;
-        sa.Log.Debug($"阶段转换为 月下美人 {_phase}");
+        _phase = 20;
+        // sa.Log.Debug($"阶段转换为 月下美人 {_phase}");
     }
     
     [ScriptMethod(name: "---- 月下美人 ----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -483,9 +488,17 @@ public class UnrealTsukuyomi
         userControl: true)]
     public void ZashikiAsobiAntitwilight(Event ev, ScriptAccessory sa)
     {
-        if (_phase > 2f) return;
+        if (_phase != 20) return;
         _zashikiAsobiAntitwilightEnabled = true;
+        _antitwilightNightFallAutoEvent.WaitOne();
+        
+        // sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
+        var safeRegion = FindDeadFanSafeRegion(sa);
+        _antitwilightNightFallUpsideSafe = safeRegion == 4;
+        
         var startPos = sa.Data.MyObject.IsDps() ? new Vector3(100, 0, 111) : new Vector3(92, 0, 107);
+        if (_antitwilightNightFallUpsideSafe)
+            startPos = startPos.PointCenterSymmetry(Center);
         sa.DrawGuidance(startPos, 0, 10000, $"宴会游乐第一步准备", isSafe: false);
         _nightFallAutoEvent.WaitOne();
         sa.DrawGuidance(startPos, _nightFallGuidancePos, 0, 10000, $"宴会游乐第二步准备", isSafe: false);
@@ -495,9 +508,11 @@ public class UnrealTsukuyomi
         userControl: Debugging, suppress: 10000)]
     public void ZashikiAsobiAntitwilightAfter1(Event ev, ScriptAccessory sa)
     {
-        if (_phase > 2f) return;
+        if (_phase != 20) return;
         if (!_zashikiAsobiAntitwilightEnabled) return;
         var startPos = sa.Data.MyObject.IsDps() ? new Vector3(100, 0, 111) : new Vector3(92, 0, 107);
+        if (_antitwilightNightFallUpsideSafe)
+            startPos = startPos.PointCenterSymmetry(Center);
         sa.Method.RemoveDraw($"宴会游乐第一步准备");
         sa.DrawGuidance(startPos, 0, 10000, $"宴会游乐第一步", isSafe: true);
     }
@@ -506,7 +521,7 @@ public class UnrealTsukuyomi
         userControl: Debugging, suppress: 10000)]
     public void ZashikiAsobiAntitwilightAfter2(Event ev, ScriptAccessory sa)
     {
-        if (_phase > 2f) return;
+        if (_phase != 20) return;
         if (!_zashikiAsobiAntitwilightEnabled) return;
         sa.Method.RemoveDraw($"宴会游乐第一步");
         sa.Method.RemoveDraw($"宴会游乐第二步准备");
@@ -517,7 +532,6 @@ public class UnrealTsukuyomi
         userControl: true)]
     public void ZashikiAsobiAntitwilightRemoveFan(Event ev, ScriptAccessory sa)
     {
-        // if (_phase > 2f) return;
         var fanObj = sa.GetById(ev.SourceId);
         sa.WriteVisible(fanObj, false);
     }
@@ -532,8 +546,8 @@ public class UnrealTsukuyomi
         userControl: Debugging)]
     public void PhaseChange_DeadDance(Event ev, ScriptAccessory sa)
     {
-        _phase = 3f;
-        sa.Log.Debug($"阶段转换为 黄泉之舞 {_phase}");
+        _phase = 30;
+        // sa.Log.Debug($"阶段转换为 黄泉之舞 {_phase}");
     }
     
     [ScriptMethod(name: "月刀左右斩与钢铁月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(1122[67]|4539[01])$"],
@@ -572,19 +586,22 @@ public class UnrealTsukuyomi
         userControl: Debugging)]
     public void DeadDanceFanRecord(Event ev, ScriptAccessory sa)
     {
-        if (_phase < 3f) return;
+        if (_phase is not 20 and not 30) return;
         lock (_deadDanceFanPos)
         {
             _deadDanceFanPos.Add(sa.GetById(ev.SourceId).Position);
+            
+            if (_deadDanceFanPos.Count == 6 && _phase is 20)
+                _antitwilightNightFallAutoEvent.Set();
         }
     }
     
-    [ScriptMethod(name: "黄泉之舞扇子记录初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11195|11954|11194|45359|45418|45358)$"],
+    [ScriptMethod(name: "扇子记录初始化", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11195|11954|11194|11224|45359|45418|45358|45388)$"],
         userControl: Debugging)]
     public void DeadDanceFanRecordInit(Event ev, ScriptAccessory sa)
     {
-        // 技能分别为魔法死刑、物理死刑、AOE
-        if (_phase < 3f) return;
+        // 技能分别为魔法死刑、物理死刑、AOE、月下美人
+        // if (_phase is not 20 and not 30) return;
         _deadDanceFanPos = [];
     }
     
@@ -601,7 +618,7 @@ public class UnrealTsukuyomi
     public void ShivaRoundGuidance(Event ev, ScriptAccessory sa)
     {
         var fanCount = _deadDanceFanPos.Count;
-        sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
+        // sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
         if (fanCount < 4) return;   // 不够判断
         
         // 九连环，找第2、3个坐标，判断方位
@@ -611,7 +628,7 @@ public class UnrealTsukuyomi
         // 顺逆时针判断
         var safePosAtCw = (region2 - region3 + 8) % 8 == 7; // 扇子逆时针增加，前一个减后一个取余后得7，安全点在顺时针方向
         var safeRegion = (region2 + (safePosAtCw ? -1 : 1) + 8) % 8; 
-        sa.Log.Debug($"第2枚在方位{region2}，第3枚在方位{region3}，安全区是{(safePosAtCw ? "顺" : "逆")}时针方向，在方位{safeRegion}");
+        // sa.Log.Debug($"第2枚在方位{region2}，第3枚在方位{region3}，安全区是{(safePosAtCw ? "顺" : "逆")}时针方向，在方位{safeRegion}");
 
         var basePoint = new Vector3(100, 0, 111);
         var startPoint = basePoint.RotateAndExtend(Center, safeRegion * 45f.DegToRad(), 0);
@@ -624,7 +641,7 @@ public class UnrealTsukuyomi
         userControl: true)]
     public void HagetsuTargetRange(Event ev, ScriptAccessory sa)
     {
-        if (_phase < 3f) return;
+        if (_phase != 30) return;
         
         var targetObj = (IBattleChara)sa.GetById(ev.TargetId);
         var myObj = sa.Data.MyObject;
@@ -633,16 +650,10 @@ public class UnrealTsukuyomi
                          (myObj.IsDps() && targetObj.IsDps());
         sa.DrawCircle(ev.TargetId, 0, 8000, $"破月", 6, isSameRole);
     }
-    
-    [ScriptMethod(name: "黄泉之舞破月指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11548|45413)$"],
-        userControl: true)]
-    public void HagetsuGuidance(Event ev, ScriptAccessory sa)
-    {
-        var fanCount = _deadDanceFanPos.Count;
-        sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
-        if (fanCount < 6) return;   // 不够判断
 
-        // 0 2 4 8 => 1 10 100 1000
+    private int FindDeadFanSafeRegion(ScriptAccessory sa)
+    {
+        // 0 2 4 6 => 1 10 100 1000
         var safeRegionFlag = 1111;
         foreach (var fanPos in _deadDanceFanPos.Take(6))
         {
@@ -651,11 +662,21 @@ public class UnrealTsukuyomi
             var region = fanPos.GetRadian(Center).RadianToRegion(8, 0, true);
             if (region % 2 != 0) continue;
             safeRegionFlag -= (int)Math.Pow(10, region / 2);
-            sa.Log.Debug($"{region} {region % 2} {safeRegionFlag}");
+            // sa.Log.Debug($"{region} {region % 2} {safeRegionFlag}");
         }
         var safeRegion = (int)Math.Log10(safeRegionFlag) * 2;
-        sa.Log.Debug($"基于标志 {safeRegionFlag}，破月安全正点方位为 {safeRegion}");
-        
+        // sa.Log.Debug($"基于标志 {safeRegionFlag}，破月安全正点方位为 {safeRegion}");
+        return safeRegion;
+    }
+    
+    [ScriptMethod(name: "黄泉之舞破月指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(11548|45413)$"],
+        userControl: true)]
+    public void HagetsuGuidance(Event ev, ScriptAccessory sa)
+    {
+        var fanCount = _deadDanceFanPos.Count;
+        // sa.Log.Debug($"扇子List中当前记录了{_deadDanceFanPos.Count}个坐标");
+        if (fanCount < 6) return;   // 不够判断
+        var safeRegion = FindDeadFanSafeRegion(sa);
         var guidanceData = new[]
         {
             (SafeRegion: safeRegion - 1, Condition: sa.Data.MyObject.IsTank()),
@@ -783,41 +804,6 @@ public static class MathTools
 }
 
 #endregion 计算函数
-
-#region 位置序列函数
-public static class IndexHelper
-{
-    /// <summary>
-    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
-    /// </summary>
-    /// <param name="pid">玩家SourceId</param>
-    /// <param name="sa"></param>
-    /// <returns>该玩家对应的位置称呼</returns>
-    public static string GetPlayerJobById(this ScriptAccessory sa, uint pid)
-    {
-        // 获得玩家职能简称，无用处，仅作DEBUG输出
-        var idx = sa.Data.PartyList.IndexOf(pid);
-        var str = sa.GetPlayerJobByIndex(idx);
-        return str;
-    }
-
-    /// <summary>
-    /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
-    /// </summary>
-    /// <param name="idx">位置index</param>
-    /// <param name="fourPeople">是否为四人迷宫</param>
-    /// <param name="sa"></param>
-    /// <returns></returns>
-    public static string GetPlayerJobByIndex(this ScriptAccessory sa, int idx, bool fourPeople = false)
-    {
-        List<string> role8 = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
-        List<string> role4 = ["T", "H", "D1", "D2"];
-        if (idx < 0 || idx >= 8 || (fourPeople && idx >= 4))
-            return "Unknown";
-        return fourPeople ? role4[idx] : role8[idx];
-    }
-}
-#endregion 位置序列函数
 
 #region 绘图函数
 
