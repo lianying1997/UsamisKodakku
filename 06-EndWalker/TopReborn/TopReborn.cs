@@ -40,11 +40,14 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         小心被电？
+         1. 调整P1接线大圈范围出现时机，正确玩家接线后距欧米茄5m即显示范围
+         2. 修复P2与P5大眼睛激光方位错误Bug
+         3. 增加P3你好世界阶段站位文字提示
+         4. 修复P5二传锁1指路终点水平反转的Bug
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -70,7 +73,7 @@ public class TopReborn
     public void Init(ScriptAccessory sa)
     {
         RefreshParams(sa);
-        // sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.");
+        sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.", Debugging);
         sa.Method.RemoveDraw(".*");
         sa.Method.ClearFrameworkUpdateAction(this);
     }
@@ -124,7 +127,7 @@ public class TopReborn
     public void P1A_循环程序_分P(Event ev, ScriptAccessory sa)
     {
         _parse = 1.1;
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
         _p1.BossId = ev.TargetId;
         _p1.Register();
         _pd.Init(sa, "P1线塔");
@@ -153,16 +156,18 @@ public class TopReborn
         if (_parse != 1.1) return;
         lock (_p1.塔字典)
         {
+            // sa.DebugMsg($"准备塔收集 R{_p1.线塔轮次} {_p1.前一轮绘图清除完毕.WaitOne(0)}", Debugging);
+            
             if (_p1.线塔轮次 != 0)
                 _p1.前一轮绘图清除完毕.WaitOne();
             
             var towerPos = ev.SourcePosition;
             var towerPriority = towerPos.GetRadian(Center).RadianToRegion(4, baseRegionIdx: 2, isDiagDiv: true, isCw: true);   // 以北为0，顺时针增加
             _p1.塔字典[towerPriority] = towerPos;
-            // sa.Log.Debug($"在第 {_p1.线塔轮次} 轮收集到方位 {towerPriority} 的塔");
+            // sa.DebugMsg($"在第 {_p1.线塔轮次} 轮收集到方位 {towerPriority} 的塔", Debugging);
             if (_p1.塔字典.Count != 2) return;
             _p1.线塔轮次++;
-            // sa.Log.Debug($"线塔轮次增加 {_p1.线塔轮次} ");
+            sa.DebugMsg($"线塔轮次增加 {_p1.线塔轮次} ", Debugging);
             _p1.每轮塔收集完毕.Set();
             _p1.前一轮绘图清除完毕.Reset();
         }
@@ -187,15 +192,15 @@ public class TopReborn
         sa.Method.TTS(isFirstTether ? "靠前接线" : "靠后");
     }
 
-    [ScriptMethod(name: "P1A_循环程序_清理绘图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(3149[67])$"], suppress: 500, userControl: Debugging)]
+    [ScriptMethod(name: "P1A_循环程序_清理绘图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(3149[67])$"], suppress: 100, userControl: Debugging)]
     public void P1A_循环程序_清理绘图(Event ev, ScriptAccessory sa)
     {
         if (_parse != 1.1) return;
         
-        // sa.Log.Debug($"清除循环程序绘图 Round {_p1.线塔轮次}");
+        sa.DebugMsg($"清除循环程序绘图 Round {_p1.线塔轮次}", Debugging);
         
         sa.Method.RemoveDraw($"P1_循环程序_R{_p1.线塔轮次}.*");
-        _p1.塔字典.Clear();
+        _p1.塔字典 = new Dictionary<int, Vector3>();
         _p1.上一次靠近状态 = 0;
         sa.Method.UnregistFrameworkUpdateAction(_p1.闲人指路Framework);
         _p1.前一轮绘图清除完毕.Set();
@@ -208,9 +213,7 @@ public class TopReborn
     public void P1A_循环程序_线塔处理位置(Event ev, ScriptAccessory sa)
     {
         if (_parse != 1.1) return;
-        // sa.Log.Debug($"等待每轮塔收集完毕事件 {_p1.线塔轮次} Ev状态{_p1.每轮塔收集完毕.WaitOne(0)}");
         _p1.每轮塔收集完毕.WaitOne();
-        // sa.Log.Debug($"执行第 {_p1.线塔轮次} 轮的线塔处理位置 Ev状态{_p1.每轮塔收集完毕.WaitOne(0)}");
         int  myIndex      = sa.GetMyIndex();
         int  myPriVal     = _pd.Priorities[myIndex];
         int  myTowerRound = myPriVal / 10;
@@ -223,7 +226,7 @@ public class TopReborn
             if (_p1.线塔轮次 == myTowerRound)
             {
                 var myTower = isHighPrior ? _p1.塔字典.MinBy(kvp => kvp.Key) : _p1.塔字典.MaxBy(kvp => kvp.Key);
-                // sa.Log.Debug($"现在是第 {_p1.线塔轮次} 轮线塔，是玩家的塔轮次，玩家需踩方位为 {myTower.Key} 的塔（以北为0，顺时针增加）");
+                // sa.DebugMsg($"现在是第 {_p1.线塔轮次} 轮线塔，是玩家的塔轮次，玩家需踩方位为 {myTower.Key} 的塔（以北为0，顺时针增加）", Debugging);
                 sa.DrawGuidance(myTower.Value, 0, 9000, $"P1_循环程序_R{_p1.线塔轮次}_塔站位");
                 sa.DrawCircle(myTower.Value, 0, 9000, $"P1_循环程序_R{_p1.线塔轮次}_塔范围", 3f, isSafe: true);
             }
@@ -238,13 +241,13 @@ public class TopReborn
                     return;
                 }
                 var myLinePos = new Vector3(100, 0, 85).RotateAndExtend(Center, myLineRegion * -90f.DegToRad());
-                // sa.Log.Debug($"现在是第 {_p1.线塔轮次} 轮线塔，是玩家的线轮次，玩家需将线接到方位 {myLineRegion} （以北为0，顺时针增加）");
+                // sa.DebugMsg($"现在是第 {_p1.线塔轮次} 轮线塔，是玩家的线轮次，玩家需将线接到方位 {myLineRegion} （以北为0，顺时针增加）", Debugging);
                 sa.DrawGuidance(myLinePos, 0, 9000, $"P1_循环程序_R{_p1.线塔轮次}_线站位");
             }
             else
             {
                 _p1.闲人指路Framework = sa.Method.RegistFrameworkUpdateAction(Action);
-                // sa.Log.Debug($"现在是第 {_p1.线塔轮次} 轮线塔，玩家闲人，在塔附近躲开即可（以北为0，顺时针增加）");
+                // sa.DebugMsg($"现在是第 {_p1.线塔轮次} 轮线塔，玩家闲人，在塔附近躲开即可（以北为0，顺时针增加）", Debugging);
 
                 if (_p1.线塔轮次 < myTowerRound)
                 {
@@ -298,7 +301,7 @@ public class TopReborn
             $"P1_循环程序_R{_p1.线塔轮次}_接线标记", 0, 5, 10, byY: true, isSafe: true, draw: false);
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp);
         
-        // sa.Log.Debug($"玩家优先级升序序列为 {myPriority}，需接序列为 {targetPriority} {sa.GetPlayerJobByIndex(targetPartyIndex)} 的线");
+        // sa.DebugMsg($"玩家优先级升序序列为 {myPriority}，需接序列为 {targetPriority} {sa.GetPlayerJobByIndex(targetPartyIndex)} 的线", Debugging);
     }
     
     [ScriptMethod(name: "P1A_循环程序_接线标记移除", eventType: EventTypeEnum.Tether, eventCondition: ["Id:0059"], userControl: Debugging)]
@@ -338,7 +341,7 @@ public class TopReborn
                 void CleanUp()
                 {
                     _p1.接线绘图字典.Remove(memberIdx, out _);
-                    sa.Method.RemoveDraw($"P1_R{_p1.线塔轮次}_线源{memberIdx}");
+                    sa.Method.RemoveDraw($"P1_循环程序_R{_p1.线塔轮次}_线源{memberIdx}");
                 }
 
                 if (!_pd.Priorities.TryGetValue(memberIdx, out int memberPrival) ||
@@ -351,7 +354,7 @@ public class TopReborn
 
                 // 距离判断
                 float distance = Vector3.Distance(memberObj.Position, bossObj.Position);
-                if (distance < 8f) { CleanUp(); continue; }
+                if (distance < 5f) { CleanUp(); continue; }
                 
                 // 线源追溯
                 var tetherSource = sa.GetTetherSource((IBattleChara?)memberObj, TETHER_ID);
@@ -360,8 +363,7 @@ public class TopReborn
 
                 // 避免反复绘图
                 if (_p1.接线绘图字典.TryAdd(memberIdx, true))
-                    sa.DrawCircle(member, 0, Int32.MaxValue,
-                        $"P1_循环程序_R{_p1.线塔轮次}_线源{memberIdx}", 15);
+                    sa.DrawCircle(member, 0, Int32.MaxValue, $"P1_循环程序_R{_p1.线塔轮次}_线源{memberIdx}", 15);
 
             }
         }
@@ -416,17 +418,17 @@ public class TopReborn
             if (ev.ActionId == FIRST_FLAME && _p1.全能之主第一次角度寄存 < -8)
             {
                 _p1.全能之主第一次角度寄存 = ev.SourceRotation;
-                // sa.Log.Debug($"得到全能之主第一次角度寄存 {_p1.全能之主第一次角度寄存}");
+                sa.DebugMsg($"得到全能之主第一次角度寄存 {_p1.全能之主第一次角度寄存}", Debugging);
             }
                 
             if (ev.ActionId == REST_FLAME)
             {
                 float diff = ev.SourceRotation.GetDiffRad(_p1.全能之主第一次角度寄存);
-                // sa.Log.Debug($"计算当前角度{ev.SourceRotation} 与 前一次的差为 {diff}");
+                sa.DebugMsg($"计算当前角度{ev.SourceRotation} 与 前一次的差为 {diff}", Debugging);
                 if (MathF.Abs(diff) > float.Pi / 2) return;
                 _p1.全能之主为顺时针 = diff < 0;
                 _p1.全能之主顺逆时针判断完毕 = true;
-                // sa.Log.Debug($"全能之主方向判断完毕，{(diff < 0 ? "顺" : "逆")}时针");
+                sa.DebugMsg($"全能之主方向判断完毕，{(diff < 0 ? "顺" : "逆")}时针", Debugging);
                 _p1.全能之主顺逆时针判断完毕事件.Set();
             }
         }
@@ -477,7 +479,7 @@ public class TopReborn
         sa.Method.RemoveDraw($"P1_全能之主_R{_p1.全能之主轮次}.*");
         _p1.全能之主轮次++;
         if (_p1.全能之主轮次 > 4) return;
-        // sa.Log.Debug($"现在是 全能之主 第{_p1.全能之主轮次}轮");
+        sa.DebugMsg($"现在是 全能之主 第{_p1.全能之主轮次}轮", Debugging);
     }
     
     [ScriptMethod(name: "P1B_全能之主_出去提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(349[567]|3424)$"])]
@@ -755,7 +757,7 @@ public class TopReborn
     public void P2A_防火墙_一运期间暂时关闭(Event ev, ScriptAccessory sa)
     {
         if (_parse != 2.1) return;
-        // sa.Log.Debug($"P2A_防火墙_一运期间暂时关闭");
+        sa.DebugMsg($"P2A_防火墙_一运期间暂时关闭", Debugging);
         _p2.使能防火墙 = false;
     }
     
@@ -764,7 +766,7 @@ public class TopReborn
     public void P2A_防火墙_男女人性别交换(Event ev, ScriptAccessory sa)
     {
         if (_parse != 2.1) return;
-        // sa.Log.Debug($"P2A_防火墙_男女人性别交换");
+        sa.DebugMsg($"P2A_防火墙_男女人性别交换", Debugging);
         (_p2.BossIdFemale, _p2.BossIdMale) = (_p2.BossIdMale, _p2.BossIdFemale);
     }
     
@@ -774,7 +776,7 @@ public class TopReborn
     {
         if (_parse != 2.15) return;
         if (!SpecialMode) return;
-        // sa.Log.Debug($"P2A_防火墙_一运后再次开启");
+        sa.DebugMsg($"P2A_防火墙_一运后再次开启", Debugging);
         _p2.使能防火墙 = true;
     }
 
@@ -828,7 +830,7 @@ public class TopReborn
         if (_parse != 2.1) return;
         const uint MID_GLITCH = 3427, REMOTE_GLITCH = 3428;
         _p2.协作程序是远线 = ev.StatusId == REMOTE_GLITCH;
-        // sa.Log.Debug($"记录下协作程序是 {(_p2.协作程序是远线 ? "远" : "近")} 线");
+        sa.DebugMsg($"记录下协作程序是 {(_p2.协作程序是远线 ? "远" : "近")} 线", Debugging);
     }
     
     [ScriptMethod(name: "P2A_协作程序_索尼记录", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(01A[0123])$"], userControl: Debugging)]
@@ -917,7 +919,7 @@ public class TopReborn
         if (_parse != 2.1) return;
         _p2.眼睛激光准备绘图.WaitOne();
         var basePos = new Vector3(100, 0, 80);
-        var eyePos = basePos.RotateAndExtend(Center, 45f.DegToRad() * _p2.大眼睛方位);
+        var eyePos = basePos.RotateAndExtend(Center, -45f.DegToRad() * _p2.大眼睛方位);
         sa.DrawRect(eyePos, Center, 0, 10000, "P2_协作程序_眼睛激光", 0, 16, 40);
         _p2.眼睛激光准备绘图.Reset();
     }
@@ -935,7 +937,7 @@ public class TopReborn
     {
         if (_parse != 2.1) return;
         var region = ev.Index() - 1;
-        
+        sa.DebugMsg($"记录下Flag2，region：{region}", Debugging);
         // Index从1开始，以A为初始，顺时针增加
         _p2.大眼睛方位 = (int)region;
         _p2.眼睛激光方位记录.Set();
@@ -960,7 +962,7 @@ public class TopReborn
             new(108.5f, 0, 117.0f), new(118.0f, 0, 107.0f), new(118.0f, 0, 93.0f), new(108.5f, 0, 83.0f)
         ];
 
-        // sa.Log.Debug(_pd.ShowPriorities());
+        sa.DebugMsg(_pd.ShowPriorities(), Debugging);
         var rank = _pd.FindPriorityIndexOfKey(sa.GetMyIndex());
         var pos = (_p2.协作程序是远线 ? farBasePos : middleBasePos)[rank].RotateAndExtend(Center, _p2.大眼睛方位 * -45f.DegToRad());
         sa.DrawGuidance(pos, 0, 10000, $"P2_协作程序_索尼站位");
@@ -997,9 +999,9 @@ public class TopReborn
             _pd.AddActionCount();
             if (_pd.ActionCount < 10) return;
             _p2.分摊记录.Set();
-            // sa.Log.Debug(_pd.ShowPriorities());
+            sa.DebugMsg(_pd.ShowPriorities(), Debugging);
             _parse = 2.15;
-            // sa.Log.Debug($"阶段转为{_parse}");
+            sa.DebugMsg($"阶段转为{_parse}", Debugging);
         }
     }
     
@@ -1065,7 +1067,7 @@ public class TopReborn
                     break;
                 }
             }
-            // sa.Log.Debug($"玩家类型为 {myStateStr}，安全区在 {(safePosRegion == leftRegion ? "左" : "右")}");
+            sa.DebugMsg($"玩家类型为 {myStateStr}，安全区在 {(safePosRegion == leftRegion ? "左" : "右")}", Debugging);
             var pos = new Vector3(100, 0, 105).RotateAndExtend(Center, safePosRegion * 45f.DegToRad());
             sa.DrawGuidance(pos, 0, 10000, $"P2_协作程序_分摊击退位置");
         
@@ -1220,7 +1222,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -1236,8 +1238,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 8) return;
-            // sa.Log.Debug($"P2C_转场_记录头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P2C_转场_记录头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p2.转场头标记录.Set();   // 头标记录
         }
     }
@@ -1256,7 +1258,7 @@ public class TopReborn
         
         if (!hasMarker)
         {
-            // sa.Log.Debug($"未在一定时间内检测到头标，启用THD优先级排列");
+            sa.DebugMsg($"未在一定时间内检测到头标，启用THD优先级排列", Debugging);
             _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
             for (int i = 0; i < sa.Data.PartyList.Count; i++)
             {
@@ -1435,8 +1437,8 @@ public class TopReborn
         _p3.你好世界轮数++;
         _p3.红塔位置 = 0;
         _p3.蓝塔位置 = 0;
-        // sa.Log.Debug($"现在是 你好世界 第{_p3.你好世界轮数}轮");
-        // sa.Log.Debug(_pd.ShowPriorities());
+        sa.DebugMsg($"现在是 你好世界 第{_p3.你好世界轮数}轮", Debugging);
+        sa.DebugMsg(_pd.ShowPriorities(), Debugging);
         _p3.你好世界轮数记录.Set();
     }
     
@@ -1497,13 +1499,14 @@ public class TopReborn
         {
             // 计算玩家当前状态（0:远线, 1:分摊, 2:近线, 3:大圈）
             var myState = (_pd.FindPriorityIndexOfKey(sa.GetMyIndex()) / 2 + _p3.你好世界轮数 - 1 + 4) % 4;
-            // sa.Log.Debug($"玩家当前状态：{myState}，0分摊远线，1分摊塔，2大圈近线，3大圈塔");
-            // sa.Log.Debug($"红塔位置：{_p3.红塔位置}，蓝塔位置：{_p3.蓝塔位置}，大圈是红塔 {_p3.大圈是红塔}");
+            sa.DebugMsg($"玩家当前状态：{myState}，0分摊远线，1分摊塔，2大圈近线，3大圈塔", Debugging);
+            sa.DebugMsg($"红塔位置：{_p3.红塔位置}，蓝塔位置：{_p3.蓝塔位置}，大圈是红塔 {_p3.大圈是红塔}", Debugging);
             
             int defamationTower = _p3.大圈是红塔 ? _p3.红塔位置 : _p3.蓝塔位置;
             int stackTower = _p3.大圈是红塔 ? _p3.蓝塔位置 : _p3.红塔位置;
             var (towerPos, baseAngle, extend, prefix) = GetStateConfig(myState, defamationTower, stackTower);
             DrawDestinationMarks(sa, towerPos, baseAngle, extend, prefix, _p3.你好世界轮数);
+            sa.Method.TextInfo(prefix, 5000);
         }
         finally
         {
@@ -1517,12 +1520,12 @@ public class TopReborn
         {
             return state switch
             {
-                STATE_DEFAMATION   => (defamationTower, DEFAMATION_CLOSE_DEG, DEFAMATION_OUT, "大圈塔"),
-                STATE_REMOTE_BREAK => (stackTower,      REMOTE_CLOSE_DEG,     REMOTE_OUT,     "远线"),
-                STATE_STACK        => (stackTower,      STACK_CLOSE_DEG,      STACK_OUT,      "分摊塔"),
+                STATE_DEFAMATION   => (defamationTower, DEFAMATION_CLOSE_DEG, DEFAMATION_OUT, $"大圈【{(_p3.大圈是红塔 ? "红" : "蓝")}】塔内"),
+                STATE_REMOTE_BREAK => (stackTower,      REMOTE_CLOSE_DEG,     REMOTE_OUT,     $"远线【{(_p3.大圈是红塔 ? "蓝" : "红")}】塔间分摊"),
+                STATE_STACK        => (stackTower,      STACK_CLOSE_DEG,      STACK_OUT,      $"分摊【{(_p3.大圈是红塔 ? "蓝" : "红")}】塔内"),
                 STATE_LOCAL_BREAK  => _p3.你好世界轮数 == 4 
-                                    ? (stackTower,      REMOTE_CLOSE_DEG,     REMOTE_OUT,      "近线第四轮") // 第4轮的近线使用远线
-                                    : (defamationTower, LOCAL_CLOSE_DEG,      LOCAL_OUT,      "近线"), // 其他轮次使用大圈塔
+                                    ? (stackTower,      REMOTE_CLOSE_DEG,     REMOTE_OUT,     $"近线第四轮【{(_p3.大圈是红塔 ? "蓝" : "红")}】塔间分摊") // 第4轮的近线使用远线
+                                    : (defamationTower, LOCAL_CLOSE_DEG,      LOCAL_OUT,      $"近线【{(_p3.大圈是红塔 ? "红" : "蓝")}】塔外分散"), // 其他轮次使用大圈塔
                 _ => throw new ArgumentException($"未知状态: {state}")
             };
         }
@@ -1545,7 +1548,7 @@ public class TopReborn
                 float rotateRad = (region * 45f + offsetAngle).DegToRad();
                 Vector3 pos = basePos.RotateAndExtend(Center, rotateRad);
                 
-                // sa.Log.Debug($"绘制 第{round}轮 {prefix}");
+                sa.DebugMsg($"绘制 第{round}轮 {prefix}", Debugging);
                 var dp = sa.DrawCircle(pos, 0, 10000, $"P3A_你好世界_初始目的地标注_R{round}_{prefix}{i}", 0.5f, isSafe: true, draw: false);
                 dp.Color = sa.Data.DefaultSafeColor.WithW(2f);
                 sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
@@ -1681,7 +1684,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -1697,8 +1700,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 8) return;
-            // sa.Log.Debug($"P3B_小电视_记录头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P3B_小电视_记录头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p3.小电视头标记录.Set();   // 头标记录
         }
     }
@@ -1730,7 +1733,7 @@ public class TopReborn
         var hasMarker = _p3.小电视头标记录.WaitOne(2500);
         if (!hasMarker)
         {
-            // sa.Log.Debug($"未在一定时间内检测到头标，启用HTDH优先级排列");
+            sa.DebugMsg($"未在一定时间内检测到头标，启用HTDH优先级排列", Debugging);
             for (int i = 0; i < sa.Data.PartyList.Count; i++)
             {
                 var obj = sa.GetById(sa.Data.PartyList[i]);
@@ -1820,7 +1823,7 @@ public class TopReborn
         
         // 2. 设置正确面向
         int correctFaceDir = _p3.小电视玩家面向;
-        // sa.Log.Debug($"小电视玩家面向应为 {correctFaceDir} ");
+        sa.DebugMsg($"小电视玩家面向应为 {correctFaceDir} ", Debugging);
         float correctFaceRotation = correctFaceDir * 90f.DegToRad();
         
         // 3. 开启触发
@@ -1881,7 +1884,7 @@ public class TopReborn
         _p4.蓝屏波动炮轮数++;
         _pd.Init(sa, $"P4蓝屏R{_p4.蓝屏波动炮轮数}");
         _pd.AddPriorities([1, 8, 3, 6, 4, 5, 2, 7]);
-        // sa.Log.Debug($"现在是蓝屏波动炮 第{_p4.蓝屏波动炮轮数}轮");
+        sa.DebugMsg($"现在是蓝屏波动炮 第{_p4.蓝屏波动炮轮数}轮", Debugging);
         _p4.波动炮初始化记录.Set();
     }
     
@@ -1974,7 +1977,7 @@ public class TopReborn
         sa.DrawLine(Center, 0, 0, 6000, $"P4_蓝屏_R{_p4.蓝屏波动炮轮数}_分摊指引线1", 20f.DegToRad(), 20f, 20f, isSafe: true, draw: true);
         sa.DrawLine(Center, 0, 0, 6000, $"P4_蓝屏_R{_p4.蓝屏波动炮轮数}_分摊指引线2", -20f.DegToRad(), 20f, 20f, isSafe: true, draw: true);
 
-        // sa.Log.Debug(_pd.ShowPriorities());
+        sa.DebugMsg(_pd.ShowPriorities(), Debugging);
         
         var myPriRank = _pd.FindPriorityIndexOfKey(sa.GetMyIndex());
         var myRegion = myPriRank is 0 or 1 or 2 or 6 ? -1 : 1;
@@ -2060,7 +2063,7 @@ public class TopReborn
         ResetSupportUnitVisibility(sa);
         _pd.Init(sa, "P5一运");
         _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "P5A1_一运_眼睛激光", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AC", "Id:00020001"])]
@@ -2069,7 +2072,7 @@ public class TopReborn
         if (_parse != 5.1) return;
         var rot = ev.Index() - 1;
         var basePos = new Vector3(100, 0, 80);
-        var eyePos = basePos.RotateAndExtend(Center, 45f.DegToRad() * rot);
+        var eyePos = basePos.RotateAndExtend(Center, -45f.DegToRad() * rot);
         sa.DrawRect(eyePos, Center, 7500, 12500, "P5A1_一运_眼睛激光", 0, 16, 40);
     }
     
@@ -2113,7 +2116,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -2127,8 +2130,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 6) return;
-            // sa.Log.Debug($"P5_一运_记录头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P5_一运_记录头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p5A.头标记录.Set();   // 头标记录
         }
     }
@@ -2142,7 +2145,7 @@ public class TopReborn
         var dir = spos.GetRadian(Center).RadianToRegion(4, isDiagDiv: true);
         _p5A.光头位置 = dir;
         _p5A.蟑螂位置 = (dir + 2) % 4;
-        // sa.Log.Debug($"一运光头位置：{_p5A.光头位置}，一运蟑螂位置：{_p5A.蟑螂位置}");
+        sa.DebugMsg($"一运光头位置：{_p5A.光头位置}，一运蟑螂位置：{_p5A.蟑螂位置}", Debugging);
         _p5A.光头蟑螂定位.Set();
     } 
     
@@ -2165,7 +2168,7 @@ public class TopReborn
             int partnerIndex = FindFarLinePartnerIndex(myPdVal);
             int partnerChain = _pd.Priorities[partnerIndex].GetDecimalDigit(3); // 1 or 2
             _pd.AddPriority(myIndex, partnerChain * 100 + 10);  // 11 or 21
-            // sa.Log.Debug($"远线无标玩家找到搭档：{sa.GetPlayerJobByIndex(partnerIndex)}");
+            sa.DebugMsg($"远线无标玩家找到搭档：{sa.GetPlayerJobByIndex(partnerIndex)}", Debugging);
         }
         
         // 2. 统一优先级 markerVal
@@ -2173,7 +2176,7 @@ public class TopReborn
             _pd.Priorities[i] = (_pd.Priorities[i] % 1000) / 10;
 
         int markerVal = _pd.Priorities[myIndex];
-        // sa.Log.Debug($"经矫正，markerVal = {markerVal}");
+        sa.DebugMsg($"经矫正，markerVal = {markerVal}", Debugging);
         
         // 3. 计算待命点
         Vector3 wait1 = CalcWaitPoint(markerVal, isLeft: true );
@@ -2237,9 +2240,7 @@ public class TopReborn
             _p5A.拳头数量++;
             _p5A.拳头颜色 += ev.DataId() == BLUE_ROCKET ? 1 : -1;
 
-            // sa.Log.Debug($"玩家半场刷出第{_p5A.拳头数量}个拳头，" +
-                         // $"颜色{(ev.DataId() == BLUE_ROCKET ? "蓝" : "黄")}，" +
-                         // $"颜色累计值={_p5A.拳头颜色}");
+            sa.DebugMsg($"玩家半场刷出第{_p5A.拳头数量}个拳头，" + $"颜色{(ev.DataId() == BLUE_ROCKET ? "蓝" : "黄")}，" + $"颜色累计值={_p5A.拳头颜色}", Debugging);
         }
         
         // 4. 14 只怪（6 头标 + 8 拳头）全部刷完
@@ -2338,7 +2339,7 @@ public class TopReborn
             Vector3 baitPos = tpos.RotateAndExtend(Center, (isCw ? 5f : -5f).DegToRad(), -1f);
             int     region  = tpos.GetRadian(Center).RadianToRegion(12, isDiagDiv: true);
         
-            // sa.Log.Debug($"激光手方向字典中添加：Key: {region} / 12, Value: {baitPos}");
+            sa.DebugMsg($"激光手方向字典中添加：Key: {region} / 12, Value: {baitPos}", Debugging);
             _p5A.激光手方向字典.TryAdd(region, baitPos);
         
             var dp = sa.DrawCircle(baitPos, 0, 10000, $"P5A1_一运_激光手旋转引导位置", 0.5f, isSafe: true, draw: false);
@@ -2419,7 +2420,7 @@ public class TopReborn
         var isShieldTarget = markerVal is 10 or 11; 
         if (isShieldTarget) return;
             
-        // sa.Log.Debug($"玩家引导激光手方位为：{_p5A.玩家引导激光手方位} / 12");
+        sa.DebugMsg($"玩家引导激光手方位为：{_p5A.玩家引导激光手方位} / 12", Debugging);
         Vector3 armUnitPos = _p5A.激光手方向字典[_p5A.玩家引导激光手方位];
         
         sa.DrawGuidance(armUnitPos, 0, 4000, $"P5A1_一运_引导拳头");
@@ -2517,7 +2518,7 @@ public class TopReborn
             // 3. 计算原始坐标（以光头在C、右刀为基准）
             Vector3 shieldPos = new(99f + (isSameTarget ? -3.5f : 0), 0, 115f);
             Vector3 stackPos  = new(99f + (isSameTarget ? 0 : -3.5f), 0, 100f);
-            // sa.Log.Debug($"分摊位置：{stackPos}，盾连击位置：{shieldPos}");
+            sa.DebugMsg($"分摊位置：{stackPos}，盾连击位置：{shieldPos}", Debugging);
             
             // 4. 左右刀镜像
             if (_p5A.光头左右扫描 == 2)   // 1 右 2 左
@@ -2619,7 +2620,7 @@ public class TopReborn
         {
             _pd.Priorities[i] %= 100;    // 保留个位与十位，即删除小电视与盾连击记录
         }
-        // sa.Log.Debug($"一传：经矫正，{_pd.ShowPriorities()}");
+        sa.DebugMsg($"一传：经矫正，{_pd.ShowPriorities()}", Debugging);
     }
     
     [ScriptMethod(name: "———————— 《P5A2 一传》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -2678,7 +2679,7 @@ public class TopReborn
             int idx = map.IndexOf(marker);
             if (idx < 0)
             {
-                // sa.Log.Debug($"玩家标点信息{marker}读取错误");
+                sa.DebugMsg($"玩家标点信息{marker}读取错误", Debugging);
                 return;
             }
             
@@ -2730,7 +2731,7 @@ public class TopReborn
         ResetSupportUnitVisibility(sa);
         _pd.Init(sa, "P5二运");
         _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "P5B1_二运_获取男人位置", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:15720"], userControl: Debugging)]
@@ -2739,7 +2740,7 @@ public class TopReborn
         if (_parse != 5.2) return;
         var region = ev.SourcePosition.GetRadian(Center).RadianToRegion(16, isDiagDiv: true);
         _p5B.男人方位 = region;
-        // sa.Log.Debug($"P5B1_二运_获取男人位置：{region} / 16");
+        sa.DebugMsg($"P5B1_二运_获取男人位置：{region} / 16", Debugging);
     }
     
     [ScriptMethod(name: "P5B1_二运_获取远近线", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(342[78])$"], userControl: Debugging, suppress: 1000)]
@@ -2748,7 +2749,7 @@ public class TopReborn
         if (_parse != 5.2) return;
         const uint MID_GLITCH = 3427, REMOTE_GLITCH = 3428;
         _p5B.协作程序是远线 = ev.StatusId == REMOTE_GLITCH;
-        // sa.Log.Debug($"记录下协作程序是 {(_p5B.协作程序是远线 ? "远" : "近")} 线");
+        sa.DebugMsg($"记录下协作程序是 {(_p5B.协作程序是远线 ? "远" : "近")} 线", Debugging);
     }
     
     [ScriptMethod(name: "P5B1_二运_获取八方头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[1234678]|12)$"],
@@ -2763,7 +2764,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -2779,8 +2780,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 8) return;
-            // sa.Log.Debug($"P5B1_二运_获取八方头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P5B1_二运_获取八方头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p5B.八方头标记录完毕.Set();   // 头标记录
         }
     }
@@ -2795,7 +2796,7 @@ public class TopReborn
         var myPriValRank = _pd.FindPriorityIndexOfKey(sa.GetMyIndex());
         var myRegion = (_p5B.男人方位 + 1 + myPriValRank * 2) % 16;
         _p5B.玩家八方方位 = myRegion;
-        // sa.Log.Debug($"P5B1_二运_八方波动炮站位：玩家八方方位为 {myRegion} / 16");
+        sa.DebugMsg($"P5B1_二运_八方波动炮站位：玩家八方方位为 {myRegion} / 16", Debugging);
         
         var basePos = new Vector3(100f, 0f, _p5B.协作程序是远线 ? 119.75f : 111.75f);
         var myExtend = myPriValRank switch
@@ -2829,7 +2830,7 @@ public class TopReborn
             var isDoubleTower = ev.DataId() == DOUBLE_TOWER;
             var region = ev.SourcePosition.GetRadian(Center).RadianToRegion(16, isDiagDiv: true);
             _p5B.塔方位类型字典.TryAdd(region, isDoubleTower);
-            // sa.Log.Debug($"P5B1_二运_塔收集：方位 {region} 的 {(isDoubleTower ? "双" : "单")}人塔");
+            sa.DebugMsg($"P5B1_二运_塔收集：方位 {region} 的 {(isDoubleTower ? "双" : "单")}人塔", Debugging);
 
             if ((_p5B.塔方位类型字典.Count == 5 && _p5B.协作程序是远线) || (_p5B.塔方位类型字典.Count == 6 && !_p5B.协作程序是远线))
                 _p5B.塔方位记录完毕.Set();
@@ -2876,7 +2877,7 @@ public class TopReborn
         _parse = 5.25;
         _pd.Init(sa, "P5二传");
         _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "———————— 《P5B2 二传》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -2897,7 +2898,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -2913,8 +2914,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 8) return;
-            // sa.Log.Debug($"P5B2_二传_获取转圈头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P5B2_二传_获取转圈头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p5B.转圈头标记录完毕.Set();   // 头标记录
         }
     }
@@ -2929,13 +2930,13 @@ public class TopReborn
         var obj = sa.GetById(ev.SourceId);
         if (obj == null) return;
         var transId = sa.GetTransformationId(obj);
-        // sa.Log.Debug($"获得女人TransformationId为：{transId}");
+        sa.DebugMsg($"获得女人TransformationId为：{transId}", Debugging);
         if (transId == null) return;
         
         const byte WOMAN_CROSS = 0, WOMAN_HOTWING = 4;
         _p5B.女人是十字外安全 = transId != WOMAN_HOTWING;
         
-        // sa.Log.Debug($"P5B2_二传_获取女人位置与技能：{region} / 8，{(_p5B.女人是十字外安全 ? "十字外安全" : "辣翅内安全")}");
+        sa.DebugMsg($"P5B2_二传_获取女人位置与技能：{region} / 8，{(_p5B.女人是十字外安全 ? "十字外安全" : "辣翅内安全")}", Debugging);
         _p5B.女人技能记录完毕.Set();
     }
     
@@ -2945,7 +2946,7 @@ public class TopReborn
         if (_parse != 5.25) return;
         const int ICON_ROTATE_CW  = 156;   // 009C
         _p5B.圆环是顺时针 = ev.Id0() == ICON_ROTATE_CW;
-        // sa.Log.Debug($"P5B2_二传_获取圆环旋转方向：{(_p5B.圆环是顺时针 ? "顺" : "逆")}时针");
+        sa.DebugMsg($"P5B2_二传_获取圆环旋转方向：{(_p5B.圆环是顺时针 ? "顺" : "逆")}时针", Debugging);
         _p5B.圆环方向记录完毕.Set();
     }
     
@@ -3050,7 +3051,7 @@ public class TopReborn
         if (_parse != 5.25) return;
         if (!SpecialMode) return;
         if (!_p5B.女人是十字外安全) return;
-        // sa.Log.Debug($"女人是十字，暂时移除大圆环");
+        sa.DebugMsg($"女人是十字，暂时移除大圆环", Debugging);
         sa.WriteVisible(sa.GetById(_p5B.圆环Id), false);
     }
     
@@ -3084,7 +3085,7 @@ public class TopReborn
             ATK2 => new Vector3(119.5f, 0, 100f),
             ATK3 => new Vector3(98f, 0, 89f),
             ATK4 => new Vector3(94.74f, 0, 81.74f),
-            BIND1 => new Vector3(90f, 0, 100f),
+            BIND1 => new Vector3(110f, 0, 100f),
             BIND2 => new Vector3(105.26f, 0, 81.74f),
             STOP1 => new Vector3(113.44f, 0, 113.44f),
             STOP2 => new Vector3(86.56f, 0, 113.44f),
@@ -3130,7 +3131,7 @@ public class TopReborn
         ResetSupportUnitVisibility(sa);
         _pd.Init(sa, "P5三运");
         _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
 
     [ScriptMethod(name: "P5C1_三运_获取男女组合技", eventType: EventTypeEnum.PlayActionTimeline,
@@ -3153,7 +3154,7 @@ public class TopReborn
             
             var skillId = (dataId == OMEGA_FEMALE ? 8 : 0) + (transId == 4 ? 4 : 0) + region;
             _p5C.组合技记录.TryAdd(region, (skillId, isFirstRound));
-            // sa.Log.Debug($"在方位 {region} 有第 {(isFirstRound ? "一" : "二")} 轮技能，技能ID {skillId}");
+            sa.DebugMsg($"在方位 {region} 有第 {(isFirstRound ? "一" : "二")} 轮技能，技能ID {skillId}", Debugging);
             if (_p5C.组合技记录.Count != 4) return;
             _p5C.男女人组合技记录完毕.Set();
         }
@@ -3174,11 +3175,11 @@ public class TopReborn
             var secondRoundSkillId = ev.ActionId == FRONT_FIRST ? 16 : 17;
             _p5C.组合技记录.TryAdd(10, (firstRoundSkillId, true));
             _p5C.组合技记录.TryAdd(11, (secondRoundSkillId, false));
-            // sa.Log.Debug($"光头的第一轮技能Id：{firstRoundSkillId}");
+            sa.DebugMsg($"光头的第一轮技能Id：{firstRoundSkillId}", Debugging);
             
             if (_p5C.组合技记录.Count != 6) return;
             _p5C.FindComboAttackSafePoint(sa);
-            // sa.Log.Debug($"组合技安全区地点为：{_p5C.组合技安全区[0]}, {_p5C.组合技安全区[1]}");
+            sa.DebugMsg($"组合技安全区地点为：{_p5C.组合技安全区[0]}, {_p5C.组合技安全区[1]}", Debugging);
             
             _p5C.男女人组合技记录完毕.Reset();
             _p5C.组合技安全区记录完毕.Set();
@@ -3320,7 +3321,7 @@ public class TopReborn
     public void P5B2_三传_分P(Event ev, ScriptAccessory sa)
     {
         _parse = 5.35;
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "P5C2_三传_获取三传头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[1234679]|10)$"],
@@ -3335,7 +3336,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -3351,8 +3352,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 8) return;
-            // sa.Log.Debug($"P5C2_三传_获取三传头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P5C2_三传_获取三传头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p5C.三传头标记录完毕.Set();   // 头标记录
         }
     }
@@ -3409,7 +3410,7 @@ public class TopReborn
         sa.Method.RemoveDraw($"P5C2_三传.*");
         _pd.Init(sa, "P5四传");
         _parse = 5.38;
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "———————— 《P5C3 四传》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -3430,7 +3431,7 @@ public class TopReborn
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            // sa.Log.Debug($"检测到{targetJob} 被标 ev.Id {mark}");
+            sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
             _pd.AddActionCount();
             var pdVal = mark switch
             {
@@ -3446,8 +3447,8 @@ public class TopReborn
             };
             _pd.AddPriority(tidx, pdVal);
             if (_pd.ActionCount != 8) return;
-            // sa.Log.Debug($"P5C3_四传_获取四传头标：头标记录完毕");
-            // sa.Log.Debug($"{_pd.ShowPriorities()}");
+            sa.DebugMsg($"P5C3_四传_获取四传头标：头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
             _p5C.四传头标记录完毕.Set();   // 头标记录
         }
     }
@@ -3459,7 +3460,7 @@ public class TopReborn
 
         _p5C.蟑螂Id = ev.SourceId;
         _p5C.蟑螂方位 = ev.SourcePosition.GetRadian(Center).RadianToRegion(4, isDiagDiv: true);
-        // sa.Log.Debug($"P5C3_四传_蟑螂方位记录：{_p5C.蟑螂方位} / 4");
+        sa.DebugMsg($"P5C3_四传_蟑螂方位记录：{_p5C.蟑螂方位} / 4", Debugging);
         _p5C.蟑螂方位记录完毕.Set();
     }
 
@@ -3575,7 +3576,7 @@ public class TopReborn
         _p6.Register();
         _p6.BossId = ev.SourceId;
         ResetSupportUnitVisibility(sa);
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "P6_普通攻击绘图", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31649", "TargetIndex:1"],
@@ -3778,7 +3779,7 @@ public class TopReborn
     {
         if (_parse < 6) return;
         _parse = _parse == 6.1 ? 6.2 : 6.1;
-        // sa.Log.Debug($"当前阶段为：{_parse} 宇宙天箭");
+        sa.DebugMsg($"当前阶段为：{_parse} 宇宙天箭", Debugging);
         _p6.ResetAutoAttack(sa, false);
         _p6.宇宙天箭读条开始.Set();
     }
@@ -3795,7 +3796,7 @@ public class TopReborn
         var region = ev.SourcePosition.GetRadian(Center).RadianToRegion(8, isDiagDiv: true);
         _p6.宇宙天箭是内天箭 = region % 2 == 0;
         _p6.宇宙天箭类型判断完毕 = true;
-        // sa.Log.Debug($"P6A_宇宙天箭_类型判断：阶段 {_parse} 的宇宙天箭，类型为 {(_p6.宇宙天箭是内天箭 ? "内" : "外")} 天箭");
+        sa.DebugMsg($"P6A_宇宙天箭_类型判断：阶段 {_parse} 的宇宙天箭，类型为 {(_p6.宇宙天箭是内天箭 ? "内" : "外")} 天箭", Debugging);
     }
     
     [ScriptMethod(name: "P6A_宇宙天箭_读条完毕", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31650"],
@@ -3842,7 +3843,7 @@ public class TopReborn
     public void P6A_宇宙天箭_绘图(Event ev, ScriptAccessory sa)
     {
         if (_parse < 6) return;
-        // sa.Log.Debug($"P6A_宇宙天箭_绘图：启动宇宙天箭绘图Framework");
+        sa.DebugMsg($"P6A_宇宙天箭_绘图：启动宇宙天箭绘图Framework", Debugging);
         _p6.宇宙天箭绘图Framework = sa.Method.RegistFrameworkUpdateAction(Action);
         return;
 
@@ -3858,7 +3859,7 @@ public class TopReborn
             var pattern = _p6.宇宙天箭绘图图案序号 >= cosmoArrowPattern.Length ? 0 : cosmoArrowPattern[_p6.宇宙天箭绘图图案序号];
             DrawCosmoArrowPattern(pattern);
             
-            // sa.Log.Debug($"P6A_宇宙天箭_绘图：绘制宇宙天箭绘图图案序号 {_p6.宇宙天箭绘图图案序号} ({pattern})");
+            sa.DebugMsg($"P6A_宇宙天箭_绘图：绘制宇宙天箭绘图图案序号 {_p6.宇宙天箭绘图图案序号} ({pattern})", Debugging);
             return;
             
             void DrawCosmoArrowPattern(int pt)
@@ -3886,7 +3887,7 @@ public class TopReborn
     public void P6A_宇宙天箭_指路(Event ev, ScriptAccessory sa)
     {
         if (_parse < 6) return;
-        // sa.Log.Debug($"P6A_宇宙天箭_指路：启动宇宙天箭指路Framework");
+        sa.DebugMsg($"P6A_宇宙天箭_指路：启动宇宙天箭指路Framework", Debugging);
         _p6.宇宙天箭指路Framework = sa.Method.RegistFrameworkUpdateAction(Action);
         return;
 
@@ -3937,7 +3938,7 @@ public class TopReborn
             var nextGuidance = _p6.宇宙天箭指路图案序号 + 1 >= cosmoArrowGuidance.Length ? 0 : cosmoArrowGuidance[_p6.宇宙天箭指路图案序号 + 1];
             DrawCosmoArrowGuidance(guidance, nextGuidance, myRotation);
             sa.Method.RemoveDraw($"P6A_宇宙天箭_指路{_p6.宇宙天箭指路图案序号 - 1}");
-            // sa.Log.Debug($"P6A_宇宙天箭_指路：绘制宇宙天箭指路图案序号 {_p6.宇宙天箭指路图案序号} {guidance} {myRotation} {nextGuidance}");
+            sa.DebugMsg($"P6A_宇宙天箭_指路：绘制宇宙天箭指路图案序号 {_p6.宇宙天箭指路图案序号} {guidance} {myRotation} {nextGuidance}", Debugging);
             return;
             
             void DrawCosmoArrowGuidance(int gd, int nextGd, int rot)
@@ -3978,7 +3979,7 @@ public class TopReborn
     public void P6B_解限波动炮_分P(Event ev, ScriptAccessory sa)
     {
         if (_parse < 6) return;
-        // sa.Log.Debug($"当前阶段为：{_parse} 解限波动炮");
+        sa.DebugMsg($"当前阶段为：{_parse} 解限波动炮", Debugging);
         _p6.ResetAutoAttack(sa, false);
     }
     
@@ -4046,7 +4047,7 @@ public class TopReborn
             var startDonutRad = (_p6.解限波动炮第一炮方位 * 45f).DegToRad();
             var startLineRad = (startRegion * 45f).DegToRad() + (isCw ? 22.5f : -22.5f).DegToRad();
             
-            // sa.Log.Debug($"开始画波动炮路径，isCW {isCw}，startRegion {startRegion}，startDonutRad {startDonutRad.RadToDeg()}，startLineRad {startLineRad.RadToDeg()}");
+            sa.DebugMsg($"开始画波动炮路径，isCW {isCw}，startRegion {startRegion}，startDonutRad {startDonutRad.RadToDeg()}，startLineRad {startLineRad.RadToDeg()}", Debugging);
             
             var dp1 = sa.DrawRect(Center, 0, 0, 20000, $"P6B_解限波动炮_跑动方向绘图_直线_{isSafe}",
                 startLineRad, 2f, 15f, isSafe, draw: false);
@@ -4107,7 +4108,7 @@ public class TopReborn
     {
         _parse = 6.3;
         _p6.ResetAutoAttack(sa, true);
-        // sa.Log.Debug($"当前阶段为：{_parse}");
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "P6C_宇宙流星_指路场中与后续八方", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31664"],
@@ -4256,7 +4257,6 @@ public class TopReborn
     }
 
     #endregion 宇宙流星
-    
     
     #region 优先级字典 类
     public class PriorityDict
@@ -4455,8 +4455,8 @@ public class TopReborn
         public void Reset(ScriptAccessory sa)
         {
             BossId = 0;
-            塔字典.Clear();
-            接线绘图字典.Clear();
+            塔字典 = new Dictionary<int, Vector3>();
+            接线绘图字典 = new Dictionary<int, bool>();
             线塔轮次 = 0;
             塔触发时间 = DateTime.MinValue;
             
@@ -4477,6 +4477,8 @@ public class TopReborn
             扫描接线Framework = "";
             全能之主出去时间Framework = "";
             全能之主最远距离Framework = "";
+            
+            sa.DebugMsg($"P1参数被reset", Debugging);
         }
 
         public void Dispose()
@@ -4688,8 +4690,8 @@ public class TopReborn
             
             开启玩家引导激光手指路 = false;
             第一根远线拉断 = false;
-        
-            激光手方向字典.Clear();
+
+            激光手方向字典 = new Dictionary<int, Vector3>();
             小电视面向辅助触发时间 = DateTime.MinValue;
             
             sa.Method.UnregistFrameworkUpdateAction(小电视面向辅助Framework);
@@ -4804,7 +4806,7 @@ public class TopReborn
                 int region = (玩家八方方位 + offset + 16) % 16;
                 if (!塔方位类型字典.TryGetValue(region, out bool isDoubleTower))
                     continue;
-                // sa.Log.Debug($"检测到 方位{region} 存在 {(isDoubleTower ? "双" : "单")}人塔");
+                sa.DebugMsg($"检测到 方位{region} 存在 {(isDoubleTower ? "双" : "单")}人塔", Debugging);
                 int score = 1 + (isDoubleTower ? 10 : 0);
                 if (score <= highestScore) continue;
                 highestScore = score;
@@ -4812,7 +4814,7 @@ public class TopReborn
                 if (isDoubleTower) break;
             }
             
-            // sa.Log.Debug($"玩家所需踩塔：{bestTower}");
+            sa.DebugMsg($"玩家所需踩塔：{bestTower}", Debugging);
             return bestTower;
         }
     }
@@ -4843,7 +4845,7 @@ public class TopReborn
             扫描接线开启 = false;
             组合技记录 = new Dictionary<int, (int, bool)>();
             组合技安全区 = [];
-            接线绘图字典.Clear();
+            接线绘图字典 = new Dictionary<int, bool>();
             
             sa.Method.UnregistFrameworkUpdateAction(扫描接线Framework);
             扫描接线Framework = "";
@@ -4911,17 +4913,16 @@ public class TopReborn
             bool[] safePoints = new bool[12]; Array.Fill(safePoints, true);
             foreach (var (region, (skill, _)) in roundSkills)
             {
-                // sa.Log.Debug($"在方位{region}发现第{(isFirstRound ? "一" : "二")}轮技能{skill}");
+                sa.DebugMsg($"在方位{region}发现第{(isFirstRound ? "一" : "二")}轮技能{skill}", Debugging);
                 var skillSafeZones = 技能类型安全区字典[skill];
                 for (int i = 0; i < 12; i++)
                     safePoints[i] &= skillSafeZones[i];
             }
             int safeIndex = Array.IndexOf(safePoints, true);
-            // if (safeIndex == -1)
-                // sa.Log.Debug($"第{(isFirstRound ? "一" : "二")}轮未找到安全点");
-            // else
-                // sa.Log.Debug($"第{(isFirstRound ? "一" : "二")}轮安全点索引: {safeIndex}");
-    
+            sa.DebugMsg(safeIndex == -1
+                    ? $"第{(isFirstRound ? "一" : "二")}轮未找到安全点"
+                    : $"第{(isFirstRound ? "一" : "二")}轮安全点索引: {safeIndex}", Debugging);
+
             return safeIndex;
         }
     }
@@ -4968,7 +4969,6 @@ public class TopReborn
             ResetCosmoArrow(sa);
             ResetUnlimitedWaveCannon();
             ResetSpreadWaveCannon();
-            ResetCosmoMeteor();
         }
 
         public void ResetAutoAttack(ScriptAccessory sa, bool unRegist)
@@ -5005,11 +5005,6 @@ public class TopReborn
         public void ResetSpreadWaveCannon()
         {
             波动炮判定次数 = 0;
-        }
-
-        public void ResetCosmoMeteor()
-        {
-            陨石目标.Clear();
         }
 
         public void Dispose()
@@ -5126,6 +5121,7 @@ public static class IbcHelper
         Character* objStruct = (Character*)obj.Address;
         return objStruct->Timeline.ModelState;
     }
+    
 }
 #region 计算函数
 
@@ -5537,6 +5533,21 @@ public static class DrawTools
 
 #endregion 绘图函数
 
+#region 调试函数
+
+public static class DebugFunction
+{
+    public static void DebugMsg(this ScriptAccessory sa, string msg, bool enable = true, bool showInChatBox = false)
+    {
+        if (!enable) return;
+        sa.Log.Debug(msg);
+        if (!showInChatBox) return;
+        sa.Method.SendChat($"/e {msg}");
+    }
+}
+
+#endregion 调试函数
+
 #region 特殊函数
 
 public static class SpecialFunction
@@ -5562,7 +5573,7 @@ public static class SpecialFunction
                 charaStruct->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
             }
         }
-        // sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
+        sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
     }
 
     public static unsafe void ScaleModify(this ScriptAccessory sa, IGameObject? obj, float scale, bool vfxScaled = true)
@@ -5587,7 +5598,7 @@ public static class SpecialFunction
             charaStruct->DisableDraw();
             charaStruct->EnableDraw();
         
-            // sa.Log.Debug($"ScaleModify => {obj.Name.TextValue} | {obj} => {scale}");
+            sa.Log.Debug($"ScaleModify => {obj.Name.TextValue} | {obj} => {scale}");
         }
     }
 
@@ -5603,7 +5614,7 @@ public static class SpecialFunction
             GameObject* charaStruct = (GameObject*)obj.Address;
             charaStruct->SetRotation(radian);
         }
-        // sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.EntityId} => {radian.RadToDeg()}");
+        sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.EntityId} => {radian.RadToDeg()}");
         
         if (!show) return;
         var ownerObj = sa.GetById(obj.EntityId);
