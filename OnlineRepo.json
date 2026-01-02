@@ -213,12 +213,12 @@
   {
     "Name": "绝欧精装 Reborn",
     "Guid": "6272e52b-5500-4ff0-8634-dd15f2e3b25e",
-    "Version": "0.0.0.3",
+    "Version": "0.0.0.4",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/TopReborn/TopReborn.cs",
-    "Note": "v0.0.0.3\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
-    "UpdateInfo": "0.0.0.3\r\n1. 调整P1接线大圈范围出现时机，正确玩家接线后距欧米茄5m即显示范围\r\n2. 修复P2与P5大眼睛激光方位错误Bug\r\n3. 增加P3你好世界阶段站位文字提示\r\n4. 修复P5二传锁1指路终点水平反转的Bug",
+    "Note": "v0.0.0.4\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
+    "UpdateInfo": "0.0.0.4\r\n1. 修复P6宇宙流星指路错误bug。",
     "TerritoryIds": [
       1122
     ]

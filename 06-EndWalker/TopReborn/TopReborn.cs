@@ -40,14 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 调整P1接线大圈范围出现时机，正确玩家接线后距欧米茄5m即显示范围
-         2. 修复P2与P5大眼睛激光方位错误Bug
-         3. 增加P3你好世界阶段站位文字提示
-         4. 修复P5二传锁1指路终点水平反转的Bug
+         1. 修复P6宇宙流星指路错误bug。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.3";
+    private const string Version = "0.0.0.4";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -4965,6 +4962,7 @@ public class TopReborn
         public void Reset(ScriptAccessory sa)
         {
             BossId = 0;
+            陨石目标 = [];
             ResetAutoAttack(sa, true);
             ResetCosmoArrow(sa);
             ResetUnlimitedWaveCannon();
