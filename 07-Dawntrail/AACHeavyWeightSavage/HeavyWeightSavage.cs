@@ -79,7 +79,7 @@ public class HeavyWeightSavage
     }
 
     [ScriptMethod(name: "蝙蝠钢铁范围提前预告", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:1957"],
-        userControl: Debugging)]
+        userControl: true)]
     public void 蝙蝠钢铁范围提前预告(Event ev, ScriptAccessory sa)
     {
         var pos = ev.TargetPosition;
@@ -111,7 +111,7 @@ public class HeavyWeightSavage
     }
 
     [ScriptMethod(name: "十字叉字地火", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:45971"],
-        userControl: Debugging)]
+        userControl: true)]
     public void 十字叉字地火(Event ev, ScriptAccessory sa)
     {
         var dp1 = sa.DrawRect(ev.SourceId, 0, 11500, 2500, $"十字叉字地火1", 0, 10, 100, draw: false);
