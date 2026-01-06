@@ -57,7 +57,7 @@ public class HeavyWeightSavage
     public void Init(ScriptAccessory sa)
     {
         RefreshParams();
-        // sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化", Debugging);
+        sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化", Debugging);
         sa.Method.RemoveDraw(".*");
         sa.Method.ClearFrameworkUpdateAction(this);
     }
@@ -86,16 +86,11 @@ public class HeavyWeightSavage
         
         var centerVec = pos.GetRadian(Center);
         var faceRotation = sa.GetById(ev.TargetId).Rotation;
-        // var dp = sa.DrawLine(ev.TargetId, 0, 0, 10000, $"a", faceRotation, 1f, 3f, isSafe: true, draw: false);
-        // sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
         
         // 计算叉乘
         var centerVecUnit = new Vector3(100, 0, 101).RotateAndExtend(Center, centerVec) - Center;
         var faceRotationUnit = new Vector3(100, 0, 101).RotateAndExtend(Center, faceRotation) - Center;
         var crossProduct = centerVecUnit.X * faceRotationUnit.Z - centerVecUnit.Z * faceRotationUnit.X;
-        // sa.DebugMsg($"centerVecUnit: {centerVecUnit}");
-        // sa.DebugMsg($"faceRotationUnit: {faceRotationUnit}");
-        // sa.DebugMsg($"crossProduct: {crossProduct}");
         
         // 正则顺时针，逆则逆时针
         var futurePos = pos.RotateAndExtend(Center, (crossProduct > 0 ? -90f : 90f).DegToRad());
