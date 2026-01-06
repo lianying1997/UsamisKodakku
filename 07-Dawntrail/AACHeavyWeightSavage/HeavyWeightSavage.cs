@@ -21,7 +21,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Vfx;
 using Lumina.Excel.Sheets;
 
-namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.AACHeavyWeightSavage.M9S;
+namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.AACHeavyWeightSavage.HeavyWeightSavage;
 
 [ScriptType(name: Name, territorys: [1321], guid: "13439382-2cf4-4a9d-a15c-5df917d98c5f",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
