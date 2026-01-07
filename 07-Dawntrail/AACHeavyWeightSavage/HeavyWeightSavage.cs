@@ -36,23 +36,25 @@ public class HeavyWeightSavage
         {Version}
         小补丁，慢慢更，自用为主，被电正常
         不会全画，只是补充！
-        现只到M9S的前一半。
+        现只到M9S。
         """;
     
     const string UpdateInfo =
         $"""
          {Version}
-         更新
+         更新M9S笼中地狱塔指路与职能站位
          """;
 
     private const string Name = "AAC_HW_Patch [零式阿卡狄亚重量级 补丁]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
     
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
+    
+    private static AACHWParams _bsp = new();
     
     public void Init(ScriptAccessory sa)
     {
@@ -64,6 +66,7 @@ public class HeavyWeightSavage
     
     private void RefreshParams()
     {
+        _bsp = new AACHWParams();
     }
 
     [ScriptMethod(name: "———————— 《测试项》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -115,23 +118,76 @@ public class HeavyWeightSavage
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp2);
     }
     
-    // todo
-    
-    // [ScriptMethod(name: "音速流散聚集", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(4598[01])$"],
-    //     userControl: Debugging)]
-    // public void 音速流散聚集(Event ev, ScriptAccessory sa)
-    // {
-    //     const uint SPREAD = 45980;
-    //     var aid = ev.ActionId;
-    //     var (drawCount, drawLimit) = (0, aid == SPREAD ? 7 : 1);
-    //     
-    //     foreach (var member in sa.Data.PartyList)
-    //     {
-    //         if (((IBattleChara)sa.GetById(member)).HasStatus(4738)) return;
-    //         
-    //         if (drawCount == drawLimit) return;
-    //     }
-    // }
+    [ScriptMethod(name: "笼中地狱", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(45974)$"],
+        userControl: true)]
+    public void 笼中地狱(Event ev, ScriptAccessory sa)
+    {
+        lock (_bsp)
+        {
+            var region = ev.SourcePosition.GetRadian(Center).RadianToRegion(8, 4, isDiagDiv: true, isCw: true);
+            _bsp.M9SA_CageCount++;
+            _bsp.M9SA_CageVal += 1 << region;
+            
+            if (_bsp.M9SA_CageCount is not 4 and not 8) return;
+            bool isMtGroup = sa.GetMyIndex() % 2 == 0;
+            var myPriority = sa.GetMyIndex() / 2;
+            sa.DebugMsg($"isMtGroup {isMtGroup} myPriority {myPriority} ");
+            
+            if (isMtGroup ^ _bsp.M9SA_CageCount == 8)
+            {
+                var counter = 0;
+                // Tower
+                for (int i = 0; i < 8; i++)
+                {
+                    if (_bsp.M9SA_CageVal.GetBinaryBit(i) != 1) continue;
+                    if (myPriority == counter)
+                    {
+                        sa.DrawGuidance(new Vector3(100, 0, 88).RotateAndExtend(Center, -45f.DegToRad() * i), 0,
+                            5000, $"踩塔指路");
+                        break;
+                    }
+                    counter++;
+                }
+            }
+            else
+            {
+                // Free
+                var tankSafeRegion = 0;
+                var counter = 0;
+                
+                // 找到大角
+                for (int i = 0; i < 8; i++)
+                {
+                    if (_bsp.M9SA_CageVal.GetBinaryBit(i) != 0) continue;
+                    if (_bsp.M9SA_CageVal.GetBinaryBit((i + 1) % 8) != 0) continue;
+                    tankSafeRegion = i;
+                    
+                    var dp = sa.DrawLine(Center, 0, 0, 12000, $"坦克安全角", 180f.DegToRad() - 45f.DegToRad() * (tankSafeRegion + 0.5f) , 30f, 20f, draw: false);
+                    dp.Color = new Vector4(0.1f, 0.1f, 1, 1);
+                    sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+                    
+                    break;
+                }
+                
+                // 找到小角
+                for (int i = 0; i < 6; i++)
+                {
+                    var checkRegion = ((tankSafeRegion + 2) % 8 + i) % 8;
+                    if (_bsp.M9SA_CageVal.GetBinaryBit(checkRegion) != 0) continue;
+                    sa.DebugMsg($"{tankSafeRegion} Check Region {checkRegion} 111");
+                    
+                    // 顺时针第一个小角属于DPS，第二个小角属于Healer
+                    var dp = sa.DrawLine(Center, 0, 0, 12000, $"其他职能安全角", 180f.DegToRad() - 45f.DegToRad() * checkRegion , 30f, 20f, draw: false);
+                    dp.Color = counter == 0 ? new Vector4(1, 0.1f, 0.1f, 1) : new Vector4(0.1f, 1f, 0.1f, 1);
+                    sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+                    
+                    counter++;
+                }
+                
+            }
+            _bsp.M9SA_CageVal = 0;
+        }
+    }
 
     #region 优先级字典 类
     public class PriorityDict
@@ -299,7 +355,29 @@ public class HeavyWeightSavage
     }
 
     #endregion 优先级字典 类
-
+    
+    #region 参数容器类
+    
+    private class AACHWParams
+    {
+        // M9S 笼中地狱
+        public int M9SA_CageVal = 0;
+        public int M9SA_CageCount = 0;
+        
+        public void Reset(ScriptAccessory sa, int param)
+        {
+            switch (param)
+            {
+                default:
+                    break;
+            }
+            
+            sa.DebugMsg($"{param} 参数被重置", Debugging);
+        }
+    }
+    
+    #endregion
+    
 }
 
 #region 函数集
