@@ -23,7 +23,7 @@ using Lumina.Excel.Sheets;
 
 namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.AACHeavyWeightSavage.HeavyWeightSavage;
 
-[ScriptType(name: Name, territorys: [1321], guid: "13439382-2cf4-4a9d-a15c-5df917d98c5f",
+[ScriptType(name: Name, territorys: [1321, 1323], guid: "13439382-2cf4-4a9d-a15c-5df917d98c5f",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)\] (Used|Cast))).*35501.*$
@@ -36,17 +36,16 @@ public class HeavyWeightSavage
         {Version}
         小补丁，慢慢更，自用为主，被电正常
         不会全画，只是补充！
-        现只到M9S。
+        现到M10S前半。
         """;
     
     const string UpdateInfo =
         $"""
          {Version}
-         更新M9S笼中地狱塔指路与职能站位
          """;
 
     private const string Name = "AAC_HW_Patch [零式阿卡狄亚重量级 补丁]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -75,9 +74,19 @@ public class HeavyWeightSavage
     {
     }
     
+    [ScriptMethod(name: "初始化", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 初始化(Event ev, ScriptAccessory sa)
+    {
+        RefreshParams();
+        sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化", Debugging);
+        sa.Method.RemoveDraw(".*");
+        sa.Method.ClearFrameworkUpdateAction(this);
+    }
+    
     [ScriptMethod(name: "———————— 《M9S》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: true)]
-    public void P1_分割线(Event ev, ScriptAccessory sa)
+    public void M9S_分割线(Event ev, ScriptAccessory sa)
     {
     }
 
@@ -187,6 +196,51 @@ public class HeavyWeightSavage
         }
     }
 
+    [ScriptMethod(name: "———————— 《M10S》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: true)]
+    public void M10S_分割线(Event ev, ScriptAccessory sa)
+    {
+    }
+    
+    [ScriptMethod(name: "交错双重旋水面向", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(46560|46557)$"],
+        userControl: true)]
+    public void 水娃旋水面向(Event ev, ScriptAccessory sa)
+    {
+        List<int> partySpreadRegion = [4, 0, 6, 2, 7, 1, 5, 3];
+        _bsp.M10SA_StormCount++;
+        
+        if (_bsp.M10SA_StormCount is not 1 and not 4) return;
+        
+        var pos = (ev.SourcePosition + new Vector3(0, 0, _bsp.M10SA_StormCount == 1 ? 4 : 17)).RotateAndExtend(ev.SourcePosition,
+            partySpreadRegion[sa.GetMyIndex()] * 45f.DegToRad());
+        var dp0 = sa.DrawGuidance(pos, 0, 5000, $"旋水面基", isSafe: true,
+            draw: false);
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
+            
+        for (int i = 0; i < 8; i++)
+        {
+            var dp = sa.DrawLine(ev.SourceId, 0, 0, 5000, $"旋水面基八方指引线{i}",
+                partySpreadRegion[i] * 45f.DegToRad(), 20f, 30f, draw: false);
+            dp.Color = i switch
+            {
+                0 or 1 => new Vector4(0.1f, 0.1f, 1, 1),
+                2 or 3 => new Vector4(0.1f, 1f, 0.1f, 1),
+                _ => new Vector4(1, 0.1f, 0.1f, 1),
+            };
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+        }
+    }
+    
+    [ScriptMethod(name: "夺浪就位", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(45953|45954|46510|46511)$"],
+        userControl: true)]
+    public void 夺浪就位(Event ev, ScriptAccessory sa)
+    {
+        HashSet<uint> FIRE = [45953, 46510];
+        var aid = ev.ActionId;
+        if (FIRE.Contains(ev.ActionId) ^ sa.GetMyIndex() % 2 == 0) return;
+        sa.DrawGuidance(ev.SourceId, 0, 5000, $"夺浪就位");
+    }
+    
     #region 优先级字典 类
     public class PriorityDict
     {
@@ -361,6 +415,9 @@ public class HeavyWeightSavage
         // M9S 笼中地狱
         public int M9SA_CageVal = 0;
         public int M9SA_CageCount = 0;
+        
+        // M10S 旋水
+        public int M10SA_StormCount = 0;
         
         public void Reset(ScriptAccessory sa, int param)
         {

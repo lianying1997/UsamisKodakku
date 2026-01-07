@@ -226,14 +226,15 @@
   {
     "Name": "AAC_HW_Patch [零式阿卡狄亚重量级 补丁]",
     "Guid": "13439382-2cf4-4a9d-a15c-5df917d98c5f",
-    "Version": "0.0.0.2",
+    "Version": "0.0.0.3",
     "Author": "Usami",
     "Repo": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-DawnTrail/AACHeavyWeightSavage/HeavyWeightSavage.cs",
     "DownloadUrl": "",
-    "Note": "0.0.0.2\r\n小补丁，慢慢更，自用为主，被电正常\r\n不会全画，只是补充！\r\n现只到M9S。",
-    "UpdateInfo": "0.0.0.2\r\n更新M9S笼中地狱塔指路与职能站位",
+    "Note": "0.0.0.3\r\n小补丁，慢慢更，自用为主，被电正常\r\n不会全画，只是补充！\r\n现到M10S前半。",
+    "UpdateInfo": "0.0.0.3",
     "TerritoryIds": [
-      1321
+      1321,
+      1323
     ]
   }
 ]
