@@ -210,7 +210,7 @@ public class HeavyWeightSavage
         _bsp.M10SA_StormCount++;
         
         if (_bsp.M10SA_StormCount is not 1 and not 4) return;
-
+        await Task.Delay(1000);
         var bossObj = sa.GetById(ev.SourceId);
         var pos = (ev.SourcePosition + new Vector3(0, 0, _bsp.M10SA_StormCount == 1 ? 4 : 17)).RotateAndExtend(ev.SourcePosition,
             partySpreadRegion[sa.GetMyIndex()] * 45f.DegToRad() + bossObj.Rotation);
