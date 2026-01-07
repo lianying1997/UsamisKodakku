@@ -45,7 +45,7 @@ public class HeavyWeightSavage
          """;
 
     private const string Name = "AAC_HW_Patch [零式阿卡狄亚重量级 补丁]";
-    private const string Version = "0.0.0.3";
+    private const string Version = "0.0.0.4";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -75,7 +75,7 @@ public class HeavyWeightSavage
     }
     
     [ScriptMethod(name: "初始化", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
+        userControl: true)]
     public void 初始化(Event ev, ScriptAccessory sa)
     {
         RefreshParams();
@@ -204,22 +204,23 @@ public class HeavyWeightSavage
     
     [ScriptMethod(name: "交错双重旋水面向", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(46560|46557)$"],
         userControl: true)]
-    public void 水娃旋水面向(Event ev, ScriptAccessory sa)
+    public async void 水娃旋水面向(Event ev, ScriptAccessory sa)
     {
-        List<int> partySpreadRegion = [4, 0, 6, 2, 7, 1, 5, 3];
+        List<int> partySpreadRegion = [0, 4, 2, 6, 3, 5, 1, 7];
         _bsp.M10SA_StormCount++;
         
         if (_bsp.M10SA_StormCount is not 1 and not 4) return;
-        
+
+        var bossObj = sa.GetById(ev.SourceId);
         var pos = (ev.SourcePosition + new Vector3(0, 0, _bsp.M10SA_StormCount == 1 ? 4 : 17)).RotateAndExtend(ev.SourcePosition,
-            partySpreadRegion[sa.GetMyIndex()] * 45f.DegToRad());
-        var dp0 = sa.DrawGuidance(pos, 0, 5000, $"旋水面基", isSafe: true,
+            partySpreadRegion[sa.GetMyIndex()] * 45f.DegToRad() + bossObj.Rotation);
+        var dp0 = sa.DrawGuidance(pos, 0, 5000, $"旋水", isSafe: true,
             draw: false);
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp0);
             
         for (int i = 0; i < 8; i++)
         {
-            var dp = sa.DrawLine(ev.SourceId, 0, 0, 5000, $"旋水面基八方指引线{i}",
+            var dp = sa.DrawLine(ev.SourceId, 0, 0, 5000, $"旋水八方指引线{i}",
                 partySpreadRegion[i] * 45f.DegToRad(), 20f, 30f, draw: false);
             dp.Color = i switch
             {
