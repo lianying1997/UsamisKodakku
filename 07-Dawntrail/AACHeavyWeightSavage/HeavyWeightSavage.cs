@@ -131,7 +131,6 @@ public class HeavyWeightSavage
             if (_bsp.M9SA_CageCount is not 4 and not 8) return;
             bool isMtGroup = sa.GetMyIndex() % 2 == 0;
             var myPriority = sa.GetMyIndex() / 2;
-            sa.DebugMsg($"isMtGroup {isMtGroup} myPriority {myPriority} ");
             
             if (isMtGroup ^ _bsp.M9SA_CageCount == 8)
             {
@@ -174,7 +173,6 @@ public class HeavyWeightSavage
                 {
                     var checkRegion = ((tankSafeRegion + 2) % 8 + i) % 8;
                     if (_bsp.M9SA_CageVal.GetBinaryBit(checkRegion) != 0) continue;
-                    sa.DebugMsg($"{tankSafeRegion} Check Region {checkRegion} 111");
                     
                     // 顺时针第一个小角属于DPS，第二个小角属于Healer
                     var dp = sa.DrawLine(Center, 0, 0, 12000, $"其他职能安全角", 180f.DegToRad() - 45f.DegToRad() * checkRegion , 30f, 20f, draw: false);
