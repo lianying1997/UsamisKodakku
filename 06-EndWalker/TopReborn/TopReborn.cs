@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P6宇宙流星指路错误bug。
+         1. 尝试修复StatusAdd/StatusRemove导致的错误事件。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.4";
+    private const string Version = "0.0.0.5";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -112,6 +112,13 @@ public class TopReborn
         }
     }
     
+    [ScriptMethod(name: "测试项：展示优先级表格", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: true)]
+    public void 展示优先级表格(Event ev, ScriptAccessory sa)
+    {
+        sa.DebugMsg(_pd.ShowPriorities(), Debugging);
+    }
+    
     #region P1A 循环程序
     
     [ScriptMethod(name: "———————— 《P1A 循环程序》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -135,6 +142,7 @@ public class TopReborn
     public void P1A_循环程序_Buff记录(Event ev, ScriptAccessory sa)
     {
         if (_parse != 1.1) return;
+        if (ev.SourceId == 0x00000000) return;
         var idx = sa.GetPlayerIdIndex((uint)ev.TargetId);
         var priVal = ev.StatusId switch
         {
@@ -389,6 +397,7 @@ public class TopReborn
     public void P1B_全能之主_Buff记录(Event ev, ScriptAccessory sa)
     {
         if (_parse != 1.2) return;
+        if (ev.SourceId == 0x00000000) return;
         var idx = sa.GetPlayerIdIndex((uint)ev.TargetId);
         var priVal = ev.StatusId switch
         {
@@ -415,13 +424,13 @@ public class TopReborn
             if (ev.ActionId == FIRST_FLAME && _p1.全能之主第一次角度寄存 < -8)
             {
                 _p1.全能之主第一次角度寄存 = ev.SourceRotation;
-                sa.DebugMsg($"得到全能之主第一次角度寄存 {_p1.全能之主第一次角度寄存}", Debugging);
+                sa.DebugMsg($"得到全能之主第一次角度寄存 {_p1.全能之主第一次角度寄存.RadToDeg()}", Debugging);
             }
                 
             if (ev.ActionId == REST_FLAME)
             {
                 float diff = ev.SourceRotation.GetDiffRad(_p1.全能之主第一次角度寄存);
-                sa.DebugMsg($"计算当前角度{ev.SourceRotation} 与 前一次的差为 {diff}", Debugging);
+                sa.DebugMsg($"计算当前角度{ev.SourceRotation.RadToDeg()} 与 前一次的差为 {diff.RadToDeg()}", Debugging);
                 if (MathF.Abs(diff) > float.Pi / 2) return;
                 _p1.全能之主为顺时针 = diff < 0;
                 _p1.全能之主顺逆时针判断完毕 = true;
@@ -435,6 +444,8 @@ public class TopReborn
     public void P1B_全能之主_起跑线(Event ev, ScriptAccessory sa)
     {
         if (_parse != 1.2) return;
+        if (_p1.全能之主起跑线绘制完毕) return;
+        _p1.全能之主起跑线绘制完毕 = true;
         
         int  myIndex      = sa.GetMyIndex();
         int  myPriority   = _pd.FindPriorityIndexOfKey(myIndex);   // 升序排列，从0开始，偶数则优先级高，奇数则优先级低
@@ -442,10 +453,11 @@ public class TopReborn
         
         var startRegion = _p1.全能之主第一次角度寄存.RadianToRegion(12, 8, isDiagDiv: true);
         startRegion = (startRegion + 3) % 12;     // 某个安全区角度
+        sa.DebugMsg($"某个安全区角度：{startRegion}，我是高优先级：{isHighPrior}，我排第 {myPriority}", Debugging);
         var isMyRegion = startRegion < 6 && isHighPrior;
         if (!isMyRegion)
             startRegion = (startRegion + 6) % 12;
-
+        sa.DebugMsg($"最终决定的安全区角度：{startRegion}", Debugging);
         var bossObj = sa.GetById(_p1.BossId);
         if (bossObj is null) return;
         var bossPos = bossObj.Position;
@@ -483,7 +495,7 @@ public class TopReborn
     public void P1B_全能之主_出去提示(Event ev, ScriptAccessory sa)
     {
         if (_parse != 1.2) return;
-
+        
         if (ev.TargetId != sa.Data.Me) return;
         _p1.全能之主出去时间Framework = sa.Method.RegistFrameworkUpdateAction(Action);
         return;
@@ -1400,6 +1412,7 @@ public class TopReborn
     public void P3A_你好世界_Buff记录(Event ev, ScriptAccessory sa)
     {
         if (_parse != 3) return;
+        if (ev.SourceId == 0x00000000) return;
         const uint STACK_PREP = 3436;
         const uint DEFAMATION_PREP = 3437;
         const uint RED_ROT_PREP = 3438;
@@ -4441,6 +4454,7 @@ public class TopReborn
         
         public int 全能之主轮次 = 0;
         public bool 全能之主为顺时针 = false;
+        public bool 全能之主起跑线绘制完毕 = false;
         public bool 全能之主顺逆时针判断完毕 = false;
         public float 全能之主第一次角度寄存 = -10;
         public ManualResetEvent 全能之主顺逆时针判断完毕事件 = new ManualResetEvent(false);
@@ -4461,6 +4475,7 @@ public class TopReborn
             扫描接线开启 = false;
             全能之主轮次 = 0;
             全能之主为顺时针 = false;
+            全能之主起跑线绘制完毕 = false;
             全能之主顺逆时针判断完毕 = false;
             全能之主第一次角度寄存 = -10;
             
