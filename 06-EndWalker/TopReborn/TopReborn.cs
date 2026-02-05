@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P1线塔与全能之主，涉及对位H2/D4的优先级错误（复制粘贴惨案）。
+         1. 修复P1全能之主起跑方向概率错误。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.6";
+    private const string Version = "0.0.0.7";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -454,8 +454,8 @@ public class TopReborn
         var startRegion = _p1.全能之主第一次角度寄存.RadianToRegion(12, 8, isDiagDiv: true);
         startRegion = (startRegion + 3) % 12;     // 某个安全区角度
         sa.DebugMsg($"某个安全区角度：{startRegion}，我是高优先级：{isHighPrior}，我排第 {myPriority}", Debugging);
-        var isMyRegion = startRegion < 6 && isHighPrior;
-        if (!isMyRegion)
+        var isNotMyRegion = startRegion < 6 ^ isHighPrior;
+        if (isNotMyRegion)
             startRegion = (startRegion + 6) % 12;
         sa.DebugMsg($"最终决定的安全区角度：{startRegion}", Debugging);
         var bossObj = sa.GetById(_p1.BossId);
