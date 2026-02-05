@@ -213,12 +213,12 @@
   {
     "Name": "绝欧精装 Reborn",
     "Guid": "6272e52b-5500-4ff0-8634-dd15f2e3b25e",
-    "Version": "0.0.0.5",
+    "Version": "0.0.0.6",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/TopReborn/TopReborn.cs",
-    "Note": "v0.0.0.5\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
-    "UpdateInfo": "0.0.0.5\r\n1. 尝试修复StatusAdd/StatusRemove导致的错误事件。",
+    "Note": "v0.0.0.6\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
+    "UpdateInfo": "0.0.0.6\r\n1. 修复P1线塔与全能之主，涉及对位H2/D4的优先级错误（复制粘贴惨案）。",
     "TerritoryIds": [
       1122
     ]

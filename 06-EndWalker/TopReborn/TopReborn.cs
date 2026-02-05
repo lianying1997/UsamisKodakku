@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 尝试修复StatusAdd/StatusRemove导致的错误事件。
+         1. 修复P1线塔与全能之主，涉及对位H2/D4的优先级错误（复制粘贴惨案）。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.5";
+    private const string Version = "0.0.0.6";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -135,7 +135,7 @@ public class TopReborn
         _p1.BossId = ev.TargetId;
         _p1.Register();
         _pd.Init(sa, "P1线塔");
-        _pd.AddPriorities([2, 3, 1, 8, 5, 6, 7, 8]);    // 数值越低，代表优先级越高
+        _pd.AddPriorities([2, 3, 1, 8, 4, 5, 6, 7]);    // 数值越低，代表优先级越高
     }
     
     [ScriptMethod(name: "P1A_循环程序_Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(3004|3005|3006|3451)$"], userControl: Debugging)]
@@ -389,7 +389,7 @@ public class TopReborn
     {
         _parse = 1.2;
         _pd.Init(sa, "P1全能之主");
-        _pd.AddPriorities([2, 3, 1, 8, 5, 6, 7, 8]);    // 数值越低，代表优先级越高
+        _pd.AddPriorities([2, 3, 1, 8, 4, 5, 6, 7]);    // 数值越低，代表优先级越高
         _p1.全能之主轮次 = 1;
     }
     
