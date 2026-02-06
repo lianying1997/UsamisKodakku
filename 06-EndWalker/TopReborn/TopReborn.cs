@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P1全能之主起跑方向概率错误。
+         1. 再次修复P1全能之主起跑方向概率错误，这次应该是没问题了。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.7";
+    private const string Version = "0.0.0.8";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -70,7 +70,7 @@ public class TopReborn
     public void Init(ScriptAccessory sa)
     {
         RefreshParams(sa);
-        sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.", Debugging);
+        sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化", Debugging);
         sa.Method.RemoveDraw(".*");
         sa.Method.ClearFrameworkUpdateAction(this);
     }
@@ -112,11 +112,28 @@ public class TopReborn
         }
     }
     
+    [ScriptMethod(name: "测试项：参数初始化", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: true)]
+    public void 参数初始化(Event ev, ScriptAccessory sa)
+    {
+        RefreshParams(sa);
+    }
+    
     [ScriptMethod(name: "测试项：展示优先级表格", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: true)]
     public void 展示优先级表格(Event ev, ScriptAccessory sa)
     {
         sa.DebugMsg(_pd.ShowPriorities(), Debugging);
+    }
+    
+    [ScriptMethod(name: "测试项：临时测试", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: true)]
+    public void 临时测试(Event ev, ScriptAccessory sa)
+    {
+        var rot = 119.74815f.DegToRad();
+        var startRegion = rot.RadianToRegion(12, 8, isDiagDiv: true);
+        var safeRegion = (startRegion + 3) % 12;     // 某个安全区角度
+        sa.DebugMsg($"炮区域：{startRegion}，某个安全区区域：{safeRegion}", Debugging);
     }
     
     #region P1A 循环程序
@@ -425,6 +442,7 @@ public class TopReborn
             {
                 _p1.全能之主第一次角度寄存 = ev.SourceRotation;
                 sa.DebugMsg($"得到全能之主第一次角度寄存 {_p1.全能之主第一次角度寄存.RadToDeg()}", Debugging);
+                _p1.全能之主第一次角度寄存完毕事件.Set();
             }
                 
             if (ev.ActionId == REST_FLAME)
@@ -451,9 +469,10 @@ public class TopReborn
         int  myPriority   = _pd.FindPriorityIndexOfKey(myIndex);   // 升序排列，从0开始，偶数则优先级高，奇数则优先级低
         bool isHighPrior  = myPriority % 2 == 0;
         
+        _p1.全能之主第一次角度寄存完毕事件.WaitOne();
         var startRegion = _p1.全能之主第一次角度寄存.RadianToRegion(12, 8, isDiagDiv: true);
         startRegion = (startRegion + 3) % 12;     // 某个安全区角度
-        sa.DebugMsg($"某个安全区角度：{startRegion}，我是高优先级：{isHighPrior}，我排第 {myPriority}", Debugging);
+        sa.DebugMsg($"某个安全区角度是：{startRegion}，我是高优先级：{isHighPrior}，我排第 {myPriority}", Debugging);
         var isNotMyRegion = startRegion < 6 ^ isHighPrior;
         if (isNotMyRegion)
             startRegion = (startRegion + 6) % 12;
@@ -478,6 +497,7 @@ public class TopReborn
             sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp0);
         }
         
+        _p1.全能之主第一次角度寄存完毕事件.Reset();
         _p1.全能之主顺逆时针判断完毕事件.Reset();
     }
     
@@ -4458,6 +4478,7 @@ public class TopReborn
         public bool 全能之主顺逆时针判断完毕 = false;
         public float 全能之主第一次角度寄存 = -10;
         public ManualResetEvent 全能之主顺逆时针判断完毕事件 = new ManualResetEvent(false);
+        public ManualResetEvent 全能之主第一次角度寄存完毕事件 = new ManualResetEvent(false);
         public int 上一次远距离状态 = 0;
         public string 全能之主出去时间Framework = "";
         public string 全能之主最远距离Framework = "";
@@ -4498,6 +4519,7 @@ public class TopReborn
             每轮塔收集完毕.Dispose();
             前一轮绘图清除完毕.Dispose();
             全能之主顺逆时针判断完毕事件.Dispose();
+            全能之主第一次角度寄存完毕事件.Dispose();
         }
 
         public void Register()
@@ -4505,9 +4527,11 @@ public class TopReborn
             每轮塔收集完毕 = new ManualResetEvent(false);
             前一轮绘图清除完毕 = new ManualResetEvent(false);
             全能之主顺逆时针判断完毕事件 = new ManualResetEvent(false);
+            全能之主第一次角度寄存完毕事件 = new ManualResetEvent(false);
             每轮塔收集完毕.Reset();
             前一轮绘图清除完毕.Reset();
             全能之主顺逆时针判断完毕事件.Reset();
+            全能之主第一次角度寄存完毕事件.Reset();
         }
     }
     
