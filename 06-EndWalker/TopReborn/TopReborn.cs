@@ -40,11 +40,12 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 再次修复P1全能之主起跑方向概率错误，这次应该是没问题了。
+         1. 修复P2一运后可能出现的，特殊模式下未屏蔽无法攻击单位的问题。
+         2. 修复P3你好世界可能出现的，站位点标注错误问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.8";
+    private const string Version = "0.0.0.9";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -800,13 +801,19 @@ public class TopReborn
     }
     
     [ScriptMethod(name: "*P2A_防火墙_一运后再次开启", eventType: EventTypeEnum.Targetable,
-        eventCondition: ["Targetable:True", "DataId:regex:^(1571[23])$"], userControl: Debugging, suppress: 1000)]
+        eventCondition: ["Targetable:True", "DataId:regex:^(1571[23])$"], userControl: Debugging)]
     public void P2A_防火墙_一运后再次开启(Event ev, ScriptAccessory sa)
     {
         if (_parse != 2.15) return;
         if (!SpecialMode) return;
-        sa.DebugMsg($"P2A_防火墙_一运后再次开启", Debugging);
-        _p2.使能防火墙 = true;
+        lock (_p2)
+        {
+            _p2.可选目标数量++;
+            sa.DebugMsg($"P2A_防火墙_一运后再次开启：{_p2.可选目标数量}", Debugging);
+            if (_p2.可选目标数量 < 2) return;
+            sa.DebugMsg($"P2A_防火墙_一运后再次开启", Debugging);
+            _p2.使能防火墙 = true;
+        }
     }
 
     [ScriptMethod(name: "P2A_防火墙_二运前关闭防火墙判断", eventType: EventTypeEnum.StatusRemove,
@@ -1490,7 +1497,7 @@ public class TopReborn
                 AddTowerParam(ref _p3.红塔位置, region);
             else
                 AddTowerParam(ref _p3.蓝塔位置, region);
-            if (_p3.红塔位置 + _p3.蓝塔位置 < 400) return;
+            if (_p3.红塔位置 / 100 + _p3.蓝塔位置 / 100 < 4) return;
             _p3.红蓝塔方位记录.Set();
         }
         void AddTowerParam(ref int towerParam, int region)
@@ -4542,6 +4549,7 @@ public class TopReborn
         
         public int 上一次防火墙状态 = 0;
         public bool 协作程序是远线 = false;
+        public int 可选目标数量 = 0;
         public bool 使能防火墙 = false;
         public bool 转场手臂先正三角 = false;
         public int 大眼睛方位 = 0;
@@ -4564,6 +4572,7 @@ public class TopReborn
             
             上一次防火墙状态 = 0;
             协作程序是远线 = false;
+            可选目标数量 = 0;
             使能防火墙 = false;
             转场手臂先正三角 = false;
             大眼睛方位 = 0;
