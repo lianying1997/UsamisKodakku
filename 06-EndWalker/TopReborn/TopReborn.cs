@@ -114,21 +114,21 @@ public class TopReborn
     }
     
     [ScriptMethod(name: "测试项：参数初始化", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: true)]
+        userControl: Debugging)]
     public void 参数初始化(Event ev, ScriptAccessory sa)
     {
         RefreshParams(sa);
     }
     
     [ScriptMethod(name: "测试项：展示优先级表格", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: true)]
+        userControl: Debugging)]
     public void 展示优先级表格(Event ev, ScriptAccessory sa)
     {
         sa.DebugMsg(_pd.ShowPriorities(), Debugging);
     }
     
     [ScriptMethod(name: "测试项：临时测试", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: true)]
+        userControl: Debugging)]
     public void 临时测试(Event ev, ScriptAccessory sa)
     {
         var rot = 119.74815f.DegToRad();
