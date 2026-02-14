@@ -40,12 +40,13 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P2一运后可能出现的，特殊模式下未屏蔽无法攻击单位的问题。
-         2. 修复P3你好世界可能出现的，站位点标注错误问题。
+         1. 增加P5三运安全区提示横幅。
+         2. 调整P3小电视攻2、攻3指路位置（偏外）。
+         3. 调整P5二运禁1、禁2指路位置（避开最后一轮激光直接就位）。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.9";
+    private const string Version = "0.0.0.10";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -1785,7 +1786,7 @@ public class TopReborn
         // 打右左安全，攻1-5，锁1-3
         List<Vector3> staticPos =
         [
-            new(99.0f, 0, 91.0f), new(104.0f, 0, 100.0f), new(115.5f, 0, 100.0f), new(99.0f, 0, 109.0f), new(99.0f, 0, 119.0f),
+            new(99.0f, 0, 91.0f), new(110.0f, 0, 100.0f), new(118.0f, 0, 100.0f), new(99.0f, 0, 109.0f), new(99.0f, 0, 119.0f),
             new(93.0f, 0, 82.0f), new(86.0f, 0, 92.5f), new(86.0f, 0, 107.5f)
         ];
 
@@ -3124,8 +3125,8 @@ public class TopReborn
             ATK4 => new Vector3(94.74f, 0, 81.74f),
             BIND1 => new Vector3(110f, 0, 100f),
             BIND2 => new Vector3(105.26f, 0, 81.74f),
-            STOP1 => new Vector3(113.44f, 0, 113.44f),
-            STOP2 => new Vector3(86.56f, 0, 113.44f),
+            STOP1 => new Vector3(111.34f, 0, 116.22f),
+            STOP2 => new Vector3(88.66f, 0, 116.22f),
         };
 
         if (!_p5B.圆环是顺时针 && myPriValRank is ATK1 or ATK2 or BIND1)
@@ -3274,25 +3275,25 @@ public class TopReborn
             switch (skillType)
             {
                 case DONUT:
-                    sa.DrawDonut(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_男月环", 40, 10);
+                    sa.DrawDonut(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_男月环", 40, 10);
                     break;
                 case CHARIOT:
-                    sa.DrawCircle(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_男钢铁", 10);
+                    sa.DrawCircle(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_男钢铁", 10);
                     break;
                 case CROSS:
-                    var dp1 = sa.DrawRect(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_女十字1", rotation, 10, 60, draw: false);
-                    var dp2 = sa.DrawRect(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_女十字2", rotation + float.Pi / 2, 10, 60, draw: false);
+                    var dp1 = sa.DrawRect(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_女十字1", rotation, 10, 60, draw: false);
+                    var dp2 = sa.DrawRect(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_女十字2", rotation + float.Pi / 2, 10, 60, draw: false);
                     sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp1);
                     sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp2);
                     break;
                 case HOTWING:
-                    var dp3 = sa.DrawDonut(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_女辣翅", 60, 8, draw: false);
+                    var dp3 = sa.DrawDonut(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_女辣翅", 60, 8, draw: false);
                     dp3.Rotation = rotation;
                     sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.HotWing, dp3);
                     break;
                 case FAN:
-                    sa.DrawFan(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_光头刀1", 120f.DegToRad(), rotation, 20f, 0f);
-                    sa.DrawFan(ownerPos, 0, 10000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_光头刀2", 120f.DegToRad(), rotation + 180f.DegToRad(), 20f, 0f);
+                    sa.DrawFan(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_光头刀1", 120f.DegToRad(), rotation, 20f, 0f);
+                    sa.DrawFan(ownerPos, 0, 12000, $"P5C1_三运_组合技攻击范围绘图_{prefix}_光头刀2", 120f.DegToRad(), rotation + 180f.DegToRad(), 20f, 0f);
                     break;
             }
         }
@@ -3304,17 +3305,18 @@ public class TopReborn
     {
         if (_parse != 5.3) return;
         _p5C.组合技安全区记录完毕.WaitOne();
-        var safePos1 = GetSafePosOfComboSkill(_p5C.组合技安全区[0]);
-        var safePos2 = GetSafePosOfComboSkill(_p5C.组合技安全区[1]);
+        var (safePos1, hintString1) = GetSafePosOfComboSkill(_p5C.组合技安全区[0]);
+        var (safePos2, hintString2) = GetSafePosOfComboSkill(_p5C.组合技安全区[1]);
+        sa.Method.TextInfo($"{hintString1} -> {hintString2}", 4000, true);
         
-        sa.DrawGuidance(safePos1, 0, 10000, $"P5C1_三运_安全点指路1");
-        sa.DrawGuidance(safePos1, safePos2, 0, 10000, $"P5C1_三运_安全点指路1预备", isSafe: false);
+        sa.DrawGuidance(safePos1, 0, 12000, $"P5C1_三运_安全点指路1");
+        sa.DrawGuidance(safePos1, safePos2, 0, 12000, $"P5C1_三运_安全点指路1预备", isSafe: false);
 
         _p5C.第一段组合技结束.WaitOne();
         sa.Method.RemoveDraw($"P5C1_三运_安全点指路1.*");
-        sa.DrawGuidance(safePos2, 0, 10000, $"P5C1_三运_安全点指路2");
-        
-        Vector3 GetSafePosOfComboSkill(int safePosIdx)
+        sa.DrawGuidance(safePos2, 0, 12000, $"P5C1_三运_安全点指路2");
+
+        (Vector3, string) GetSafePosOfComboSkill(int safePosIdx)
         {
             var rotation = safePosIdx % 4 * 90f.DegToRad();
             var distance = (safePosIdx / 4) switch
@@ -3324,7 +3326,24 @@ public class TopReborn
                 2 => 19f,
                 _ => 0,
             };
-            return new Vector3(100, 0, 100 + distance).RotateAndExtend(Center, rotation);
+
+            var markHint = (safePosIdx % 4) switch
+            {
+                0 => "C",
+                1 => "B",
+                2 => "A",
+                _ => "D",
+            };
+            
+            var distanceHint = (safePosIdx / 4) switch
+            {
+                0 => "近",
+                1 => "中",
+                _ => "远",
+            };
+            
+            var hintString = $"{markHint}{distanceHint}";
+            return (new Vector3(100, 0, 100 + distance).RotateAndExtend(Center, rotation), hintString);
         }
     }
 

@@ -213,12 +213,12 @@
   {
     "Name": "绝欧精装 Reborn",
     "Guid": "6272e52b-5500-4ff0-8634-dd15f2e3b25e",
-    "Version": "0.0.0.9",
+    "Version": "0.0.0.10",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/TopReborn/TopReborn.cs",
-    "Note": "v0.0.0.9\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
-    "UpdateInfo": "0.0.0.9\r\n1. 修复P2一运后可能出现的，特殊模式下未屏蔽无法攻击单位的问题。\r\n2. 修复P3你好世界可能出现的，站位点标注错误问题。",
+    "Note": "v0.0.0.10\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
+    "UpdateInfo": "0.0.0.10\r\n1. 增加P5三运安全区提示横幅。\r\n2. 调整P3小电视攻2、攻3指路位置（偏外）。\r\n3. 调整P5二运禁1、禁2指路位置（避开最后一轮激光直接就位）。",
     "TerritoryIds": [
       1122
     ]
