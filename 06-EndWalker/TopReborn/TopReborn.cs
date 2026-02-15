@@ -40,13 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 增加P5三运安全区提示横幅。
-         2. 调整P3小电视攻2、攻3指路位置（偏外）。
-         3. 调整P5二运禁1、禁2指路位置（避开最后一轮激光直接就位）。
+         1. 调整P5三运第一步到第二步的指路间隔。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.10";
+    private const string Version = "0.0.0.11";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -3307,7 +3305,7 @@ public class TopReborn
         _p5C.组合技安全区记录完毕.WaitOne();
         var (safePos1, hintString1) = GetSafePosOfComboSkill(_p5C.组合技安全区[0]);
         var (safePos2, hintString2) = GetSafePosOfComboSkill(_p5C.组合技安全区[1]);
-        sa.Method.TextInfo($"{hintString1} -> {hintString2}", 4000, true);
+        sa.Method.TextInfo($"{hintString1} -> {hintString2}", 4500, true);
         
         sa.DrawGuidance(safePos1, 0, 12000, $"P5C1_三运_安全点指路1");
         sa.DrawGuidance(safePos1, safePos2, 0, 12000, $"P5C1_三运_安全点指路1预备", isSafe: false);
@@ -3348,7 +3346,7 @@ public class TopReborn
     }
 
     [ScriptMethod(name: "P5C1_三运_第一段组合技结束", eventType: EventTypeEnum.ActionEffect,
-        eventCondition: ["ActionId:regex:^(3164[34])$"], userControl: Debugging)]
+        eventCondition: ["ActionId:regex:^(3152[56])$"], userControl: Debugging)]
     public void P5C1_三运_第一段组合技结束(Event ev, ScriptAccessory sa)
     {
         if (_parse != 5.3) return;
