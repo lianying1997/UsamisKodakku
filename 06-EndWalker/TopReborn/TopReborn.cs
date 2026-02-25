@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 调整P5三运第一步到第二步的指路间隔。
+         1. 调整P6宇宙龙炎的范围显示，现在是一个环，避免从视觉上影响二地火。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.11";
+    private const string Version = "0.0.0.12";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -2070,7 +2070,7 @@ public class TopReborn
     }
     
     #endregion P4 蓝屏
-    
+
     #region P5A 一运一传
     
     [ScriptMethod(name: "———————— 《P5A1 一运》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -3740,15 +3740,18 @@ public class TopReborn
         var sid = ev.SourceId;
         var myIndex = sa.GetMyIndex();
         var isTank = myIndex <= 1;
-        var dp1 = sa.DrawCircle(sid, 0, 10000, $"P6_宇宙龙炎_绘图1", 8f, isTank, draw: false);
+        var dp1 = sa.DrawDonut(sid, 0, 10000, $"P6_宇宙龙炎_绘图1", 8f, 7.7f, isTank, draw: false);
+        dp1.Color = isTank ? sa.Data.DefaultSafeColor.WithW(5f) : sa.Data.DefaultDangerColor.WithW(5f);
         dp1.SetOwnersDistanceOrder(true, 1);
-        var dp2 = sa.DrawCircle(sid, 0, 10000, $"P6_宇宙龙炎_绘图2", 8f, isTank, draw: false);
+        var dp2 = sa.DrawDonut(sid, 0, 10000, $"P6_宇宙龙炎_绘图2", 8f, 7.7f, isTank, draw: false);
+        dp2.Color = isTank ? sa.Data.DefaultSafeColor.WithW(5f) : sa.Data.DefaultDangerColor.WithW(5f);
         dp2.SetOwnersDistanceOrder(true, 2);
-        var dp3 = sa.DrawCircle(sid, 0, 10000, $"P6_宇宙龙炎_绘图3", 6f, !isTank, draw: false);
+        var dp3 = sa.DrawDonut(sid, 0, 10000, $"P6_宇宙龙炎_绘图3", 6f, 5.7f, !isTank, draw: false);
+        dp3.Color = !isTank ? sa.Data.DefaultSafeColor.WithW(5f) : sa.Data.DefaultDangerColor.WithW(5f);
         dp3.SetOwnersDistanceOrder(true, 3);
-        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
-        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
-        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp3);
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp1);
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp2);
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp3);
     }
     
     [ScriptMethod(name: "P6_宇宙龙炎_绘图删除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31655"],
