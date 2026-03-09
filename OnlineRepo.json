@@ -213,12 +213,12 @@
   {
     "Name": "绝欧精装 Reborn",
     "Guid": "6272e52b-5500-4ff0-8634-dd15f2e3b25e",
-    "Version": "0.0.0.12",
+    "Version": "0.0.0.13",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/TopReborn/TopReborn.cs",
-    "Note": "v0.0.0.12\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
-    "UpdateInfo": "0.0.0.12\r\n1. 调整P6宇宙龙炎的范围显示，现在是一个环，避免从视觉上影响二地火。",
+    "Note": "v0.0.0.13\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
+    "UpdateInfo": "0.0.0.13\r\n1. 修复P2一运分摊，当一组索尼搭档被点分摊时，左侧最偏下闲人的指路错误问题。",
     "TerritoryIds": [
       1122
     ]

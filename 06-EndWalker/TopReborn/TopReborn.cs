@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 调整P6宇宙龙炎的范围显示，现在是一个环，避免从视觉上影响二地火。
+         1. 修复P2一运分摊，当一组索尼搭档被点分摊时，左侧最偏下闲人的指路错误问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.12";
+    private const string Version = "0.0.0.13";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -1010,6 +1010,7 @@ public class TopReborn
     {
         if (_parse != 2.1) return;
         _p2.男人钢铁方位 = ev.SourcePosition.GetRadian(Center).RadianToRegion(8, isDiagDiv: true);
+        sa.DebugMsg($"男人钢铁方位 {_p2.男人钢铁方位}", Debugging);
         _p2.男人钢铁方位记录.Set();
     }
     
@@ -1052,6 +1053,7 @@ public class TopReborn
         {
             int leftRegion = (_p2.男人钢铁方位 + 2 + 8) % 8;
             int rightRegion = (_p2.男人钢铁方位 - (_p2.协作程序是远线 ? 2 : 4) + 8) % 8;
+            sa.DebugMsg($"分摊左方位 {leftRegion}，右方位 {rightRegion}");
 
             var dp1 = sa.DrawLine(Center, 0, 0, 6000, $"P2_协作程序_指引线左", leftRegion * 45f.DegToRad(), 20f, 20f,
                 draw: false);
@@ -1086,7 +1088,8 @@ public class TopReborn
             {
                 case IDLE:
                 {
-                    safePosRegion = myRank <= 1 ? leftRegion : rightRegion;
+                    safePosRegion = myPriVal.GetDecimalDigit(3) == 0 ? leftRegion : rightRegion;
+                    // safePosRegion = myRank <= 1 ? leftRegion : rightRegion;
                     break;
                 }
                 case STACK_PARTNER:
