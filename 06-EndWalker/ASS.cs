@@ -1773,9 +1773,9 @@ public static class EventExtensions
         return @event["TargetName"];
     }
 
-    public static uint DurationMilliseconds(this Event @event)
+    public static ulong DurationMilliseconds(this Event @event)
     {
-        return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
+        return JsonConvert.DeserializeObject<ulong>(@event["DurationMilliseconds"]);
     }
 
     public static uint Index(this Event @event)

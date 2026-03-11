@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P2一运分摊，当一组索尼搭档被点分摊时，左侧最偏下闲人的指路错误问题。
+         1. 修复P2一运分摊，当一组索尼搭档被点分摊时，右侧第二位闲人指路错误问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.13";
+    private const string Version = "0.0.0.14";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -1069,17 +1069,16 @@ public class TopReborn
             const int STACK_PARTNER = 2;
             const int STACK_SOURCE = 3;
 
-            int myRank = _pd.FindPriorityIndexOfKey(sa.GetMyIndex());
-            (int myState, string myStateStr) = myRank switch
-            {
-                <= 3 => (IDLE, "闲人"),
-                > 3 and <= 5 => (STACK_PARTNER, "分摊搭档"),
-                > 5 and <= 7 => (STACK_SOURCE, "分摊源"),
-                _ => (0, "未知")
-            };
-            if (myState == 0) return;
-        
             int myPriVal = _pd.Priorities[sa.GetMyIndex()];
+            int myRank = _pd.FindPriorityIndexOfKey(sa.GetMyIndex());
+
+            (int myState, string myStateStr) = myPriVal switch
+            {
+                > 1000 => (STACK_SOURCE, "分摊源"),
+                > 500 => (STACK_PARTNER, "分摊搭档"),
+                _ => (IDLE, "闲人")
+            };
+
             int safePosRegion = 0;
             bool bothStackSourceAtRight = _pd.SelectSpecificPriorityIndex(1, true).Value.GetDecimalDigit(3) == 1;
             bool bothStackSourceAtLeft = _pd.SelectSpecificPriorityIndex(0, true).Value.GetDecimalDigit(3) == 0;
