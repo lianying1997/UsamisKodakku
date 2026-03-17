@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P2一运分摊，当一组索尼搭档被点分摊时，右侧第二位闲人指路错误问题。
+         1. 修复P5二运八方，若右侧第四人头标为方块而非大饼时，整个二运二传阶段指路错误的问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.14";
+    private const string Version = "0.0.0.15";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -2790,7 +2790,7 @@ public class TopReborn
         sa.DebugMsg($"记录下协作程序是 {(_p5B.协作程序是远线 ? "远" : "近")} 线", Debugging);
     }
     
-    [ScriptMethod(name: "P5B1_二运_获取八方头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[1234678]|12)$"],
+    [ScriptMethod(name: "P5B1_二运_获取八方头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[1234678]|11|12)$"],
         userControl: Debugging)]
     public void P5B1_二运_获取八方头标(Event ev, ScriptAccessory sa)
     {
@@ -2813,7 +2813,7 @@ public class TopReborn
                 0x06 => 80,   // 锁链1
                 0x07 => 70,   // 锁链2
                 0x08 => 60,   // 锁链3
-                0x12 => 50,   // 大饼
+                0x11 or 0x12 => 50,   // 方块/大饼
                 _ => 0
             };
             _pd.AddPriority(tidx, pdVal);
