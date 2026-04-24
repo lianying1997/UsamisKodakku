@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复P5二运八方，若右侧第四人头标为方块而非大饼时，整个二运二传阶段指路错误的问题。
+         1. 修复 P3 小电视，在无头标情况下不指路的问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.15";
+    private const string Version = "0.0.0.16";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -1775,14 +1775,13 @@ public class TopReborn
             for (int i = 0; i < sa.Data.PartyList.Count; i++)
             {
                 var obj = sa.GetById(sa.Data.PartyList[i]);
-                if (obj is null) return;
-                
-                if (!((IBattleChara)obj).HasStatusAny([3452, 3453])) return;
+                if (obj is null) continue;
+                if (!((IBattleChara)obj).HasStatusAny([3452, 3453])) continue;
                 _pd.AddPriority(i, 100);
             }
         }
         _p3.光头扫描方向记录.WaitOne();
-
+        
         // 打右左安全，攻1-5，锁1-3
         List<Vector3> staticPos =
         [
