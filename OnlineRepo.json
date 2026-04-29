@@ -224,17 +224,16 @@
     ]
   },
   {
-    "Name": "AAC_HW_Patch [零式阿卡狄亚重量级 补丁]",
-    "Guid": "13439382-2cf4-4a9d-a15c-5df917d98c5f",
-    "Version": "0.0.0.4",
+    "Name": "Shinryu-Ur [神龙幻巧战]",
+    "Guid": "fcf45bf5-bb72-42f8-b918-4c4b779fb70c",
+    "Version": "0.0.0.1",
     "Author": "Usami",
     "Repo": "",
-    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/AACHeavyWeightSavage/HeavyWeightSavage.cs",
-    "Note": "0.0.0.4\r\n小补丁，慢慢更，自用为主，被电正常\r\n不会全画，只是补充！\r\n现到M10S前半。",
-    "UpdateInfo": "0.0.0.4",
+    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UnrealShinryu/UnrealShinryu.cs",
+    "Note": "0.0.0.1\r\n初版，有机制待补全",
+    "UpdateInfo": "0.0.0.1\r\n初版，有机制待补全",
     "TerritoryIds": [
-      1321,
-      1323
+      730
     ]
   }
 ]

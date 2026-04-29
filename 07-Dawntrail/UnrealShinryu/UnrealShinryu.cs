@@ -30,6 +30,7 @@ namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.UnrealShinryu;
  * 3. 水池 + 超新星，超新星未记录
  * 4. 水池 + 地狱之火焰，地狱之火焰未记录
  * 5. P3 吹雪 + 闪电，未记录
+ * ++ 40540
  */
 
 public class UnrealShinryu
@@ -37,17 +38,17 @@ public class UnrealShinryu
     const string NoteStr =
         $"""
         {Version}
-        说明
+        初版，有机制待补全
         """;
     
     const string UpdateInfo =
         $"""
          {Version}
-         更新
+         初版，有机制待补全
          """;
 
     private const string Name = "Shinryu-Ur [神龙幻巧战]";
-    private const string Version = "0.0.0.0";
+    private const string Version = "0.0.0.1";
     private const string DebugVersion = "a";
     private const bool Debugging = true;
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
@@ -62,8 +63,8 @@ public class UnrealShinryu
         _shinryuParam.Reset(sa);
     }
     
-    // 攻击（左翼/右翼） 9720
-    [ScriptMethod(name: "*判断副本", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(9720)$"],
+    // 攻击（左翼/右翼） 9720 50260
+    [ScriptMethod(name: "判断副本", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(9720|50260)$"],
         userControl: Debugging)]
     public void 判断副本(Event ev, ScriptAccessory sa)
     {
@@ -82,8 +83,8 @@ public class UnrealShinryu
         sa.DebugMsg($"[INFO]【大地之怒】绿色地板裂纹 True");
     }
     
-    // 巨浪 9690
-    [ScriptMethod(name: "*巨浪击退", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9690)$"],
+    // 巨浪 9690 50230
+    [ScriptMethod(name: "巨浪击退", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9690|50230)$"],
         userControl: true)]
     public void 巨浪击退(Event ev, ScriptAccessory sa)
     {
@@ -100,8 +101,8 @@ public class UnrealShinryu
         }
     }
     
-    // 冰柱突刺 9712
-    [ScriptMethod(name: "*冰柱突刺直线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9712)$"],
+    // 冰柱突刺 9712 50252
+    [ScriptMethod(name: "冰柱突刺直线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9712|50252)$"],
         userControl: true)]
     public void 冰柱突刺直线(Event ev, ScriptAccessory sa)
     {
@@ -127,8 +128,8 @@ public class UnrealShinryu
         sa.Method.TTS($"{pos} 放尾巴");
     }
     
-    // 尾部猛击 9698
-    [ScriptMethod(name: "*尾部猛击", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9698)$"],
+    // 尾部猛击 9698 50238
+    [ScriptMethod(name: "尾部猛击", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9698|50238)$"],
         userControl: true)]
     public void 尾部猛击(Event ev, ScriptAccessory sa)
     {
@@ -136,8 +137,8 @@ public class UnrealShinryu
         sa.DrawRect(ev.SourcePosition, 0, 3000, $"尾部猛击", ev.SourceRotation + 180f.DegToRad(), 20, 20, sa.Data.DefaultDangerColor.WithW(2f));
     }
     
-    // 闪电 9706
-    [ScriptMethod(name: "*闪电", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9706)$"],
+    // 闪电 9706 50246
+    [ScriptMethod(name: "闪电", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9706|50246)$"],
         userControl: true)]
     public void 闪电(Event ev, ScriptAccessory sa)
     {
@@ -151,8 +152,8 @@ public class UnrealShinryu
             sa.DrawCircle(p, 0, 8000, $"闪电分散", 5, sa.Data.DefaultDangerColor.WithW(2f), byTime: true);
     }
     
-    // 吹雪 9713
-    [ScriptMethod(name: "*吹雪 AOE 提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9713)$"],
+    // 吹雪 9713 50253
+    [ScriptMethod(name: "吹雪 AOE 提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9713|50253)$"],
         userControl: true)]
     public void 吹雪(Event ev, ScriptAccessory sa)
     {
@@ -160,8 +161,8 @@ public class UnrealShinryu
         sa.Method.TTS($"ＡＯＥ");
     }
     
-    // 死亡轮回 9715
-    [ScriptMethod(name: "*死亡轮回", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9715)$"],
+    // 死亡轮回 9715 50255
+    [ScriptMethod(name: "死亡轮回", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9715|50255)$"],
         userControl: true)]
     public void 死亡轮回(Event ev, ScriptAccessory sa)
     {
@@ -182,8 +183,8 @@ public class UnrealShinryu
             (isTank ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor).WithW(2f), byTime: true);
     }
     
-    // 制裁之雷 9723
-    [ScriptMethod(name: "*制裁之雷", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9723)$"],
+    // 制裁之雷 9723 50263
+    [ScriptMethod(name: "制裁之雷", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9723|50263)$"],
         userControl: true)]
     public void 制裁之雷(Event ev, ScriptAccessory sa)
     {
@@ -197,8 +198,8 @@ public class UnrealShinryu
         userControl: true)]
     public void 大地吐息(Event ev, ScriptAccessory sa)
     {
-        var bossObj = sa.GetByDataId(_shinryuParam.是幻巧战 ? 8026u : 8026u).First();
-        sa.DrawFan(bossObj!.GameObjectId, ev.TargetId, 0, 6000, $"大地吐息扇形", 60f.DegToRad(), 0f, 80f, 0f, sa.Data.DefaultDangerColor.WithW(2f));
+        // var bossObj = sa.GetByDataId(_shinryuParam.是幻巧战 ? 8026u : 8026u).First();
+        // sa.DrawFan(bossObj!.GameObjectId, ev.TargetId, 0, 6000, $"大地吐息扇形", 60f.DegToRad(), 0f, 80f, 0f, sa.Data.DefaultDangerColor.WithW(2f));
         if (ev.TargetId != sa.Data.Me) return;
         var myIndex = sa.GetMyIndex();
         
@@ -211,8 +212,8 @@ public class UnrealShinryu
         sa.Method.TTS($"{pos} 引导扇形");
     }
     
-    // 钻石星辰 9724
-    [ScriptMethod(name: "*钻石星辰", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9724)$"],
+    // 钻石星辰 9724 50264
+    [ScriptMethod(name: "钻石星辰", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9724|50264)$"],
         userControl: true)]
     public void 钻石星辰(Event ev, ScriptAccessory sa)
     {
@@ -221,16 +222,16 @@ public class UnrealShinryu
         sa.Method.TTS($"ＡＯＥ，场中集合{(myIndex == 3 ? "，即将滑冰" : "")}");
     }
     
-    // 大气爆发 9726
-    [ScriptMethod(name: "*大气爆发", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9726)$"],
+    // 大气爆发 9726 50266
+    [ScriptMethod(name: "大气爆发", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9726|50266)$"],
         userControl: true)]
     public void 大气爆发(Event ev, ScriptAccessory sa)
     {
         sa.DrawKnockBack(sa.Data.Me, 0, 10000, $"大气爆发", 3f, 20f, sa.Data.DefaultDangerColor.WithW(2f));
     }
     
-    // 以太射线 9752
-    [ScriptMethod(name: "*以太射线直线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9752)$"],
+    // 以太射线 9752 50292
+    [ScriptMethod(name: "以太射线直线", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9752|50292)$"],
         userControl: true)]
     public void 以太射线直线(Event ev, ScriptAccessory sa)
     {
@@ -238,8 +239,8 @@ public class UnrealShinryu
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Rect, dp);
     }
     
-    // 万亿斩击 9803
-    [ScriptMethod(name: "*万亿斩击", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9803)$"],
+    // 万亿斩击 9803 50296
+    [ScriptMethod(name: "万亿斩击", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9803|50343)$"],
         userControl: true)]
     public void 万亿斩击(Event ev, ScriptAccessory sa)
     {
@@ -248,8 +249,8 @@ public class UnrealShinryu
         sa.Method.TTS($"死刑换Ｔ");
     }
     
-    // 超新星P3 10015
-    [ScriptMethod(name: "*超新星（P3）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(10015)$"],
+    // 超新星P3 10015 50305
+    [ScriptMethod(name: "超新星（P3）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(10015|50305)$"],
         userControl: true)]
     public void 超新星P3(Event ev, ScriptAccessory sa)
     {
@@ -257,8 +258,8 @@ public class UnrealShinryu
         sa.Method.TTS($"集合，停止移动");
     }
     
-    // 神龙啸月环 9800
-    [ScriptMethod(name: "*神龙啸月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9800)$"],
+    // 神龙啸月环 9800 50293
+    [ScriptMethod(name: "神龙啸月环", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9800|50293)$"],
         userControl: true)]
     public void 神龙啸月环(Event ev, ScriptAccessory sa)
     {
