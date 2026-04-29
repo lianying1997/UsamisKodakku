@@ -50,7 +50,7 @@ public class UnrealShinryu
     private const string Name = "Shinryu-Ur [神龙幻巧战]";
     private const string Version = "0.0.0.1";
     private const string DebugVersion = "a";
-    private const bool Debugging = true;
+    private const bool Debugging = false;
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center1 = new Vector3(0, -380, 0);
     
