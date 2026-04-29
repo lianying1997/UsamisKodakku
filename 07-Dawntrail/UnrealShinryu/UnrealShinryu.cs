@@ -21,7 +21,7 @@ using Lumina.Excel.Sheets;
 
 namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.UnrealShinryu;
 
-[ScriptType(name: Name, territorys: [730], guid: "fcf45bf5-bb72-42f8-b918-4c4b779fb70c",
+[ScriptType(name: Name, territorys: [730, 1372], guid: "fcf45bf5-bb72-42f8-b918-4c4b779fb70c",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 /* todo
