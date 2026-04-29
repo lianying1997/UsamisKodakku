@@ -230,7 +230,7 @@ public class UnrealShinryu
     }
     
     // 极神龙 DataId 8026 19934
-    [ScriptMethod(name: "*大地吐息", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0028)$"],
+    [ScriptMethod(name: "大地吐息", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0028)$"],
         userControl: true)]
     public void 大地吐息(Event ev, ScriptAccessory sa)
     {
