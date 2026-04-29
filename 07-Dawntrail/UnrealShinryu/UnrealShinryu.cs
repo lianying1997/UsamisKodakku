@@ -24,35 +24,31 @@ namespace KodakkuScripts.UsamisKodakku._07_Dawntrail.UnrealShinryu;
 [ScriptType(name: Name, territorys: [730, 1372], guid: "fcf45bf5-bb72-42f8-b918-4c4b779fb70c",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
-/* todo
- * 1. 火焰链
- * 2. 天光轮回（需要躲开的那个）
- * 3. 水池 + 超新星，超新星未记录
- * 4. 水池 + 地狱之火焰，地狱之火焰未记录
- * 5. P3 吹雪 + 闪电，未记录
- * ++ 40540
- */
-
 public class UnrealShinryu
 {
     const string NoteStr =
         $"""
         {Version}
-        初版，有机制待补全
+        初版
         """;
     
     const string UpdateInfo =
         $"""
          {Version}
-         初版，有机制待补全
+         1. 修复大气爆发击退方向错误的问题
+         2. 增加地狱之火焰站水坑安全区提示
+         3. 增加火焰链提示
+         4. 增加 P3 闪电吹雪组合技提示
          """;
 
     private const string Name = "Shinryu-Ur [神龙幻巧战]";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
     private const bool Debugging = false;
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center1 = new Vector3(0, -380, 0);
+    
+    private long 机制上次触发时间;
     
     private ShinryuParams _shinryuParam = new ShinryuParams();
 
@@ -81,6 +77,36 @@ public class UnrealShinryu
         if (distance > 2f) return;
         _shinryuParam.绿色地板裂纹 = true;
         sa.DebugMsg($"[INFO]【大地之怒】绿色地板裂纹 True");
+    }
+    
+    [ScriptMethod(name: "火焰链", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0061)$"],
+        userControl: true)]
+    public void 火焰链(Event ev, ScriptAccessory sa)
+    {
+        lock (_shinryuParam)
+        {
+            if (MathTools.Debounce(ref 机制上次触发时间, 500))
+            {
+                _shinryuParam.火焰链次数++;
+                sa.DebugMsg($"[INFO]【火焰链】当前次数：{_shinryuParam.火焰链次数}");
+            };
+        }
+        
+        if (ev.TargetId != sa.Data.Me) return;
+        if (_shinryuParam.火焰链次数 is 3 or 4) return;
+        
+        // 04, 15, 26, 37
+        var myIndex = sa.GetMyIndex();
+        var dir = (myIndex % 4) switch
+        {
+            0 => "左上",
+            1 => "右上",
+            2 => _shinryuParam.火焰链次数 == 2 ? "左上" : "左下",
+            3 => _shinryuParam.火焰链次数 == 2 ? "右上" : "右下",
+            _ => ""
+        };
+        sa.Method.TextInfo($"即将在 {dir} 拉断锁链", 2500);
+        sa.Method.TTS($"即将在 {dir} 拉断锁链");
     }
     
     // 巨浪 9690 50230
@@ -124,7 +150,7 @@ public class UnrealShinryu
             3 => _shinryuParam.绿色地板裂纹 ? "左上" : "中间",
             _ => ""
         };
-        sa.Method.TextInfo($"{pos} 放尾巴", 4000);
+        sa.Method.TextInfo($"{pos} 放尾巴", 2500);
         sa.Method.TTS($"{pos} 放尾巴");
     }
     
@@ -157,7 +183,7 @@ public class UnrealShinryu
         userControl: true)]
     public void 吹雪(Event ev, ScriptAccessory sa)
     {
-        sa.Method.TextInfo($"ＡＯＥ", 4000, true);
+        sa.Method.TextInfo($"ＡＯＥ", 2500, true);
         sa.Method.TTS($"ＡＯＥ");
     }
     
@@ -175,7 +201,7 @@ public class UnrealShinryu
             0 or 1 => "分摊死刑",
             _ => "即将躲避 天光轮回"
         };
-        sa.Method.TextInfo(hintText, 4000, true);
+        sa.Method.TextInfo(hintText, 2500, true);
         sa.Method.TTS(hintText);
 
         var isTank = sa.Data.MyObject!.IsTank();
@@ -193,13 +219,23 @@ public class UnrealShinryu
             sa.DrawCircle(sink!.GameObjectId, 0, 8000, $"水坑", 5.25f, new Vector4(1, 0, 0, 5));
     }
     
-    // 极神龙 DataId 8026
+    // 地狱之火炎 9722 50262
+    [ScriptMethod(name: "地狱之火炎", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9722|50262)$"],
+        userControl: true)]
+    public void 地狱之火炎(Event ev, ScriptAccessory sa)
+    {
+        var sinks = sa.GetByDataId(2004237);
+        foreach (var sink in sinks)
+            sa.DrawCircle(sink!.GameObjectId, 0, 8000, $"水坑", 5.25f, sa.Data.DefaultSafeColor.WithW(5f));
+    }
+    
+    // 极神龙 DataId 8026 19934
     [ScriptMethod(name: "*大地吐息", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(0028)$"],
         userControl: true)]
     public void 大地吐息(Event ev, ScriptAccessory sa)
     {
-        // var bossObj = sa.GetByDataId(_shinryuParam.是幻巧战 ? 8026u : 8026u).First();
-        // sa.DrawFan(bossObj!.GameObjectId, ev.TargetId, 0, 6000, $"大地吐息扇形", 60f.DegToRad(), 0f, 80f, 0f, sa.Data.DefaultDangerColor.WithW(2f));
+        var bossObj = sa.GetByDataId(_shinryuParam.是幻巧战 ? 19934u : 8026u).First();
+        sa.DrawFan(bossObj!.GameObjectId, ev.TargetId, 0, 6000, $"大地吐息扇形", 60f.DegToRad(), 0f, 80f, 0f, sa.Data.DefaultDangerColor.WithW(2f));
         if (ev.TargetId != sa.Data.Me) return;
         var myIndex = sa.GetMyIndex();
         
@@ -208,7 +244,7 @@ public class UnrealShinryu
             <= 3 => "左上",
             _ => "右上"
         };
-        sa.Method.TextInfo($"{pos} 引导扇形", 4000);
+        sa.Method.TextInfo($"{pos} 引导扇形", 2500);
         sa.Method.TTS($"{pos} 引导扇形");
     }
     
@@ -218,7 +254,7 @@ public class UnrealShinryu
     public void 钻石星辰(Event ev, ScriptAccessory sa)
     {
         var myIndex = sa.GetMyIndex();
-        sa.Method.TextInfo($"ＡＯＥ，场中集合{(myIndex == 3 ? "，即将滑冰" : "")}", 4000, true);
+        sa.Method.TextInfo($"ＡＯＥ，场中集合{(myIndex == 3 ? "，即将滑冰" : "")}", 2500, true);
         sa.Method.TTS($"ＡＯＥ，场中集合{(myIndex == 3 ? "，即将滑冰" : "")}");
     }
     
@@ -227,7 +263,7 @@ public class UnrealShinryu
         userControl: true)]
     public void 大气爆发(Event ev, ScriptAccessory sa)
     {
-        sa.DrawKnockBack(sa.Data.Me, 0, 10000, $"大气爆发", 3f, 20f, sa.Data.DefaultDangerColor.WithW(2f));
+        sa.DrawKnockBack(Center1, 0, 10000, $"大气爆发", 3f, 20f, sa.Data.DefaultDangerColor.WithW(2f));
     }
     
     // 以太射线 9752 50292
@@ -245,7 +281,7 @@ public class UnrealShinryu
     public void 万亿斩击(Event ev, ScriptAccessory sa)
     {
         if (!sa.Data.MyObject!.IsTank()) return;
-        sa.Method.TextInfo($"死刑换Ｔ", 3000, true);
+        sa.Method.TextInfo($"死刑换Ｔ", 2500, true);
         sa.Method.TTS($"死刑换Ｔ");
     }
     
@@ -254,8 +290,30 @@ public class UnrealShinryu
         userControl: true)]
     public void 超新星P3(Event ev, ScriptAccessory sa)
     {
-        sa.Method.TextInfo($"集合，停止移动", 5000, true);
+        sa.Method.TextInfo($"集合，停止移动", 2500, true);
         sa.Method.TTS($"集合，停止移动");
+    }
+    
+    // 闪电P3 10016 50306
+    [ScriptMethod(name: "闪电（P3）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(10016|50306)$"],
+        userControl: true)]
+    public void 闪电P3(Event ev, ScriptAccessory sa)
+    {
+        sa.Method.TextInfo($"集合，保持移动", 2500, true);
+        sa.Method.TTS($"集合，保持移动");
+    }
+    
+    // 闪电旋风P3 10021 50309
+    [ScriptMethod(name: "闪电旋风（P3）", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(10021|50309)$"],
+        userControl: true)]
+    public void 闪电旋风P3(Event ev, ScriptAccessory sa)
+    {
+        if (MathTools.Debounce(ref 机制上次触发时间, 500))
+        {
+            sa.Method.TextInfo($"快躲开！", 2500, true);
+            sa.Method.TTS($"快躲开！");
+        };
+        sa.DrawCircle(ev.EffectPosition, 0, 3000, $"闪电旋风", 5f, sa.Data.DefaultDangerColor.WithW(2f));
     }
     
     // 神龙啸月环 9800 50293
@@ -270,6 +328,7 @@ public class UnrealShinryu
     private class ShinryuParams
     {
         public int 放尾巴次数 = 0;
+        public int 火焰链次数 = 0;
         public bool 绿色地板裂纹 = false;
         public int 死亡轮回次数 = 0;
         public bool 是幻巧战 = false;
@@ -277,6 +336,7 @@ public class UnrealShinryu
         public void Reset(ScriptAccessory sa)
         {
             放尾巴次数 = 0;
+            火焰链次数 = 0;
             绿色地板裂纹 = false;
             死亡轮回次数 = 0;
             是幻巧战 = false;
@@ -422,6 +482,14 @@ internal static class MathTools
         return ((int)Math.Floor(rad / sepRad) + baseRegionIdx + regionNum) % regionNum;
     }
 
+    public static bool Debounce(ref long lastTick, int delayMs = 1000)
+    {
+        long tickCount64 = Environment.TickCount64;
+        if (tickCount64 - lastTick < delayMs)
+            return false;
+        lastTick = tickCount64;
+        return true;
+    }
 }
 
 #endregion 计算函数
