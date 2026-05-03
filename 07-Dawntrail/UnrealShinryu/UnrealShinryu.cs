@@ -35,14 +35,12 @@ public class UnrealShinryu
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复大气爆发击退方向错误的问题
-         2. 增加地狱之火焰站水坑安全区提示
-         3. 增加火焰链提示
-         4. 增加 P3 闪电吹雪组合技提示
+         1. 增加 P1 超新星站水坑安全区提示
+         2. 增加 P1 螺旋冲锋危险区提示（怎么压不掉？）
          """;
 
     private const string Name = "Shinryu-Ur [神龙幻巧战]";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private const bool Debugging = false;
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
@@ -220,9 +218,10 @@ public class UnrealShinryu
     }
     
     // 地狱之火炎 9722 50262
-    [ScriptMethod(name: "地狱之火炎", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9722|50262)$"],
+    // 超新星 9704 50244
+    [ScriptMethod(name: "地狱之火炎与超新星", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9722|50262)$"],
         userControl: true)]
-    public void 地狱之火炎(Event ev, ScriptAccessory sa)
+    public void 地狱之火炎与超新星(Event ev, ScriptAccessory sa)
     {
         var sinks = sa.GetByDataId(2004237);
         foreach (var sink in sinks)
@@ -264,6 +263,14 @@ public class UnrealShinryu
     public void 大气爆发(Event ev, ScriptAccessory sa)
     {
         sa.DrawKnockBack(Center1, 0, 10000, $"大气爆发", 3f, 20f, sa.Data.DefaultDangerColor.WithW(2f));
+    }
+    
+    // 螺旋冲锋 9731 50271
+    [ScriptMethod(name: "螺旋冲锋", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(9731|50271)$"],
+        userControl: true)]
+    public void 螺旋冲锋(Event ev, ScriptAccessory sa)
+    {
+        sa.DrawRect(ev.SourceId, 0, 6000, $"螺旋冲锋", 0, 60, 100, sa.Data.DefaultDangerColor.WithW(1.5f));
     }
     
     // 以太射线 9752 50292

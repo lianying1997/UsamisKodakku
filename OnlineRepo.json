@@ -226,12 +226,12 @@
   {
     "Name": "Shinryu-Ur [神龙幻巧战]",
     "Guid": "fcf45bf5-bb72-42f8-b918-4c4b779fb70c",
-    "Version": "0.0.0.2",
+    "Version": "0.0.0.3",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UnrealShinryu/UnrealShinryu.cs",
-    "Note": "0.0.0.2\r\n初版",
-    "UpdateInfo": "0.0.0.2\r\n1. 修复大气爆发击退方向错误的问题\r\n2. 增加地狱之火焰站水坑安全区提示\r\n3. 增加火焰链提示\r\n4. 增加 P3 闪电吹雪组合技提示",
+    "Note": "0.0.0.3\r\n初版",
+    "UpdateInfo": "0.0.0.3\r\n1. 增加 P1 超新星站水坑安全区提示\r\n2. 增加 P1 螺旋冲锋危险区提示（怎么压不掉？）",
     "TerritoryIds": [
       730,
       1372
