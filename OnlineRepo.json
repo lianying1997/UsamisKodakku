@@ -197,28 +197,14 @@
     ]
   },
   {
-    "Name": "Tsukuyomi-Ur [月读幻巧战]",
-    "Guid": "93036a00-ec46-4897-a97c-66ee03089e66",
-    "Version": "0.0.0.3",
-    "Author": "Usami",
-    "Repo": "",
-    "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UnrealTsukuyomi/UnrealTsukuyomi.cs",
-    "Note": "0.0.0.3\r\n初版，可用于极神/幻巧。",
-    "UpdateInfo": "0.0.0.3\r\n修复月下美人阶段宴会游乐指路错误问题。",
-    "TerritoryIds": [
-      779,
-      1318
-    ]
-  },
-  {
     "Name": "绝欧精装 Reborn",
     "Guid": "6272e52b-5500-4ff0-8634-dd15f2e3b25e",
-    "Version": "0.0.0.16",
+    "Version": "0.0.0.17",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/06-EndWalker/TopReborn/TopReborn.cs",
-    "Note": "v0.0.0.16\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
-    "UpdateInfo": "0.0.0.16\r\n1. 修复 P3 小电视，在无头标情况下不指路的问题。",
+    "Note": "v0.0.0.17\r\n修改自Karlin/Meva的脚本，\r\n谨慎使用特殊功能。",
+    "UpdateInfo": "0.0.0.17\r\n1. 修复小电视和 P5 一运的自动面向辅助在关闭“启用方法设置中带*的特殊功能”脚本全局设置项时，仍生效的问题。",
     "TerritoryIds": [
       1122
     ]

@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复 P3 小电视，在无头标情况下不指路的问题。
+         1. 修复小电视和 P5 一运的自动面向辅助在关闭“启用方法设置中带*的特殊功能”脚本全局设置项时，仍生效的问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.16";
+    private const string Version = "0.0.0.17";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -1849,6 +1849,7 @@ public class TopReborn
     public void P3B_小电视_自动面向辅助(Event ev, ScriptAccessory sa)
     {
         if (_parse != 3.1) return;
+        if (!SpecialMode) return;
         
         // 1. 判断进入条件
         _p3.小电视玩家面向记录.WaitOne();
@@ -2608,6 +2609,7 @@ public class TopReborn
     public void P5A1_一运_小电视自动面向辅助(Event ev, ScriptAccessory sa)
     {
         if (_parse != 5.1) return;
+        if (!SpecialMode) return;
         
         // 1. 判断进入条件
         int  myIndex  = sa.GetMyIndex();
