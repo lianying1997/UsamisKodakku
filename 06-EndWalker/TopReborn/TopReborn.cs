@@ -40,11 +40,11 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 修复小电视和 P5 一运的自动面向辅助在关闭“启用方法设置中带*的特殊功能”脚本全局设置项时，仍生效的问题。
+         1. 适配 P5 二运在女人击退踩塔时标点的指挥逻辑，以解决 P5 二运后半不指路的问题。
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.17";
+    private const string Version = "0.0.0.18";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -2888,13 +2888,19 @@ public class TopReborn
         var myKnockBackPos = basePos.RotateAndExtend(Center, rad);
         sa.DrawGuidance(myKnockBackPos, 0, 10000, $"P5B1_二运_踩塔击退点");
         sa.DrawLine(Center, 0, 0, 10000, $"P5B1_二运_踩塔击退指引线", rad, 20f, 20f, isSafe: true);
+
+        // 适配 BBY 的标点节奏，提前进入二运后半
+        _parse = 5.25;
+        _pd.Init(sa, "P5二传");
+        _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
+        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "P5B1_二运_踩塔位置提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31534)$"],
         userControl: true, suppress: 1000)]
     public void P5B1_二运_踩塔位置提示(Event ev, ScriptAccessory sa)
     {
-        if (_parse != 5.21) return;
+        if (_parse != 5.25) return;
         var text = _p5B.协作程序是远线 ? "站在场边将线拉长" : "站在塔中间";
         sa.Method.TextInfo(text, 3000);
     }
@@ -2903,20 +2909,20 @@ public class TopReborn
         userControl: Debugging)]
     public void P5B1_二运_踩塔击退后删除绘图(Event ev, ScriptAccessory sa)
     {
-        if (_parse != 5.21) return;
+        if (_parse != 5.25) return;
         sa.Method.RemoveDraw("P5B1_二运_踩塔.*");
         _p5B.塔方位记录完毕.Reset();
     }
     
-    [ScriptMethod(name: "P5B1_二运_塔消失转阶段", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["Operate:Remove", "DataId:regex:^(201324[56])$"],
+    [ScriptMethod(name: "P5B1_二运_塔消失转阶段（废弃）", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["Operate:Remove", "DataId:regex:^(201324[56])$"],
         userControl: Debugging, suppress: 1000)]
     public void P5B1_二运_塔消失转阶段(Event ev, ScriptAccessory sa)
     {
-        if (_parse != 5.21) return;
-        _parse = 5.25;
-        _pd.Init(sa, "P5二传");
-        _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
-        sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
+        // if (_parse != 5.25) return;
+        // _parse = 5.25;
+        // _pd.Init(sa, "P5二传");
+        // _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
+        // sa.DebugMsg($"当前阶段为：{_parse}", Debugging);
     }
     
     [ScriptMethod(name: "———————— 《P5B2 二传》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
