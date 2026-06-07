@@ -47,7 +47,7 @@ public class UDM_P3
     private const string Version = "0.0.0.1";
     private const string DebugVersion = "a";
 
-    private const bool Debugging = true;
+    private const bool Debugging = false;
 
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
@@ -932,7 +932,7 @@ internal class PriorityDict
 #region 参数容器类
 internal class UDMP3Params
 {
-    public bool Debugging = true;
+    public bool Debugging = false;
     
     public int 当前阶段 = 0;
     public bool 是长火 = false;
