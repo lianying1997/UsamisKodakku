@@ -64,7 +64,7 @@ public class UDM_P3
     public bool SpecialMode { get; set; } = false;
     
     [UserSetting("P3A1 - 一运深层痛楚策略")]
-    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB_相反水晶;
+    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB_纯固定;
     public enum BoAStgEnum
     {
         TLB_纯固定,
