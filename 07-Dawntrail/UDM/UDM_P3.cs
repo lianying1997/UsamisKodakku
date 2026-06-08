@@ -1889,7 +1889,7 @@ internal static class MarkerHelper
 
 internal static class DebugFunction
 {
-    public static void DebugMsg(this ScriptAccessory sa, string msg, bool enable = true, bool showInChatBox = true)
+    public static void DebugMsg(this ScriptAccessory sa, string msg, bool enable = false, bool showInChatBox = false)
     {
         if (!enable) return;
         sa.Log.Debug(msg);
