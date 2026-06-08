@@ -35,19 +35,22 @@ public class UDM_P3
         {Version}
         目前一运（到麻将）
         - 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位
-        - TLB逃课固定式：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊
+        - TLB_相反水晶：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊
+        - TLB_纯固定：无视水晶，近战贴 Boss，远程远离于两水晶分组
         特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线
         """;
     
     const string UpdateInfo =
         $"""
         {Version}
-        1. 参数漏了哎哎
+        1. 策略名字有更改，具体见脚本说明
+        2. 增加一运策略 TLB_纯固定
+        3. 增加选项 拉艾克斯迪司的是 MT，默认关闭
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.4";
-    private const string DebugVersion = "a";
+    private const string Version = "0.0.0.5";
+    private const string DebugVersion = "b";
 
     private const bool Debugging = false;
 
@@ -60,22 +63,27 @@ public class UDM_P3
     public bool SpecialMode { get; set; } = false;
     
     [UserSetting("P3A1 - 一运深层痛楚策略")]
-    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB逃课固定式;
+    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB_相反水晶;
     public enum BoAStgEnum
     {
-        TLB逃课固定式,
+        TLB_纯固定,
+        TLB_相反水晶,
         正攻,
     }
+
+    [UserSetting("P3A1 - 拉艾克斯迪司的是 MT")]
+    public bool ExDeathMT { get; set; } = false;
     
     public void Init(ScriptAccessory sa)
     {
         sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.");
         _udmP3Param.Reset(sa);
         sa.Method.RemoveDraw(".*");
+        sa.Method.ClearFrameworkUpdateAction(this);
     }
     
     [ScriptMethod(name: "———————— 《测试项》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: true)]
+        userControl: Debugging)]
     public void 测试项分割线(Event ev, ScriptAccessory sa)
     {
     }
@@ -125,7 +133,7 @@ public class UDM_P3
         _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
         
-        sa.DebugMsg($"[测试项：一运赋值] 赋值完毕");
+        sa.DebugMsg($"[测试项：一运赋值] 赋值完毕", Debugging);
     }
     
     [ScriptMethod(name: "测试项：究极冲击波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -137,7 +145,7 @@ public class UDM_P3
         _udmP3Param.究极冲击波为顺时针 = false;
         _udmP3Param.究极冲击波记录完毕 = true;
         _pd.AddPriorities([7000, 8000, 2000, 1000, 4000, 3000, 5000, 6000]);
-        sa.DebugMsg($"[测试项：究极冲击波赋值] 赋值完毕");
+        sa.DebugMsg($"[测试项：究极冲击波赋值] 赋值完毕", Debugging);
     }
     
     [ScriptMethod(name: "测试项：测试TTS", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -148,10 +156,18 @@ public class UDM_P3
         sa.Method.TextInfo($"{needBack} 吃火月环", 3000);
         sa.Method.TTS($"{needBack}吃火月环", 2);
     }
+    
+    [ScriptMethod(name: "测试项：画近远钢铁月环", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 画近远钢铁月环(Event ev, ScriptAccessory sa)
+    {
+        DrawNearCircle(sa, sa.Data.DefaultDangerColor, 2000);
+        DrawNearDonut(sa, sa.Data.DefaultDangerColor, 2000);
+    }
         
     
     [ScriptMethod(name: "———————— 《P3》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: true)]
+        userControl: Debugging)]
     public void P3_分割线(Event ev, ScriptAccessory sa)
     {
     }
@@ -164,7 +180,7 @@ public class UDM_P3
         sa.Log.Debug($"当前阶段为：P3 重构 {_udmP3Param.当前阶段}");
     }
     
-    [ScriptMethod(name: "———————— 《P3A 深层痛楚》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    [ScriptMethod(name: "=============《P3A 深层痛楚》=============", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: true)]
     public void P3A_分割线(Event ev, ScriptAccessory sa)
     {
@@ -177,7 +193,7 @@ public class UDM_P3
         _pd.Init(sa, "P3一运");
         _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
         _udmP3Param.当前阶段 = 3100;
-        sa.Log.Debug($"当前阶段为：P3 一运 深层痛楚 {_udmP3Param.当前阶段}");
+        sa.DebugMsg($"当前阶段为：P3 一运 深层痛楚 {_udmP3Param.当前阶段}", Debugging);
     }
 
     
@@ -304,11 +320,11 @@ public class UDM_P3
         var myIndex = sa.GetMyIndex();
         
         // 艾克斯迪司 ST 无水晶
-        if (myIndex == 1)
-            执行P3拉怪指路逻辑(sa, false, _udmP3Param.无水晶方位, 6500, false);
+        if (myIndex == (ExDeathMT ? 0 : 1))
+            执行P3拉怪指路逻辑(sa, isChaos: false, _udmP3Param.无水晶方位, 6500, false);
         // 卡奥斯 MT 正攻场中，逃课风水晶
-        else if (myIndex == 0)
-            执行P3拉怪指路逻辑(sa, true, _udmP3Param.风水晶方位, 6500, BoAStg == BoAStgEnum.正攻);
+        else if (myIndex == (ExDeathMT ? 1 : 0))
+            执行P3拉怪指路逻辑(sa, isChaos: true, _udmP3Param.风水晶方位, 6500, BoAStg == BoAStgEnum.正攻);
 
         await Task.Delay(8000);
         执行水火指路逻辑(sa, _udmP3Param.一水火指路与绘图时间);
@@ -349,25 +365,118 @@ public class UDM_P3
         var myIndex = sa.GetMyIndex();
         var myPriVal = _pd.Priorities[myIndex];
         var crystalPos = new Vector3(109.9f, 0, 109.9f);
-        
-        var windIndex = _udmP3Param.查询组序(_udmP3Param.风组, myIndex);
-        if (windIndex >= 0)
+
+        if (BoAStg != BoAStgEnum.TLB_纯固定)
         {
-            DrawWindGuideWf(sa, crystalPos, windIndex, destroyTime);
-            return;
+            var windIndex = _udmP3Param.查询组序(_udmP3Param.风组, myIndex);
+            if (windIndex >= 0)
+            {
+                DrawWindGuideWf(sa, crystalPos, windIndex, destroyTime);
+                return;
+            }
+
+            var waterIndex = _udmP3Param.查询组序(_udmP3Param.水组, myIndex);
+            if (waterIndex >= 0)
+            {
+                DrawWaterGuideWf(sa, crystalPos, waterIndex, myPriVal, destroyTime);
+                return;
+            }
+
+            var fireIndex = _udmP3Param.查询组序(_udmP3Param.火组, myIndex);
+            if (fireIndex >= 0)
+            {
+                DrawFireGuideWf(sa, crystalPos, fireIndex, myPriVal, destroyTime);
+            }
         }
-        
-        var waterIndex = _udmP3Param.查询组序(_udmP3Param.水组, myIndex);
-        if (waterIndex >= 0)
+        else
         {
-            DrawWaterGuideWf(sa, crystalPos, waterIndex, myPriVal, destroyTime);
-            return;
+            DrawStaticGuideWf(sa, crystalPos, destroyTime);
+            DrawStaticGuideLineCrystal(sa, crystalPos, destroyTime);
         }
-        
-        var fireIndex = _udmP3Param.查询组序(_udmP3Param.火组, myIndex);
-        if (fireIndex >= 0)
+
+    }
+
+    private void DrawStaticGuideWf(ScriptAccessory sa, Vector3 crystalPos, int destroyTime)
+    {
+        var myIndex = sa.GetMyIndex();
+        float angleBias = myIndex switch
         {
-            DrawFireGuideWf(sa, crystalPos, fireIndex, myPriVal, destroyTime);
+            0 => -135f,
+            1 => 135f,
+            4 => -45f,
+            5 => 45f,
+            2 => -30f,
+            3 => 30f,
+            6 => -75f,
+            7 => 75f
+        };
+        bool isMelee = (myIndex % 4) <= 1;
+        var basePos = crystalPos.RotateAndExtend(Center, 0, isMelee ? -4f : -14.5f);
+        var guidePos = basePos.RotateAndExtend(crystalPos, angleBias.DegToRad());
+
+        // 检查近战组是否有水 Buff，且该轮为水，则站脚下等月环
+        if (!_udmP3Param.当前轮为火() && _udmP3Param.水组有近战(sa) && isMelee)
+        {
+            guidePos = crystalPos;
+            sa.Method.TextInfo($"集合放月环", 6000);
+            sa.Method.TTS($"集合放月环", 3);
+        }
+        else
+        {
+            sa.Method.TextInfo($"避开钢铁月环", 6000);
+            sa.Method.TTS($"避开钢铁月环", 3);
+        }
+
+        if (_udmP3Param.当前轮为火())
+        {
+            DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, 5, destroyTime);
+            DrawNearDonut(sa, sa.Data.DefaultDangerColor, destroyTime + 3000);
+        }
+        else
+        {
+            DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultDangerColor, destroyTime);
+            DrawNearCircle(sa, sa.Data.DefaultDangerColor, destroyTime + 3000);
+        }
+
+        guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.风水晶方位);
+        sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawStaticGuideWf 指路", sa.Data.DefaultSafeColor);
+    }
+
+    private void DrawStaticGuideLineCrystal(ScriptAccessory sa, Vector3 crystalPos, int destroyTime)
+    {
+        var myIndex = sa.GetMyIndex();
+        bool isMelee = (myIndex % 4) <= 1;
+        var realCrystalPos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.风水晶方位);
+        var baseRadian = 180f.DegToRad() + realCrystalPos.GetRadian(Center);
+        if (isMelee)
+        {
+            List<float> biasDeg = [-135, 135, -45, 45];
+            for (int i = 0; i < 4; i++)
+            {
+                var dp = sa.DrawLine(realCrystalPos, 0, 0, destroyTime, $"DrawStaticGuideLine 指引线{i}",
+                    baseRadian + biasDeg[i].DegToRad(), 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
+                dp.Color = i switch
+                {
+                    0 or 1 => new Vector4(0.1f, 0.1f, 1f, 1),   // Tank
+                    _ => new Vector4(1, 0.1f, 0.1f, 1),         // DPS
+                };
+                sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+            }
+        }
+        else
+        {
+            List<float> biasDeg = [-30, 30, -75, 75];
+            for (int i = 0; i < 4; i++)
+            {
+                var dp = sa.DrawLine(realCrystalPos, 0, 0, destroyTime, $"DrawStaticGuideLine 指引线{i}",
+                    baseRadian + biasDeg[i].DegToRad(), 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
+                dp.Color = i switch
+                {
+                    0 or 1 => new Vector4(0.1f, 1f, 0.1f, 1),   // Healer
+                    _ => new Vector4(1, 0.1f, 0.1f, 1),         // DPS
+                };
+                sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+            }
         }
     }
 
@@ -375,15 +484,15 @@ public class UDM_P3
     {
         List<float> angleBias = [-30, -15, 15, 30];
 
-        // TLB逃课固定式无需分摊站位
+        // TLB相反水晶无需分摊站位
         var guidePos = crystalPos.RotateAndExtend(Center, BoAStg == BoAStgEnum.正攻 ? angleBias[windIndex].DegToRad() : 0);
 
         guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.风水晶方位);
         sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawWindGuideWf 风组指路", sa.Data.DefaultSafeColor);
 
         var dir = windIndex >= 2 ? "右" : "左";
-        sa.Method.TextInfo(BoAStg == BoAStgEnum.正攻 ? $"面向场中，前往 风水晶{dir} 吃分摊": $"前往 风水晶", 6000);
-        sa.Method.TTS(BoAStg == BoAStgEnum.正攻 ? $"前往 风水晶{dir} 吃分摊": $"前往风水晶", 3);
+        sa.Method.TextInfo(BoAStg == BoAStgEnum.正攻 ? $"面向场中，前往 风水晶{dir} 吃分摊" : $"前往 风水晶", 6000);
+        sa.Method.TTS(BoAStg == BoAStgEnum.正攻 ? $"前往 风水晶{dir} 吃分摊" : $"前往风水晶", 3);
     }
 
     private void DrawWaterGuideWf(ScriptAccessory sa, Vector3 crystalPos, int waterIndex, int myPriVal, int destroyTime)
@@ -519,6 +628,32 @@ public class UDM_P3
             sa.DrawDonut(sa.Data.PartyList[group[i].Key], 0, destroyTime, $"{name}月环{i + 1}", 10, 5, color);
     }
 
+    private void DrawNearCircle(ScriptAccessory sa, Vector4 color, int destroyTime)
+    {
+        var crystalPos = new Vector3(109.9f, 0, 109.9f);
+        crystalPos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.水水晶方位);
+
+        for (int i = 0; i < 2; i++)
+        {
+            var dp = sa.DrawCircle(crystalPos, 0, destroyTime, $"DrawNearCircle 水水晶钢铁{i + 1}", 5f, color, draw: false);
+            dp.SetOwnersDistanceOrder(true, (uint)(i + 1));
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+        }
+    }
+
+    private void DrawNearDonut(ScriptAccessory sa, Vector4 color, int destroyTime)
+    {
+        var crystalPos = new Vector3(109.9f, 0, 109.9f);
+        crystalPos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.火水晶方位);
+        
+        for (int i = 0; i < 2; i++)
+        {
+            var dp = sa.DrawDonut(crystalPos, 0, destroyTime, $"DrawNearCircle 火水晶月环{i + 1}", 10f, 5f, color, draw: false);
+            dp.SetOwnersDistanceOrder(true, (uint)(i + 1));
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Donut, dp);
+        }
+    }
+
     private void DrawGroupConnection(
         ScriptAccessory sa, List<KeyValuePair<int, int>> group, string name, Vector4 color, int destroyTime)
     {
@@ -555,17 +690,17 @@ public class UDM_P3
         if (_udmP3Param.当前阶段 < 3101) return;
         _udmP3Param.当前阶段 = 3102;
 
-        if (sa.GetMyIndex() == 1)
+        if (sa.GetMyIndex() == (ExDeathMT ? 0 : 1))
         {
             if (BoAStg == BoAStgEnum.正攻) return;
-            执行P3拉怪指路逻辑(sa, false, _udmP3Param.风水晶方位, 4000, false);
+            执行P3拉怪指路逻辑(sa, isChaos: false, _udmP3Param.风水晶方位, 4000, false);
             sa.DebugMsg($"[P3A_暴雷死刑后_拉Boss提示] 暴雷死刑结束，ST 拉艾克斯迪司");
         }
 
-        if (sa.GetMyIndex() == 0)
+        if (sa.GetMyIndex() == (ExDeathMT ? 1 : 0))
         {
             if (BoAStg != BoAStgEnum.正攻) return;
-            执行P3拉怪指路逻辑(sa, true, 0, 4000, true);
+            执行P3拉怪指路逻辑(sa, isChaos: true, 0, 4000, true);
             sa.DebugMsg($"[P3A_暴雷死刑后_拉Boss提示] 暴雷死刑结束，MT 拉卡奥斯");
         }
     }
@@ -581,15 +716,15 @@ public class UDM_P3
         
         // 第一轮
         sa.DrawFan(ev.SourceId, 0, 5000, $"第一轮前左", 90f.DegToRad(), (先打左右 ? 90f : 0f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(1.5f));
+            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
         sa.DrawFan(ev.SourceId, 0, 5000, $"第一轮后右", 90f.DegToRad(), (先打左右 ? -90f : 180f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(1.5f));
+            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
         
         // 第二轮
         sa.DrawFan(ev.SourceId, 5000, 2500, $"第二轮前左", 90f.DegToRad(), (!先打左右 ? 90f : 0f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(1.5f));
+            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
         sa.DrawFan(ev.SourceId, 5000, 2500, $"第二轮后右", 90f.DegToRad(), (!先打左右 ? -90f : 180f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(1.5f));
+            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
     }
     
     #endregion P3A1 暴雷死刑 3101 3102
@@ -687,11 +822,14 @@ public class UDM_P3
     {
         if (_udmP3Param.当前阶段 < 3111) return;
         sa.DebugMsg($"[P3A_真空波] 开始", Debugging);
-
+        
         if (BoAStg == BoAStgEnum.正攻)
             执行真空波正攻指路逻辑(sa);
-        else if (BoAStg == BoAStgEnum.TLB逃课固定式)
-            执行真空波逃课指路逻辑(sa);
+        else
+            // 两种逃课都是执行固定站位逻辑
+            执行真空波相反水晶指路逻辑(sa);
+        
+        DrawStaticGuideLineVw(sa, _udmP3Param.真空波指路时间);
     }
     
     [ScriptMethod(name: "P3A_真空波后分摊", eventType: EventTypeEnum.ActionEffect,
@@ -700,7 +838,17 @@ public class UDM_P3
     {
         if (_udmP3Param.当前阶段 < 3111) return;
         sa.DebugMsg($"[P3A_真空波] 击退后分摊", Debugging);
-        DrawGroupCircle(sa, _udmP3Param.风组, "P3A_真空波后分摊", sa.Data.DefaultSafeColor, 6, 4000);
+        
+        if (BoAStg == BoAStgEnum.正攻)
+            DrawGroupCircle(sa, _udmP3Param.风组, "P3A_真空波后分摊", sa.Data.DefaultSafeColor, 6, 4000);
+        else
+        {
+            var myIndex = sa.GetMyIndex();
+            List<int> partner = [2, 3, 0, 1];
+            for (var i = 0; i < 4; i++)
+                sa.DrawCircle(sa.Data.PartyList[i + (myIndex < 4 ? 4 : 0)], 0, 4000, $"真空波分摊 {i}", 6,
+                    i == partner[myIndex] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor);
+        }
     }
     
     private void 执行真空波正攻指路逻辑(ScriptAccessory sa)
@@ -766,29 +914,47 @@ public class UDM_P3
         sa.Method.TTS($"防击退，然后与搭档分摊", 3);
     }
 
-    private void 执行真空波逃课指路逻辑(ScriptAccessory sa)
+    private void 执行真空波相反水晶指路逻辑(ScriptAccessory sa)
     {
         var myIndex = sa.GetMyIndex();
 
         // 根据 role 固定站位
-        List<float> angleBias = [60, -60, 20, -20, 20, -20, 60, -60];
+        List<float> angleBias = [-60, 60, -20, 20, -20, 20, -60, 60];
         Vector3 bossPos = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司).Position;
         var basePos = bossPos.RotateAndExtend(Center, 0, -3.8f);
         var guidePos = basePos.RotateAndExtend(bossPos, angleBias[myIndex].DegToRad());
-        sa.DrawGuidance(guidePos, 0, _udmP3Param.真空波指路时间, $"执行真空波逃课指路逻辑 指路", sa.Data.DefaultSafeColor);
+        sa.DrawGuidance(guidePos, 0, _udmP3Param.真空波指路时间, $"执行真空波相反水晶指路逻辑 指路", sa.Data.DefaultSafeColor);
 
         // 面向指示
         var myPriVal = _pd.Priorities[myIndex];
         var needBack = _udmP3Param.需要背对(myPriVal);
         var needBackStr = needBack ? "背对" : "面向";
-        DrawFacingArrow(sa, 0, false, $"执行真空波逃课指路逻辑 面向辅助自身", _udmP3Param.真空波指路时间);
+        DrawFacingArrow(sa, 0, false, $"执行真空波相反水晶指路逻辑 面向辅助自身", _udmP3Param.真空波指路时间);
 
-        var dp = sa.DrawLine(sa.Data.Me, _udmP3Param.ObjectId_艾克斯迪司, 0, _udmP3Param.真空波指路时间, $"执行真空波逃课指路逻辑 面向辅助正确面向",
+        var dp = sa.DrawLine(sa.Data.Me, _udmP3Param.ObjectId_艾克斯迪司, 0, _udmP3Param.真空波指路时间, $"执行真空波相反水晶指路逻辑 面向辅助正确面向",
             needBack ? 180f.DegToRad() : 0, 1f, 4.5f, sa.Data.DefaultSafeColor, draw: false);
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
 
         sa.Method.TextInfo($"目标圈内 {needBackStr} 艾克斯迪司 击退", 4000);
         sa.Method.TTS($"{needBackStr}Boss击退", 3);
+    }
+    
+    private void DrawStaticGuideLineVw(ScriptAccessory sa, int destroyTime)
+    {
+        var myIndex = sa.GetMyIndex();
+        var crystalPos = new Vector3(109.9f, 0, 109.9f);
+        var realCrystalPos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.风水晶方位);
+        var baseRadian = 180f.DegToRad() + realCrystalPos.GetRadian(Center);
+        
+        List<float> biasDeg = [-20, 20, -60, 60];
+        List<int> partner = [2, 3, 0, 1];
+        for (int i = 0; i < 4; i++)
+        {
+            var dp = sa.DrawLine(realCrystalPos, 0, 0, destroyTime, $"DrawStaticGuideLineVw 指引线{i}",
+                baseRadian + biasDeg[i].DegToRad(), 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
+            dp.Color = i == partner[myIndex % 4] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor;
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+        }
     }
 
     #endregion P3A1 真空波 3111
@@ -1076,6 +1242,10 @@ internal class UDMP3Params
     public int 一水火指路与绘图时间 = 10000;
     public int 二水火指路与绘图时间 = 9000;
     public int 真空波指路时间 = 7000;
+    
+    public string 近钢铁Framework = "";
+    public string 近月环Framework = "";
+    
     public void Reset(ScriptAccessory sa)
     {
         当前阶段 = 0;
@@ -1096,8 +1266,19 @@ internal class UDMP3Params
         一运状态记录 = new(false);
         一运水晶记录 = new(false);
         一水火准备 = new(false);
+        
+        火组 = new();
+        水组 = new();
+        风组 = new();
             
         一水火指路与绘图时间 = 10000;
+        二水火指路与绘图时间 = 9000;
+        真空波指路时间 = 7000;
+        
+        sa.Method.UnregistFrameworkUpdateAction(近钢铁Framework);
+        近钢铁Framework = "";
+        sa.Method.UnregistFrameworkUpdateAction(近月环Framework);
+        近月环Framework = "";
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
@@ -1156,9 +1337,18 @@ internal static class P3AExtension
         var center = new Vector3(100, 0, 100);
         return basePos.RotateAndExtend(center, (crystalRegion * 90f).DegToRad());
     }
-    
+
     public static int 查询组序(this UDMP3Params prm, List<KeyValuePair<int, int>> group, int myIndex)
         => group.FindIndex(kvp => kvp.Key == myIndex);
+
+    public static bool 水组有近战(this UDMP3Params prm, ScriptAccessory sa)
+    {
+        bool result = false;
+        foreach (var kvp in prm.水组)
+            result |= kvp.Key % 4 <= 1;
+        prm.Dbg(sa, $"水组 {(result ? "有" : "无")} 近战");
+        return result;
+    }
 }
     
 #endregion 参数容器类
@@ -2021,4 +2211,3 @@ internal static class SpecialFunction
 #endregion 特殊函数
 
 #endregion 函数集
-

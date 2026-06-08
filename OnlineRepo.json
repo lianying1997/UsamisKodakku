@@ -226,12 +226,12 @@
   {
     "Name": "绝妖星乱舞_P3",
     "Guid": "c902dd56-629e-4033-a77f-fb23b8d94745",
-    "Version": "0.0.0.4",
+    "Version": "0.0.0.5",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UDM/UDM_P3.cs",
-    "Note": "0.0.0.4\r\n目前一运（到麻将）\r\n- 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位\r\n- TLB逃课固定式：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊\r\n特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线",
-    "UpdateInfo": "0.0.0.4\r\n1. 参数漏了哎哎",
+    "Note": "0.0.0.5\r\n目前一运（到麻将）\r\n- 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位\r\n- TLB_相反水晶：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊\r\n- TLB_纯固定：无视水晶，近战贴 Boss，远程远离于两水晶分组\r\n特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线",
+    "UpdateInfo": "0.0.0.5\r\n1. 策略名字有更改，具体见脚本说明\r\n2. 增加一运策略 TLB_纯固定\r\n3. 增加选项 拉艾克斯迪司的是 MT，默认关闭",
     "TerritoryIds": [
       1363
     ]
