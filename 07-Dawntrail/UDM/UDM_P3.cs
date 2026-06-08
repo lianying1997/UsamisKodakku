@@ -43,11 +43,12 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复一运麻将 8 没有指路的 Bug
+        1. P3 二运黑洞指挥模式
+        2. 修复究极冲击波部分情况下顺逆时针判断错误
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.8";
+    private const string Version = "0.0.0.9";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -72,11 +73,15 @@ public class UDM_P3
     [UserSetting("P3A1 - 拉艾克斯迪司的是 MT")]
     public bool ExDeathMT { get; set; } = false;
     
+    [UserSetting("P3B1 - 指挥模式")]
+    public bool P3B1CaptainMode { get; set; } = false;
+    
     public void Init(ScriptAccessory sa)
     {
         sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.");
         _udmP3Param.Reset(sa);
         sa.Method.RemoveDraw(".*");
+        sa.Method.MarkClear();
         sa.Method.ClearFrameworkUpdateAction(this);
     }
     
@@ -106,11 +111,12 @@ public class UDM_P3
         sa.DebugMsg($"{_udmP3Param.当前轮为火()}", Debugging);
     }
 
-    [ScriptMethod(name: "测试项：初始化参数", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    [ScriptMethod(name: "测试项：初始化参数与本地标点", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
-    public void 初始化参数(Event ev, ScriptAccessory sa)
+    public void 初始化参数与本地标点(Event ev, ScriptAccessory sa)
     {
         _udmP3Param.Reset(sa);
+        sa.MarkClear(local: true);
     }
 
     [ScriptMethod(name: "测试项：一运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -161,6 +167,20 @@ public class UDM_P3
     {
         DrawNearCircle(sa, sa.Data.DefaultDangerColor, 2000);
         DrawNearDonut(sa, sa.Data.DefaultDangerColor, 2000);
+    }
+    
+    [ScriptMethod(name: "测试项：二运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 二运赋值(Event ev, ScriptAccessory sa)
+    {
+        _pd.Init(sa, "P3二运");
+        _udmP3Param.当前阶段 = 3200;
+
+        _pd.AddPriorities([37, 28, 21, 12, 33, 24, 15, 16]);
+        _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
+        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
+        
+        sa.DebugMsg($"[测试项：二运赋值] 赋值完毕", Debugging);
     }
         
     
@@ -270,6 +290,15 @@ public class UDM_P3
         var dp = sa.DrawCircle(ev.SourceId, 0, 5000, $"靠近死刑", 5f, sa.Data.DefaultDangerColor.WithW(2f), draw: false);
         dp.SetOwnersDistanceOrder(true, 1);
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+    
+    [ScriptMethod(name: "P3A_暴雷死刑通用提示", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:47881"], userControl: true)]
+    public void P3A_暴雷死刑通用提示(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 <= 3101) return;
+        sa.Method.TextInfo($"艾克斯迪司 靠近死刑", 3000);
+        sa.Method.TTS($"艾克斯迪司 靠近死刑", 3);
     }
     
     [ScriptMethod(name: "P3A_经纬聚爆", eventType: EventTypeEnum.StartCasting,
@@ -991,14 +1020,11 @@ public class UDM_P3
         {
             sa.DebugMsg($"[P3A_究极冲击波方位记录] 第二轮方位 {region}", Debugging);
             
-            if (region < _udmP3Param.究极冲击波起始方位 && region != 0)
-                _udmP3Param.究极冲击波为顺时针 = true;
-            else if (region == 0)
-                _udmP3Param.究极冲击波为顺时针 = _udmP3Param.究极冲击波起始方位 == 7;
-            else
-                _udmP3Param.究极冲击波为顺时针 = false;
-            
+            int delta = (region - _udmP3Param.究极冲击波起始方位 + 8) % 8;
+            // 7 为顺时针，1 为逆时针
+            _udmP3Param.究极冲击波为顺时针 = delta == 7;
             _udmP3Param.究极冲击波记录完毕 = true;
+            
             // 用面向计算的起始方位可直接作为终点，顺逆时针需要转换
             sa.DebugMsg($"[P3A_究极冲击波方位记录] 为 {(_udmP3Param.究极冲击波为顺时针 ? "顺" : "逆")} 时针", Debugging);
         }
@@ -1022,7 +1048,7 @@ public class UDM_P3
         };
         var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
         _pd.AddPriority(playerIdx, priVal);
-        sa.DebugMsg($"[P3A_究极冲击波麻将记录] {Role[playerIdx]} 被点 {priVal / 1000}");
+        sa.DebugMsg($"[P3A_究极冲击波麻将记录] {Role[playerIdx]} 被点 {priVal / 1000}", Debugging);
     }
     
     [ScriptMethod(name: "P3A_究极冲击波指路", eventType: EventTypeEnum.ActionEffect,
@@ -1030,10 +1056,10 @@ public class UDM_P3
     public void P3A_究极冲击波指路(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
-        sa.DebugMsg($"[P3A_究极冲击波指路] 风分摊结束，从方位 {_udmP3Param.究极冲击波起始方位} {(_udmP3Param.究极冲击波为顺时针 ? "逆" : "顺")} 开始");
+        sa.DebugMsg($"[P3A_究极冲击波指路] 风分摊结束，从方位 {_udmP3Param.究极冲击波起始方位} {(_udmP3Param.究极冲击波为顺时针 ? "逆" : "顺")} 开始", Debugging);
         var priVal = _pd.Priorities[sa.GetMyIndex()];
         var num = priVal.GetDecimalDigit(3);
-        sa.DebugMsg($"[P3A_究极冲击波指路] 玩家被点麻将 {priVal.GetDecimalDigit(3)}");
+        sa.DebugMsg($"[P3A_究极冲击波指路] 玩家被点麻将 {priVal.GetDecimalDigit(3)}", Debugging);
         if (num == 0) return;
 
         // 顺则逆转
@@ -1041,7 +1067,7 @@ public class UDM_P3
         var basePos = new Vector3(100, 0, 119.5f).RotateAndExtend(Center,
             baseRotDeg.DegToRad());
         var guidePos = basePos.RotateAndExtend(Center, 45f.DegToRad() * (num - 1) * (_udmP3Param.究极冲击波为顺时针 ? 1 : -1));
-        sa.DrawGuidance(guidePos, 0, 6000, $"P3A_究极冲击波指路", sa.Data.DefaultSafeColor);
+        sa.DrawGuidance(guidePos, 0, 12000, $"P3A_究极冲击波指路", sa.Data.DefaultSafeColor);
     }
     
     #endregion P3A1 究极冲击波 3111
@@ -1049,7 +1075,7 @@ public class UDM_P3
     #region P3B 地震 通用部分
 
     [ScriptMethod(name: "=============《P3B 地震》=============", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
+        userControl: true)]
     public void P3B_分割线(Event ev, ScriptAccessory sa)
     {
     }
@@ -1059,12 +1085,86 @@ public class UDM_P3
     public void P3A_二运分P_地震(Event ev, ScriptAccessory sa)
     {
         _pd.Init(sa, "P3二运");
-        _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
+        // 尽可能让坦克不参与第一轮黑洞
+        _pd.AddPriorities([7, 8, 3, 4, 5, 6, 7, 8]);
         _udmP3Param.当前阶段 = 3200;
+        sa.Method.MarkClear();
         sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
     }
 
     #endregion P3B 地震 通用部分
+    
+    #region P3B1 黑洞 3200
+    
+    [ScriptMethod(name: "=============《P3B1 黑洞》=============", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: true)]
+    public void P3B1_分割线(Event ev, ScriptAccessory sa)
+    {
+    }
+    
+    [ScriptMethod(name: "P3B1_状态添加记录", eventType: EventTypeEnum.StatusAdd,
+        eventCondition: ["StatusID:regex:^(300[456])$", "SourceId:E0000000"],
+        userControl: Debugging)]
+    public void P3B_状态添加(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3200) return;
+        const uint 第一目标 = 3004;
+        const uint 第二目标 = 3005;
+        const uint 第三目标 = 3006;
+        
+        var statusId = ev.StatusId;
+        var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+        var priVal = ev.StatusId switch
+        {
+            第一目标 => 10,
+            第二目标 => 20,
+            第三目标 => 30,
+            _ => 0
+        };
+        
+        _pd.AddPriority(playerIdx, priVal);
+        _udmP3Param.二运状态记录次数++;
+        sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
+
+        if (_udmP3Param.二运状态记录完毕())
+            _udmP3Param.二运状态记录.Set();
+    }
+
+    [ScriptMethod(name: "P3B1_指挥标点", eventType: EventTypeEnum.StatusAdd,
+        eventCondition: ["StatusID:regex:^(300[456])$", "SourceId:E0000000"],
+        suppress: 10000, userControl: Debugging)]
+    public void P3B1_指挥标点(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3200) return;
+        if (!P3B1CaptainMode) return;
+        _udmP3Param.二运状态记录.WaitOne();
+        
+        for (int i = 0; i < 8; i++)
+        {
+            var kvp = _pd.SelectSpecificPriorityIndex(i);
+            var marker = GetMarkTypeByRankBh(i);
+            sa.MarkPlayerByIdx(kvp.Key, marker);
+            sa.DebugMsg($"[P3B1_指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
+        }
+    }
+
+    private MarkType GetMarkTypeByRankBh(int rank)
+    {
+        return rank switch
+        {
+            0 => MarkType.Attack1,
+            1 => MarkType.Attack2,
+            2 => MarkType.Attack3,
+            3 => MarkType.Bind1,
+            4 => MarkType.Bind2,
+            5 => MarkType.Bind3,
+            6 => MarkType.Stop1,
+            _ => MarkType.Stop2
+        };
+    }
+    
+
+    #endregion P3B1 黑洞 3200
     
 }
 
@@ -1244,8 +1344,11 @@ internal class PriorityDict
 internal class UDMP3Params
 {
     public bool Debugging = false;
-    
     public int 当前阶段 = 0;
+    public ulong ObjectId_卡奥斯 = 0;
+    public ulong ObjectId_艾克斯迪司 = 0;
+    
+    // ---- 一运 ----
     public bool 是长火 = false;
     public int 一运状态记录次数 = 0;
     public int 火水晶方位 = -1;
@@ -1256,9 +1359,6 @@ internal class UDMP3Params
     public int 究极冲击波起始方位 = -1;
     public bool 究极冲击波为顺时针 = false;
     public bool 究极冲击波记录完毕 = false;
-
-    public ulong ObjectId_卡奥斯 = 0;
-    public ulong ObjectId_艾克斯迪司 = 0;
     
     public List<KeyValuePair<int, int>> 火组 = new();
     public List<KeyValuePair<int, int>> 水组 = new();
@@ -1271,12 +1371,15 @@ internal class UDMP3Params
     public int 二水火指路与绘图时间 = 9000;
     public int 真空波指路时间 = 7000;
     
-    public string 近钢铁Framework = "";
-    public string 近月环Framework = "";
+    // ---- 二运 ----
+    public int 二运状态记录次数 = 0;
+    public ManualResetEvent 二运状态记录 = new(false);
     
     public void Reset(ScriptAccessory sa)
     {
         当前阶段 = 0;
+        
+        // 一运
         是长火 = false;
         一运状态记录次数 = 0;
         火水晶方位 = -1;
@@ -1303,10 +1406,9 @@ internal class UDMP3Params
         二水火指路与绘图时间 = 9000;
         真空波指路时间 = 7000;
         
-        sa.Method.UnregistFrameworkUpdateAction(近钢铁Framework);
-        近钢铁Framework = "";
-        sa.Method.UnregistFrameworkUpdateAction(近月环Framework);
-        近月环Framework = "";
+        // 二运
+        二运状态记录次数 = 0;
+        一运状态记录 = new(false);
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
@@ -1378,7 +1480,13 @@ internal static class P3AExtension
         return result;
     }
 }
-    
+
+internal static class P3BExtension
+{
+    public static bool 二运状态记录完毕(this UDMP3Params prm) =>
+        prm.一运状态记录次数 == 8;
+}
+
 #endregion 参数容器类
 
 #region 函数集
