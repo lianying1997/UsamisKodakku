@@ -33,18 +33,20 @@ public class UDM_P3
     const string NoteStr =
         $"""
         {Version}
-        目前一运（到麻将），正攻
+        目前一运（到麻将）
+        - 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位
+        - TLB逃课固定式：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊
         特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线
         """;
     
     const string UpdateInfo =
         $"""
         {Version}
-        1. 启用忘记恢复的注释
+        1. 一运策略添加TLB逃课固定式
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -58,7 +60,7 @@ public class UDM_P3
     public bool SpecialMode { get; set; } = false;
     
     [UserSetting("P3A1 - 一运深层痛楚策略")]
-    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.正攻;
+    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB逃课固定式;
     public enum BoAStgEnum
     {
         TLB逃课固定式,
@@ -301,11 +303,11 @@ public class UDM_P3
 
         var myIndex = sa.GetMyIndex();
         
+        // 艾克斯迪司 ST 无水晶
         if (myIndex == 1)
-            // 艾克斯迪司 ST 无水晶
             执行P3拉怪指路逻辑(sa, false, _udmP3Param.无水晶方位, 6500, false);
+        // 卡奥斯 MT 正攻场中，逃课风水晶
         else if (myIndex == 0)
-            // 卡奥斯 MT 正攻场中，逃课风水晶
             执行P3拉怪指路逻辑(sa, true, _udmP3Param.风水晶方位, 6500, BoAStg == BoAStgEnum.正攻);
 
         await Task.Delay(8000);
@@ -341,24 +343,6 @@ public class UDM_P3
         sa.Method.TTS($"将{bossStr}拉到{regionStr}", 3);
 
     }
-
-    // private void 执行一水火拉怪指路逻辑(ScriptAccessory sa)
-    // {
-    //     var crystalPos = new Vector3(109.9f, 0, 109.9f);
-    //     var guidePos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.无水晶方位);
-    //     sa.DrawGuidance(guidePos, 0, 6500, $"执行一水火拉怪指路逻辑 拉怪", sa.Data.DefaultSafeColor);
-
-    //     var dirStr = _udmP3Param.无水晶方位 switch
-    //     {
-    //         0 => "右下",
-    //         1 => "右上",
-    //         2 => "左上",
-    //         _ => "左下"
-    //     };
-
-    //     sa.Method.TextInfo($"将 艾克斯迪司 拉到{dirStr}", 3000);
-    //     sa.Method.TTS($"将艾克斯迪司拉到{dirStr}", 3);
-    // }
 
     private void 执行水火指路逻辑(ScriptAccessory sa, int destroyTime)
     {
@@ -404,122 +388,104 @@ public class UDM_P3
 
     private void DrawWaterGuideWf(ScriptAccessory sa, Vector3 crystalPos, int waterIndex, int myPriVal, int destroyTime)
     {
+        if (BoAStg != BoAStgEnum.正攻)
+        {
+            var tlbDestroyTime = _udmP3Param.当前轮为火() ? destroyTime + 3000 : destroyTime;
+            DrawTlbWaterGroupGuide(sa, crystalPos, tlbDestroyTime);
+            return;
+        }
+
         Vector3 guidePos;
         if (_udmP3Param.当前轮为火())
         {
             // TODO +3000 暂时为了续剑，后续添加 ActionEffect 删绘图
 
-            if (BoAStg == BoAStgEnum.正攻)
-            {
-                guidePos = Center;
-                DrawCrystalSightAvoid(sa, _udmP3Param.火水晶方位, myPriVal, destroyTime);
-                DrawGroupDonut(sa, _udmP3Param.火组, "DrawWaterGuideWf 火组", sa.Data.DefaultSafeColor, destroyTime + 3000);
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
+            guidePos = Center;
+            DrawCrystalSightAvoid(sa, _udmP3Param.火水晶方位, myPriVal, destroyTime);
+            DrawGroupDonut(sa, _udmP3Param.火组, "DrawWaterGuideWf 火组", sa.Data.DefaultSafeColor, destroyTime + 3000);
+            guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
 
-                var needBackStr = _udmP3Param.需要背对(myPriVal) ? "背对" : "面向";
-                sa.Method.TextInfo($"前往场中 {needBackStr}火水晶 吃火", 6000);
-                sa.Method.TTS($"前往场中{needBackStr}火水晶吃火", 3);
-            }
-            else
-            {
-                guidePos = crystalPos;
-                DrawGroupConnection(sa, _udmP3Param.水组, $"DrawWaterGuideWf 水组", new Vector4(1, 1, 0, 0), destroyTime + 3000);
-                DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultDangerColor, destroyTime + 3000);
-                // 逃课式去相反属性水晶
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
-
-                sa.Method.TextInfo($"靠近 艾克斯迪司 与 火水晶，集合放月环", 6000);
-                sa.Method.TTS($"靠近Boss与火水晶 集合放月环", 3);
-            }
+            var needBackStr = _udmP3Param.需要背对(myPriVal) ? "背对" : "面向";
+            sa.Method.TextInfo($"前往场中 {needBackStr}火水晶 吃火", 6000);
+            sa.Method.TTS($"前往场中{needBackStr}火水晶吃火", 3);
         }
         else
         {
-            if (BoAStg == BoAStgEnum.正攻)
-            {
-                List<float> distanceBias = [-10, 4];
-                guidePos = crystalPos.RotateAndExtend(Center, 0, distanceBias[waterIndex]);
-                DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultDangerColor, destroyTime);
-                DrawGroupCircle(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultSafeColor, 5, destroyTime + 3000);
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
+            List<float> distanceBias = [-10, 4];
+            guidePos = crystalPos.RotateAndExtend(Center, 0, distanceBias[waterIndex]);
+            DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultDangerColor, destroyTime);
+            DrawGroupCircle(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultSafeColor, 5, destroyTime + 3000);
+            guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
 
-                var dir = waterIndex >= 1 ? "外" : "内";
-                sa.Method.TextInfo($"前往 水水晶{dir} 准备判定", 6000);
-                sa.Method.TTS($"前往 水水晶{dir} 准备判定", 3);
-            }
-            else
-            {
-                guidePos = crystalPos;
-                DrawGroupConnection(sa, _udmP3Param.水组, $"DrawWaterGuideWf 水组", new Vector4(1, 1, 0, 0), destroyTime);
-                DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultDangerColor, destroyTime);
-                // 逃课式去相反属性水晶
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
-
-                sa.Method.TextInfo($"靠近 艾克斯迪司 与 火水晶，集合放月环", 6000);
-                sa.Method.TTS($"靠近Boss与火水晶 集合放月环", 3);
-            }
+            var dir = waterIndex >= 1 ? "外" : "内";
+            sa.Method.TextInfo($"前往 水水晶{dir} 准备判定", 6000);
+            sa.Method.TTS($"前往 水水晶{dir} 准备判定", 3);
         }
 
-        sa.DrawGuidance(guidePos, 0, _udmP3Param.一水火指路与绘图时间, $"DrawWaterGuideWf 水组指路", sa.Data.DefaultSafeColor);
+        sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawWaterGuideWf 水组指路", sa.Data.DefaultSafeColor);
 
     }
 
     private void DrawFireGuideWf(ScriptAccessory sa, Vector3 crystalPos, int fireIndex, int myPriVal, int destroyTime)
     {
+        if (BoAStg != BoAStgEnum.正攻)
+        {
+            var tlbDestroyTime = _udmP3Param.当前轮为火() ? destroyTime : destroyTime + 3000;
+            DrawTlbFireGroupGuide(sa, crystalPos, tlbDestroyTime);
+            return;
+        }
+
         Vector3 guidePos;
         if (_udmP3Param.当前轮为火())
         {
-            if (BoAStg == BoAStgEnum.正攻)
-            {
-                List<float> distanceBias = [-10, 4];
-                guidePos = crystalPos.RotateAndExtend(Center, 0, distanceBias[fireIndex]);
-                DrawGroupDonut(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultSafeColor, destroyTime + 3000);
-                DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, 5, destroyTime);
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
+            List<float> distanceBias = [-10, 4];
+            guidePos = crystalPos.RotateAndExtend(Center, 0, distanceBias[fireIndex]);
+            DrawGroupDonut(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultSafeColor, destroyTime + 3000);
+            DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, 5, destroyTime);
+            guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
 
-                var dir = fireIndex >= 1 ? "外" : "内";
-                sa.Method.TextInfo($"前往 火水晶{dir} 准备判定", 6000);
-                sa.Method.TTS($"前往 火水晶{dir} 准备判定", 3);
-            }
-            else
-            {
-                guidePos = crystalPos;
-                DrawGroupConnection(sa, _udmP3Param.火组, $"DrawFireGuideWf 火组", new Vector4(1, 1, 0, 0), destroyTime);
-                DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, destroyTime);
-                // 逃课式去相反属性水晶
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
-
-                sa.Method.TextInfo($"靠近 艾克斯迪司 与 水水晶，集合放月环", 6000);
-                sa.Method.TTS($"靠近Boss与水水晶 集合放月环", 3);
-            }
+            var dir = fireIndex >= 1 ? "外" : "内";
+            sa.Method.TextInfo($"前往 火水晶{dir} 准备判定", 6000);
+            sa.Method.TTS($"前往 火水晶{dir} 准备判定", 3);
 
         }
         else
         {
-            if (BoAStg == BoAStgEnum.正攻)
-            {
-                guidePos = Center;
-                DrawCrystalSightAvoid(sa, _udmP3Param.水水晶方位, myPriVal, destroyTime);
-                DrawGroupCircle(sa, _udmP3Param.水组, "DrawFireGuideWf 水组", sa.Data.DefaultSafeColor, 5, destroyTime + 3000);
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
+            guidePos = Center;
+            DrawCrystalSightAvoid(sa, _udmP3Param.水水晶方位, myPriVal, destroyTime);
+            DrawGroupCircle(sa, _udmP3Param.水组, "DrawFireGuideWf 水组", sa.Data.DefaultSafeColor, 5, destroyTime + 3000);
+            guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
 
-                var needBackStr = _udmP3Param.需要背对(myPriVal) ? "背对" : "面向";
-                sa.Method.TextInfo($"前往场中 {needBackStr}水水晶 吃火", 6000);
-                sa.Method.TTS($"前往场中{needBackStr}水水晶吃火", 3);
-            }
-            else
-            {
-                guidePos = crystalPos;
-                DrawGroupConnection(sa, _udmP3Param.火组, $"DrawFireGuideWf 火组", new Vector4(1, 1, 0, 0), destroyTime + 3000);
-                DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, destroyTime + 3000);
-                // 逃课式去相反属性水晶
-                guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
-
-                sa.Method.TextInfo($"靠近 艾克斯迪司 与 水水晶，集合放月环", 6000);
-                sa.Method.TTS($"靠近Boss与水水晶 集合放月环", 3);
-            }
+            var needBackStr = _udmP3Param.需要背对(myPriVal) ? "背对" : "面向";
+            sa.Method.TextInfo($"前往场中 {needBackStr}水水晶 吃火", 6000);
+            sa.Method.TTS($"前往场中{needBackStr}水水晶吃火", 3);
         }
         
         sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawFireGuideWf 火组指路", sa.Data.DefaultSafeColor);
+    }
+
+    private void DrawTlbWaterGroupGuide(ScriptAccessory sa, Vector3 crystalPos, int destroyTime)
+    {
+        // 水组固定去火水晶，放月环
+        DrawGroupConnection(sa, _udmP3Param.水组, $"DrawWaterGuideWf 水组", new Vector4(1, 1, 0, 1), destroyTime);
+        DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideWf 水组", sa.Data.DefaultDangerColor, destroyTime);
+
+        var guidePos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.火水晶方位);
+        sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawWaterGuideWf 水组指路", sa.Data.DefaultSafeColor);
+        sa.Method.TextInfo($"靠近 艾克斯迪司 与 火水晶，集合放月环", 6000);
+        sa.Method.TTS($"靠近Boss与火水晶 集合放月环", 3);
+    }
+
+    private void DrawTlbFireGroupGuide(ScriptAccessory sa, Vector3 crystalPos, int destroyTime)
+    {
+        // 火组固定去水水晶，放钢铁
+        DrawGroupConnection(sa, _udmP3Param.火组, $"DrawFireGuideWf 火组", new Vector4(1, 1, 0, 1), destroyTime);
+        DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, destroyTime);
+
+        var guidePos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.水水晶方位);
+        sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawFireGuideWf 火组指路", sa.Data.DefaultSafeColor);
+        sa.Method.TextInfo($"靠近 艾克斯迪司 与 水水晶，集合放月环", 6000);
+        sa.Method.TTS($"靠近Boss与水水晶 集合放月环", 3);
     }
 
     private void DrawCrystalSightAvoid(ScriptAccessory sa, int crystalRegion, int myPriVal, int destroyTime)
