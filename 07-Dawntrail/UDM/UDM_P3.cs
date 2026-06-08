@@ -43,14 +43,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 策略名字有更改，具体见脚本说明
-        2. 增加一运策略 TLB_纯固定
-        3. 增加选项 拉艾克斯迪司的是 MT，默认关闭
-        4. 修复阶段计数 Bug 导致提示重复
+        1. 阶段又改错了哎哎
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.6";
+    private const string Version = "0.0.0.7";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -200,7 +197,8 @@ public class UDM_P3
     }
 
     
-    [ScriptMethod(name: "P3A_状态添加记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(160[0123])$"],
+    [ScriptMethod(name: "P3A_状态添加记录", eventType: EventTypeEnum.StatusAdd,
+        eventCondition: ["StatusID:regex:^(160[0123])$", "SourceId:E0000000"],
         userControl: Debugging)]
     public void P3A_状态添加(Event ev, ScriptAccessory sa)
     {
@@ -310,7 +308,7 @@ public class UDM_P3
         eventCondition: ["ActionId:47890"], userControl: true)]
     public void P3A_暴雷钢铁(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3100) return;
+        if (_udmP3Param.当前阶段 != 3100) return;
         _udmP3Param.ObjectId_艾克斯迪司 = ev.SourceId;
         sa.DrawCircle(ev.SourceId, 0, 7000, $"P3A_暴雷钢铁 暴雷钢铁", 14.8f, sa.Data.DefaultDangerColor.WithW(2f), byTime: true);
     }
@@ -329,7 +327,7 @@ public class UDM_P3
         userControl: Debugging)]
     public void P3A_深层痛楚判定(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3100) return;
+        if (_udmP3Param.当前阶段 != 3100) return;
         _udmP3Param.一运状态记录.WaitOne();
         sa.DebugMsg($"[P3A_深层痛楚判定] 一运状态记录完毕", Debugging);
         _udmP3Param.一运水晶记录.WaitOne();
@@ -349,7 +347,7 @@ public class UDM_P3
         userControl: true)]
     public async void P3A_一水火指路(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3100) return;
+        if (_udmP3Param.当前阶段 != 3100) return;
         _udmP3Param.一水火准备.WaitOne();
         sa.DebugMsg($"[P3A_一水火指路] 开始", Debugging);
 
@@ -705,7 +703,7 @@ public class UDM_P3
         eventCondition: ["ActionId:47881"], userControl: true)]
     public void P3A_暴雷一死刑提示(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3100) return;
+        if (_udmP3Param.当前阶段 != 3100) return;
         _udmP3Param.当前阶段 = 3101;
         sa.DebugMsg($"[P3A_暴雷死刑] 暴雷死刑，一水火结束");
         
@@ -719,7 +717,7 @@ public class UDM_P3
         eventCondition: ["ActionId:47884"], suppress: 10000, userControl: true)]
     public void P3A_暴雷死刑后_拉Boss提示(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3101) return;
+        if (_udmP3Param.当前阶段 != 3101) return;
         _udmP3Param.当前阶段 = 3102;
 
         if (sa.GetMyIndex() == (ExDeathMT ? 0 : 1))
@@ -751,7 +749,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47869|47870)$"], suppress: 10000, userControl: true)]
     public void P3A_二水火指路(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3102) return;
+        if (_udmP3Param.当前阶段 != 3102) return;
         _udmP3Param.当前阶段 = 3110;
         sa.DebugMsg($"[P3A_二水火指路] 开始", Debugging);
         执行水火指路逻辑(sa, _udmP3Param.二水火指路与绘图时间);
@@ -761,7 +759,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(4786[01])$"], suppress: 10000, userControl: true)]
     public void P3A_二水火结束(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3110) return;
+        if (_udmP3Param.当前阶段 != 3110) return;
         _udmP3Param.当前阶段 = 3111;
         
         /*
@@ -830,7 +828,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47891)$"], userControl: true)]
     public void P3A_真空波(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3111) return;
+        if (_udmP3Param.当前阶段 != 3111) return;
         sa.DebugMsg($"[P3A_真空波] 开始", Debugging);
         
         if (BoAStg == BoAStgEnum.正攻)
@@ -846,7 +844,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47891)$"], suppress: 10000, userControl: true)]
     public void P3A_真空波后分摊(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3111) return;
+        if (_udmP3Param.当前阶段 != 3111) return;
         sa.DebugMsg($"[P3A_真空波] 击退后分摊", Debugging);
         
         if (BoAStg == BoAStgEnum.正攻)
@@ -981,7 +979,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47843)$"], suppress: 500, userControl: Debugging)]
     public void P3A_究极冲击波方位记录(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3111) return;
+        if (_udmP3Param.当前阶段 != 3111) return;
         if (_udmP3Param.究极冲击波记录完毕) return;
         var region = ev.SourceRotation.RadianToRegion(8, 0, true);
         if (_udmP3Param.究极冲击波起始方位 < 0)
@@ -1010,7 +1008,7 @@ public class UDM_P3
         eventCondition: ["Id:regex:^(015[0123]|01B[567])$"], userControl: Debugging)]
     public void P3A_究极冲击波麻将记录(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3111) return;
+        if (_udmP3Param.当前阶段 != 3111) return;
         var priVal = ev.Id0() switch
         {
             0x0150 => 1000,
@@ -1031,7 +1029,7 @@ public class UDM_P3
         eventCondition: ["ActionId:47864"], suppress: 1000, userControl: true)]
     public void P3A_究极冲击波指路(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 > 3111) return;
+        if (_udmP3Param.当前阶段 != 3111) return;
         sa.DebugMsg($"[P3A_究极冲击波指路] 风分摊结束，从方位 {_udmP3Param.究极冲击波起始方位} {(_udmP3Param.究极冲击波为顺时针 ? "逆" : "顺")} 开始");
         var priVal = _pd.Priorities[sa.GetMyIndex()];
         var num = priVal.GetDecimalDigit(3);
