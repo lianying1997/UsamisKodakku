@@ -40,11 +40,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
          {Version}
-         初版，一运到麻将
+         1. 启用忘记恢复的注释
          """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.1";
+    private const string Version = "0.0.0.2";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -53,9 +53,17 @@ public class UDM_P3
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
     private UDMP3Params _udmP3Param = new UDMP3Params();
     private PriorityDict _pd = new PriorityDict();
-    
+
     [UserSetting("启用方法设置中带*的特殊功能")]
     public bool SpecialMode { get; set; } = false;
+    
+    [UserSetting("P3A1 - 一运深层痛楚策略")]
+    public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.正攻;
+    public enum BoAStgEnum
+    {
+        // TLB逃课固定式,
+        正攻,
+    }
     
     public void Init(ScriptAccessory sa)
     {
@@ -288,7 +296,7 @@ public class UDM_P3
     public async void P3A_一水火指路(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 < 3100) return;
-        // _udmP3Param.一水火准备.WaitOne();
+        _udmP3Param.一水火准备.WaitOne();
         sa.DebugMsg($"[P3A_一水火指路] 开始", Debugging);
 
         var myIndex = sa.GetMyIndex();
