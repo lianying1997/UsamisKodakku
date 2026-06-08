@@ -43,11 +43,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 阶段又改错了哎哎
+        1. 修复一运麻将 8 没有指路的 Bug
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.7";
+    private const string Version = "0.0.0.8";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -1005,7 +1005,7 @@ public class UDM_P3
     }
     
     [ScriptMethod(name: "P3A_究极冲击波麻将记录", eventType: EventTypeEnum.TargetIcon,
-        eventCondition: ["Id:regex:^(015[0123]|01B[567])$"], userControl: Debugging)]
+        eventCondition: ["Id:regex:^(015[0123]|01B[5678])$"], userControl: Debugging)]
     public void P3A_究极冲击波麻将记录(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
@@ -1045,6 +1045,26 @@ public class UDM_P3
     }
     
     #endregion P3A1 究极冲击波 3111
+
+    #region P3B 地震 通用部分
+
+    [ScriptMethod(name: "=============《P3B 地震》=============", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void P3B_分割线(Event ev, ScriptAccessory sa)
+    {
+    }
+    
+    [ScriptMethod(name: "P3B_二运分P_地震", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:50545"],
+        userControl: Debugging)]
+    public void P3A_二运分P_地震(Event ev, ScriptAccessory sa)
+    {
+        _pd.Init(sa, "P3二运");
+        _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
+        _udmP3Param.当前阶段 = 3200;
+        sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
+    }
+
+    #endregion P3B 地震 通用部分
     
 }
 
