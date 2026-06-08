@@ -42,11 +42,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 一运策略添加TLB逃课固定式
+        1. 参数漏了哎哎
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.3";
+    private const string Version = "0.0.0.4";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -480,7 +480,7 @@ public class UDM_P3
     {
         // 火组固定去水水晶，放钢铁
         DrawGroupConnection(sa, _udmP3Param.火组, $"DrawFireGuideWf 火组", new Vector4(1, 1, 0, 1), destroyTime);
-        DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, destroyTime);
+        DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideWf 火组", sa.Data.DefaultDangerColor, 5, destroyTime);
 
         var guidePos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.水水晶方位);
         sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawFireGuideWf 火组指路", sa.Data.DefaultSafeColor);
