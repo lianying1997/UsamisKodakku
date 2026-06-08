@@ -226,12 +226,12 @@
   {
     "Name": "绝妖星乱舞_P3",
     "Guid": "c902dd56-629e-4033-a77f-fb23b8d94745",
-    "Version": "0.0.0.9",
+    "Version": "0.0.0.10",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/main/07-Dawntrail/UDM/UDM_P3.cs",
-    "Note": "0.0.0.9\r\n目前一运（到麻将）\r\n- 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位\r\n- TLB_相反水晶：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊\r\n- TLB_纯固定：无视水晶，近战贴 Boss，远程远离于两水晶分组\r\n特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线",
-    "UpdateInfo": "0.0.0.9\r\n1. P3 二运黑洞指挥模式\r\n2. 修复究极冲击波部分情况下顺逆时针判断错误",
+    "Note": "0.0.0.10\r\n目前一运（到麻将）\r\n- 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位\r\n- TLB_相反水晶：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊\r\n- TLB_纯固定：无视水晶，近战贴 Boss，远程远离于两水晶分组\r\n特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线",
+    "UpdateInfo": "0.0.0.10\r\n1. P3 二运黑洞指挥模式\r\n2. 修复究极冲击波部分情况下顺逆时针判断错误\r\n3. 修复部分未复原的事件导致不执行指路",
     "TerritoryIds": [
       1363
     ]

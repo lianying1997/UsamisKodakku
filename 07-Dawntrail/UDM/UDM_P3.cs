@@ -45,10 +45,11 @@ public class UDM_P3
         {Version}
         1. P3 二运黑洞指挥模式
         2. 修复究极冲击波部分情况下顺逆时针判断错误
+        3. 修复部分未复原的事件导致不执行指路
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.9";
+    private const string Version = "0.0.0.10";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -391,6 +392,7 @@ public class UDM_P3
 
         await Task.Delay(8000);
         执行水火指路逻辑(sa, _udmP3Param.一水火指路与绘图时间);
+        _udmP3Param.一水火准备.Reset();
     }
 
     private void 执行P3拉怪指路逻辑(ScriptAccessory sa, bool isChaos, int region, int destroyTime, bool toCenter = false)
@@ -1138,7 +1140,7 @@ public class UDM_P3
         if (_udmP3Param.当前阶段 != 3200) return;
         if (!P3B1CaptainMode) return;
         _udmP3Param.二运状态记录.WaitOne();
-        
+        sa.DebugMsg($"[P3B1_指挥标点] 进入指挥标点", Debugging);
         for (int i = 0; i < 8; i++)
         {
             var kvp = _pd.SelectSpecificPriorityIndex(i);
@@ -1146,6 +1148,7 @@ public class UDM_P3
             sa.MarkPlayerByIdx(kvp.Key, marker);
             sa.DebugMsg($"[P3B1_指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
         }
+        _udmP3Param.二运状态记录.Reset();
     }
 
     private MarkType GetMarkTypeByRankBh(int rank)
@@ -1408,7 +1411,7 @@ internal class UDMP3Params
         
         // 二运
         二运状态记录次数 = 0;
-        一运状态记录 = new(false);
+        二运状态记录 = new(false);
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
