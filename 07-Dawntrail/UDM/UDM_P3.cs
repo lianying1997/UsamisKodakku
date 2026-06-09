@@ -639,7 +639,7 @@ public class UDM_P3
             List<float> biasDeg = [-30, 30, -75, 75];
             for (int i = 0; i < 4; i++)
             {
-                var dp = sa.DrawLine(realCrystalPos, 0, 0, destroyTime, $"DrawStaticGuideLine 指引线{i}",
+                var dp = sa.DrawLine(windCrystalPos, 0, 0, destroyTime, $"DrawStaticGuideLine 指引线{i}",
                     baseRadian + biasDeg[i].DegToRad(), 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
                 dp.Color = i switch
                 {
@@ -799,7 +799,7 @@ public class UDM_P3
         _udmP3Param.当前阶段 = 3101;
         sa.DebugMsg($"[P3A_暴雷死刑] 暴雷死刑，一水火结束");
         
-        if (sa.GetMyIndex() != 1) return;   // ST 机制
+        if (sa.GetMyIndex() != (ExDeathMT ? 0 : 1)) return;
         sa.DrawGuidance(ev.TargetId, 0, 5000, $"P3A_暴雷_死刑", sa.Data.DefaultSafeColor);
         sa.Method.TextInfo($"前往 艾克斯迪司 脚下吃死刑", 3000);
         sa.Method.TTS($"前往艾克斯迪司脚下吃死刑", 3);
@@ -973,7 +973,7 @@ public class UDM_P3
             List<int> partner = [2, 3, 0, 1];
             for (var i = 0; i < 4; i++)
                 sa.DrawCircle(sa.Data.PartyList[i + (myIndex < 4 ? 4 : 0)], 0, 4000, $"真空波分摊 {i}", 6,
-                    i == partner[myIndex] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor);
+                    i == partner[myIndex % 4] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor);
         }
     }
     
@@ -1576,7 +1576,7 @@ internal static class P3AExtension
 internal static class P3BExtension
 {
     public static bool 二运状态记录完毕(this UDMP3Params prm) =>
-        prm.一运状态记录次数 == 8;
+        prm.二运状态记录次数 == 8;
 }
 
 #endregion 参数容器类
