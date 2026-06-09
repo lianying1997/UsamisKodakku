@@ -51,11 +51,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复 TLB_拉火水晶_夜音 策略下 火Buff 指路以风水晶为圆心向内分散的问题，应为火水晶
+        1. 增加异步锁，防止记录状态时的错误导致后续代码阻塞。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.12";
+    private const string Version = "0.0.0.13";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -207,7 +207,7 @@ public class UDM_P3
     public void P3_分P_重构(Event ev, ScriptAccessory sa)
     {
         _udmP3Param.当前阶段 = 3000;
-        sa.Log.Debug($"当前阶段为：P3 重构 {_udmP3Param.当前阶段}");
+        sa.DebugMsg($"当前阶段为：P3 重构 {_udmP3Param.当前阶段}", Debugging);
     }
 
     #region P3A 深层痛楚 通用部分
@@ -239,28 +239,31 @@ public class UDM_P3
         const uint 混沌之水 = 1601;
         const uint 混沌之风 = 1602;
         const uint 混沌之逆风 = 1603;
-        
-        var statusId = ev.StatusId;
-        var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-        var priVal = ev.StatusId switch
-        {
-            混沌之炎 => 100,
-            混沌之水 => 200,
-            混沌之风 => 10,
-            混沌之逆风 => 20,
-            _ => 0
-        };
-        
-        _pd.AddPriority(playerIdx, priVal);
-        _udmP3Param.一运状态记录次数++;
-        sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
 
-        if (_udmP3Param.一运状态记录完毕())
-            _udmP3Param.一运状态记录.Set();
+        lock (_pd)
+        {
+            var statusId = ev.StatusId;
+            var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            var priVal = ev.StatusId switch
+            {
+                混沌之炎 => 100,
+                混沌之水 => 200,
+                混沌之风 => 10,
+                混沌之逆风 => 20,
+                _ => 0
+            };
         
-        if (statusId != 混沌之炎) return;
-        var statusTime = ev.DurationMilliseconds();
-        _udmP3Param.是长火 = statusTime > 30000;
+            _pd.AddPriority(playerIdx, priVal);
+            _udmP3Param.一运状态记录次数++;
+            sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
+
+            if (_udmP3Param.一运状态记录完毕())
+                _udmP3Param.一运状态记录.Set();
+        
+            if (statusId != 混沌之炎) return;
+            var statusTime = ev.DurationMilliseconds();
+            _udmP3Param.是长火 = statusTime > 30000;
+        }
     }
 
     [ScriptMethod(name: "P3A_水晶生成记录", eventType: EventTypeEnum.ObjectChanged,
@@ -668,7 +671,6 @@ public class UDM_P3
         {
             guidePos = Center;
             DrawCrystalSightAvoid(sa, _udmP3Param.火水晶方位, myPriVal, destroyTime);
-            // DrawGroupDonut(sa, _udmP3Param.火组, "DrawWaterGuideAlongCrystal_Wf 火组", sa.Data.DefaultSafeColor, destroyTime + 3000);
             guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
 
             var needBackStr = _udmP3Param.需要背对(myPriVal) ? "背对" : "面向";
@@ -679,8 +681,6 @@ public class UDM_P3
         {
             List<float> distanceBias = [-10, 4];
             guidePos = CrystalBasePos.RotateAndExtend(Center, 0, distanceBias[waterIndex]);
-            // DrawGroupDonut(sa, _udmP3Param.水组, "DrawWaterGuideAlongCrystal_Wf 水组", sa.Data.DefaultDangerColor, destroyTime);
-            // DrawGroupCircle(sa, _udmP3Param.水组, "DrawWaterGuideAlongCrystal_Wf 水组", sa.Data.DefaultSafeColor, 5, destroyTime + 3000);
             guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.水水晶方位);
 
             var dir = waterIndex >= 1 ? "外" : "内";
@@ -698,8 +698,6 @@ public class UDM_P3
         {
             List<float> distanceBias = [-10, 4];
             guidePos = CrystalBasePos.RotateAndExtend(Center, 0, distanceBias[fireIndex]);
-            // DrawGroupDonut(sa, _udmP3Param.火组, "DrawFireGuideAlongCrystal_Wf 火组", sa.Data.DefaultSafeColor, destroyTime + 3000);
-            // DrawGroupCircle(sa, _udmP3Param.火组, "DrawFireGuideAlongCrystal_Wf 火组", sa.Data.DefaultDangerColor, 5, destroyTime);
             guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
 
             var dir = fireIndex >= 1 ? "外" : "内";
@@ -711,7 +709,6 @@ public class UDM_P3
         {
             guidePos = Center;
             DrawCrystalSightAvoid(sa, _udmP3Param.水水晶方位, myPriVal, destroyTime);
-            // DrawGroupCircle(sa, _udmP3Param.水组, "DrawFireGuideAlongCrystal_Wf 水组", sa.Data.DefaultSafeColor, 5, destroyTime + 3000);
             guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
 
             var needBackStr = _udmP3Param.需要背对(myPriVal) ? "背对" : "面向";
@@ -1120,20 +1117,24 @@ public class UDM_P3
     public void P3A_究极冲击波麻将记录(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
-        var priVal = ev.Id0() switch
+
+        lock (_pd)
         {
-            0x0150 => 1000,
-            0x0151 => 2000,
-            0x0152 => 3000,
-            0x0153 => 4000,
-            0x01B5 => 5000,
-            0x01B6 => 6000,
-            0x01B7 => 7000,
-            _ => 8000,
-        };
-        var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-        _pd.AddPriority(playerIdx, priVal);
-        sa.DebugMsg($"[P3A_究极冲击波麻将记录] {Role[playerIdx]} 被点 {priVal / 1000}", Debugging);
+            var priVal = ev.Id0() switch
+            {
+                0x0150 => 1000,
+                0x0151 => 2000,
+                0x0152 => 3000,
+                0x0153 => 4000,
+                0x01B5 => 5000,
+                0x01B6 => 6000,
+                0x01B7 => 7000,
+                _ => 8000,
+            };
+            var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            _pd.AddPriority(playerIdx, priVal);
+            sa.DebugMsg($"[P3A_究极冲击波麻将记录] {Role[playerIdx]} 被点 {priVal / 1000}", Debugging);
+        }
     }
     
     [ScriptMethod(name: "P3A_究极冲击波指路", eventType: EventTypeEnum.ActionEffect,
@@ -1196,23 +1197,26 @@ public class UDM_P3
         const uint 第一目标 = 3004;
         const uint 第二目标 = 3005;
         const uint 第三目标 = 3006;
-        
-        var statusId = ev.StatusId;
-        var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-        var priVal = ev.StatusId switch
-        {
-            第一目标 => 10,
-            第二目标 => 20,
-            第三目标 => 30,
-            _ => 0
-        };
-        
-        _pd.AddPriority(playerIdx, priVal);
-        _udmP3Param.二运状态记录次数++;
-        sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
 
-        if (_udmP3Param.二运状态记录完毕())
-            _udmP3Param.二运状态记录.Set();
+        lock (_pd)
+        {
+            var statusId = ev.StatusId;
+            var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            var priVal = ev.StatusId switch
+            {
+                第一目标 => 10,
+                第二目标 => 20,
+                第三目标 => 30,
+                _ => 0
+            };
+        
+            _pd.AddPriority(playerIdx, priVal);
+            _udmP3Param.二运状态记录次数++;
+            sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
+
+            if (_udmP3Param.二运状态记录完毕())
+                _udmP3Param.二运状态记录.Set();
+        }
     }
 
     [ScriptMethod(name: "P3B1_二运黑洞指挥标点", eventType: EventTypeEnum.StatusAdd,
@@ -1221,8 +1225,11 @@ public class UDM_P3
     public void P3B1_二运黑洞指挥标点(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3200) return;
-        if (!P3B1CaptainMode) return;
+        
         if (!_udmP3Param.二运状态记录.WaitOne(2000)) return;
+        _udmP3Param.二运状态记录.Reset();
+        
+        if (!P3B1CaptainMode) return;
         sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 进入指挥标点", Debugging);
         for (int i = 0; i < 8; i++)
         {
@@ -1231,7 +1238,6 @@ public class UDM_P3
             sa.MarkPlayerByIdx(kvp.Key, marker);
             sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
         }
-        _udmP3Param.二运状态记录.Reset();
     }
 
     private MarkType GetMarkTypeByRankBh(int rank)
@@ -1249,6 +1255,39 @@ public class UDM_P3
         };
     }
     
+    // [ScriptMethod(name: "P3B1_获得二运黑洞标点", eventType: EventTypeEnum.Marker, 
+    //     eventCondition: ["Operate:Add", "Id:regex:^(0[1234679]|10)$"], userControl: Debugging)]
+    // public void P3B1_获得二运黑洞标点(Event ev, ScriptAccessory sa)
+    // {
+    //     // 取攻击123、锁链123、禁止12
+    //     if (_udmP3Param.当前阶段 != 3200) return;
+    //     
+    //     lock (_pd)
+    //     {
+    //         var mark = ev.Id0();
+    //         var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+    //         var targetJob = sa.GetPlayerJobByIndex(tidx);
+    //         sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
+    //         _pd.AddActionCount();
+    //         var pdVal = mark switch
+    //         {
+    //             0x01 => 10,    // 攻击1
+    //             0x02 => 20,    // 攻击2
+    //             0x03 => 30,    // 攻击3
+    //             0x04 => 40,    // 攻击4
+    //             0x06 => 100,   // 锁链1
+    //             0x07 => 110,   // 锁链2
+    //             0x09 => 200,   // 禁止1
+    //             0x10 => 210,   // 禁止2
+    //             _ => 0
+    //         };
+    //         _pd.AddPriority(tidx, pdVal);
+    //         if (_pd.ActionCount != 8) return;
+    //         sa.DebugMsg($"P5B2_二传_获取转圈头标：头标记录完毕", Debugging);
+    //         sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
+    //         _p5B.转圈头标记录完毕.Set();   // 头标记录
+    //     }
+    // }
 
     #endregion P3B1 黑洞 3200
     
@@ -1460,6 +1499,7 @@ internal class UDMP3Params
     // ---- 二运 ----
     public int 二运状态记录次数 = 0;
     public ManualResetEvent 二运状态记录 = new(false);
+    public int 黑洞接线轮数 = 0;
     
     public void Reset(ScriptAccessory sa)
     {
@@ -1486,7 +1526,6 @@ internal class UDMP3Params
         一运状态记录 = new(false);
         一运水晶记录 = new(false);
         一水火准备 = new(false);
-
         
         火组 = new();
         水组 = new();
@@ -1498,7 +1537,9 @@ internal class UDMP3Params
         
         // 二运
         二运状态记录次数 = 0;
+        二运状态记录.Reset();
         二运状态记录 = new(false);
+        黑洞接线轮数 = 0;
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
