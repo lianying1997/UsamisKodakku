@@ -53,6 +53,7 @@ public class UDM_P3
         {Version}
         1. 占卜了一些 Bug 进行修复
         2. 更改了些许策略名，一运策略增加 TLB_拉火水晶_夜音式
+        3. 修复真空波击退与指路源不同的问题，现固定为艾克斯迪司
         """;
 
     private const string Name = "绝妖星乱舞_P3";
@@ -562,7 +563,7 @@ public class UDM_P3
         var basePos = CrystalBasePos.RotateAndExtend(Center, 0, -5f);
         var guidePos = basePos.RotateAndExtend(CrystalBasePos, angleBias.DegToRad());
 
-        if (!_udmP3Param.当前轮为火())
+        if (_udmP3Param.当前轮为火())
         {
             sa.Method.TextInfo($"远离 放火钢铁", 6000);
             sa.Method.TTS($"远离放火钢铁", 3);
@@ -1066,15 +1067,14 @@ public class UDM_P3
     private void DrawStaticGuideLineVw(ScriptAccessory sa, int destroyTime)
     {
         var myIndex = sa.GetMyIndex();
-        var crystalPos = new Vector3(109.9f, 0, 109.9f);
-        var realCrystalPos = _udmP3Param.基于水晶旋转(crystalPos, _udmP3Param.风水晶方位);
-        var baseRadian = 180f.DegToRad() + realCrystalPos.GetRadian(Center);
+        Vector3 bossPos = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司).Position;
+        var baseRadian = 180f.DegToRad() + bossPos.GetRadian(Center);
         
         List<float> biasDeg = [-20, 20, -60, 60];
         List<int> partner = [2, 3, 0, 1];
         for (int i = 0; i < 4; i++)
         {
-            var dp = sa.DrawLine(realCrystalPos, 0, 0, destroyTime, $"DrawStaticGuideLineVw 指引线{i}",
+            var dp = sa.DrawLine(bossPos, 0, 0, destroyTime, $"DrawStaticGuideLineVw 指引线{i}",
                 baseRadian + biasDeg[i].DegToRad(), 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
             dp.Color = i == partner[myIndex % 4] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor;
             sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
