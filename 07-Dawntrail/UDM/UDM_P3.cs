@@ -33,17 +33,17 @@ public class UDM_P3
     const string NoteStr =
         $"""
         {Version}
-        一运
+        一运：全程
         - 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位
         - TLB_相反水晶_盗火文档：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊
         - TLB_纯固定_NoCCHH：无视水晶，近战贴 Boss，远程远离于两水晶分组
         - TLB_拉火水晶_夜音：拉火水晶6人集合，只有火 Buff 在外
 
-        二运未完成，只有黑洞指挥模式
-        - 麻将1：攻123
-        - 麻将2：锁123
-        - 麻将3：禁12
-        - 标点优先级 H > D > T
+        二运：含黑洞指路与指挥模式，需在用户设置开启。
+        - * 黑洞指路依赖标点，建议开启指挥模式。
+        - * 因为黑洞模式指路需在黑洞出现前完成标点，手慢则乱。
+        - 标点优先级 H > D > T，站定方向顺时针
+        - 其余机制暂未完成，可以配合已有功能的脚本使用。
 
         特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线
         """;
@@ -51,11 +51,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 增加异步锁，防止记录状态时的错误导致后续代码阻塞。
+        1. 增加P3二运黑洞接线指路，站定方向顺时针。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.13";
+    private const string Version = "0.0.0.14";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -64,8 +64,10 @@ public class UDM_P3
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
     private static readonly Vector3 CrystalBasePos = new Vector3(109.9f, 0, 109.9f);
+    private static readonly Vector3 BlackHoleBasePos = new Vector3(100f, 0, 83f);
     private UDMP3Params _udmP3Param = new UDMP3Params();
     private PriorityDict _pd = new PriorityDict();
+    private PriorityDict _pdCaptain = new PriorityDict();
 
     [UserSetting("启用方法设置中带*的特殊功能")]
     public bool SpecialMode { get; set; } = false;
@@ -173,12 +175,16 @@ public class UDM_P3
         sa.Method.TTS($"{needBack}吃火月环", 2);
     }
     
-    [ScriptMethod(name: "测试项：画近远钢铁月环", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    [ScriptMethod(name: "测试项：测试黑洞线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
-    public void 画近远钢铁月环(Event ev, ScriptAccessory sa)
+    public void 测试黑洞线(Event ev, ScriptAccessory sa)
     {
-        DrawNearCircle(sa, sa.Data.DefaultDangerColor, 2000);
-        DrawNearDonut(sa, sa.Data.DefaultDangerColor, 2000);
+        // 判断是否有线
+        uint tetherId = 0x54;
+        var bc = sa.GetById(0x40001CD8);
+        if (bc == null) return;
+        var hasTether = sa.GetTetherSource((IBattleChara)bc, tetherId).Count > 0;
+        sa.DebugMsg($"{hasTether}", Debugging);
     }
     
     [ScriptMethod(name: "测试项：二运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -188,7 +194,7 @@ public class UDM_P3
         _pd.Init(sa, "P3二运");
         _udmP3Param.当前阶段 = 3200;
 
-        _pd.AddPriorities([37, 28, 21, 12, 33, 24, 15, 16]);
+        _pd.AddPriorities([311, 232, 223, 134, 325, 216, 127, 118]);
         _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
         
@@ -1171,8 +1177,12 @@ public class UDM_P3
     public void P3A_二运分P_地震(Event ev, ScriptAccessory sa)
     {
         _pd.Init(sa, "P3二运");
+        _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
+        
         // 尽可能让坦克不参与第一轮黑洞
-        _pd.AddPriorities([7, 8, 3, 4, 5, 6, 7, 8]);
+        _pdCaptain.Init(sa, "P3二运指挥");
+        _pdCaptain.AddPriorities([7, 8, 3, 4, 5, 6, 7, 8]);
+        
         _udmP3Param.当前阶段 = 3200;
         sa.Method.MarkClear();
         sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
@@ -1198,7 +1208,7 @@ public class UDM_P3
         const uint 第二目标 = 3005;
         const uint 第三目标 = 3006;
 
-        lock (_pd)
+        lock (_pdCaptain)
         {
             var statusId = ev.StatusId;
             var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
@@ -1210,7 +1220,7 @@ public class UDM_P3
                 _ => 0
             };
         
-            _pd.AddPriority(playerIdx, priVal);
+            _pdCaptain.AddPriority(playerIdx, priVal);
             _udmP3Param.二运状态记录次数++;
             sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
 
@@ -1233,7 +1243,7 @@ public class UDM_P3
         sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 进入指挥标点", Debugging);
         for (int i = 0; i < 8; i++)
         {
-            var kvp = _pd.SelectSpecificPriorityIndex(i);
+            var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
             var marker = GetMarkTypeByRankBh(i);
             sa.MarkPlayerByIdx(kvp.Key, marker);
             sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
@@ -1255,39 +1265,220 @@ public class UDM_P3
         };
     }
     
-    // [ScriptMethod(name: "P3B1_获得二运黑洞标点", eventType: EventTypeEnum.Marker, 
-    //     eventCondition: ["Operate:Add", "Id:regex:^(0[1234679]|10)$"], userControl: Debugging)]
-    // public void P3B1_获得二运黑洞标点(Event ev, ScriptAccessory sa)
-    // {
-    //     // 取攻击123、锁链123、禁止12
-    //     if (_udmP3Param.当前阶段 != 3200) return;
-    //     
-    //     lock (_pd)
-    //     {
-    //         var mark = ev.Id0();
-    //         var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-    //         var targetJob = sa.GetPlayerJobByIndex(tidx);
-    //         sa.DebugMsg($"检测到{targetJob} 被标 ev.Id {mark}", Debugging);
-    //         _pd.AddActionCount();
-    //         var pdVal = mark switch
-    //         {
-    //             0x01 => 10,    // 攻击1
-    //             0x02 => 20,    // 攻击2
-    //             0x03 => 30,    // 攻击3
-    //             0x04 => 40,    // 攻击4
-    //             0x06 => 100,   // 锁链1
-    //             0x07 => 110,   // 锁链2
-    //             0x09 => 200,   // 禁止1
-    //             0x10 => 210,   // 禁止2
-    //             _ => 0
-    //         };
-    //         _pd.AddPriority(tidx, pdVal);
-    //         if (_pd.ActionCount != 8) return;
-    //         sa.DebugMsg($"P5B2_二传_获取转圈头标：头标记录完毕", Debugging);
-    //         sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
-    //         _p5B.转圈头标记录完毕.Set();   // 头标记录
-    //     }
-    // }
+    [ScriptMethod(name: "P3B1_获得二运黑洞标点", eventType: EventTypeEnum.Marker, 
+        eventCondition: ["Operate:Add", "Id:regex:^(0[1236789]|10)$"], userControl: Debugging)]
+    public void P3B1_获得二运黑洞标点(Event ev, ScriptAccessory sa)
+    {
+        // 取攻击123、锁链123、禁止12
+        if (_udmP3Param.当前阶段 != 3200) return;
+        
+        lock (_pd)
+        {
+            var mark = ev.Id0();
+            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            var targetJob = sa.GetPlayerJobByIndex(tidx);
+            
+            _pd.AddActionCount();
+            sa.DebugMsg($"[P3B1_获得二运黑洞标点] #{_pd.ActionCount} {targetJob} 被标 ev.Id {mark}", Debugging);
+            
+            var pdVal = mark switch
+            {
+                0x01 => 110,   // 攻击1
+                0x02 => 120,   // 攻击2
+                0x03 => 130,   // 攻击3
+                0x06 => 210,   // 锁链1
+                0x07 => 220,   // 锁链2
+                0x08 => 230,   // 锁链3
+                0x09 => 310,   // 禁止1
+                0x10 => 320,   // 禁止2
+                _ => 0
+            };
+            _pd.AddPriority(tidx, pdVal);
+            if (_pd.ActionCount != 8) return;
+            
+            sa.DebugMsg($"[P3B1_获得二运黑洞标点] 头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
+        }
+    }
+
+    [ScriptMethod(name: "P3B1_黑洞轮数增加", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: Debugging, suppress: 5000)]
+    public void P3B1_黑洞轮数增加(Event ev, ScriptAccessory sa)
+    {
+        _udmP3Param.黑洞字典.Clear();
+        _udmP3Param.黑洞轮数++;
+        sa.DebugMsg($"[P3B1_黑洞轮数增加] 当前阶段 {_udmP3Param.当前阶段}，清除黑洞字典 {_udmP3Param.黑洞字典.Count}", Debugging);
+        _udmP3Param.黑洞轮数增加完毕.Set();
+    }
+    
+    [ScriptMethod(name: "P3B1_凯夫卡方位获取", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: Debugging, suppress: 5000)]
+    public void P3B1_凯夫卡方位获取(Event ev, ScriptAccessory sa)
+    {
+        // 每次增加黑洞都再次获取凯夫卡方位
+        var obj = sa.GetByDataId(19504u).FirstOrDefault();
+        if (obj == null) return;
+        // A顺计数
+        _udmP3Param.凯夫卡方位 = (obj.Rotation.RadianToRegion(8, 4, isDiagDiv: true, isCw: true) + 4) % 8;
+        _udmP3Param.凯夫卡方位获取完毕.Set();
+        sa.DebugMsg($"[P3B1_凯夫卡方位获取] 凯夫卡方位 {_udmP3Param.凯夫卡方位}", Debugging);
+    }
+    
+    [ScriptMethod(name: "P3B1_外黑洞获取", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: Debugging)]
+    public void P3B1_外黑洞获取(Event ev, ScriptAccessory sa)
+    {
+        if (!_udmP3Param.黑洞轮数增加完毕.WaitOne(2000)) return;
+        if (!_udmP3Param.凯夫卡方位获取完毕.WaitOne(2000)) return;
+        
+        lock (_pd)
+        {
+            var sid = ev.SourceId;
+            var obj = sa.GetById(sid);
+            if (obj == null) return;
+            var pos = obj.Position;
+            
+            // 黑洞距离场中 17
+            if (Vector3.Distance(pos, Center) < 16.5f) return;
+            
+            // A顺计数
+            var region = (pos.GetRadian(Center).RadianToRegion(8, 4, isDiagDiv: true, isCw: true)) % 8;
+            var relativeRegion = (region + 8 - _udmP3Param.凯夫卡方位) % 8;
+            
+            _udmP3Param.黑洞字典.TryAdd(sid,
+                (round: _udmP3Param.黑洞轮数, region: region, relativeRegion: relativeRegion, hasTether: false));
+            var count = _udmP3Param.黑洞字典.Count;
+            sa.DebugMsg($"[P3B1_外黑洞获取] 获取到方位 {region} 相对方位 {relativeRegion} 的黑洞 #{count}", Debugging);
+            
+            if (_udmP3Param.黑洞字典.Count < 3) return;
+            
+            // 判断是否有线
+            uint tetherId = 0x54;
+            foreach (var 黑洞 in _udmP3Param.黑洞字典.ToList())
+            {
+                var bc = sa.GetById(黑洞.Key);
+                if (bc == null) continue;
+                var valueTuple = _udmP3Param.黑洞字典[黑洞.Key];
+                var tetherCount = sa.GetTetherSource((IBattleChara)bc, tetherId).Count;
+                valueTuple.hasTether = tetherCount > 0;
+                _udmP3Param.黑洞字典[黑洞.Key] = valueTuple;
+                sa.DebugMsg(
+                    $"[P3B1_外黑洞获取] 方位 {黑洞.Value.region} 相对方位 {黑洞.Value.relativeRegion} 的黑洞 0x{bc.GameObjectId:X8} {(tetherCount > 0 ? "有" : "没")}线",
+                    Debugging);
+            }
+            
+            排序黑洞字典();
+            _udmP3Param.外黑洞获取完毕.Set();
+            _udmP3Param.黑洞轮数增加完毕.Reset();
+            _udmP3Param.凯夫卡方位获取完毕.Reset();
+        }
+    }
+    
+    [ScriptMethod(name: "P3B1_接线逻辑_每轮初始", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: true, suppress: 5000)]
+    public void P3B1_接线逻辑_每轮初始(Event ev, ScriptAccessory sa)
+    {
+        if (!_udmP3Param.外黑洞获取完毕.WaitOne(2000)) return;
+        
+        // 第一轮黑洞起始，攻击1
+        // 第二轮黑洞起始，攻击1，攻击2，攻击3
+        // 第三轮黑洞起始，锁链1，锁链2，锁链3
+        // 第四轮黑洞起始，禁止1，禁止2
+
+        var priRankList = 筛选本轮接线玩家(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
+        for (int i = 0; i < priRankList.Count; i++)
+        {
+            // 黑洞字典已在生成时排好序
+            var bh = _udmP3Param.黑洞字典.ElementAt(i);
+            var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
+            绘制玩家向黑洞方位接线(sa, player.Key, bh.Value.region,
+                $"R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数} {player.Key} {bh.Value.region}");
+        }
+        _udmP3Param.外黑洞获取完毕.Reset();
+    }
+    
+    [ScriptMethod(name: "P3B1_接线逻辑_中途", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 1000)]
+    public void P3B1_接线逻辑_中途(Event ev, ScriptAccessory sa)
+    {
+        // 删掉上一轮的连线
+        sa.Method.RemoveDraw($"绘制黑洞接线 R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数}.*");
+        _udmP3Param.黑洞喷射轮数++;
+        if (_udmP3Param.黑洞轮数 is 1 or 4)
+        {
+            翻转黑洞有线状态();
+            排序黑洞字典();
+        }
+        if (_udmP3Param.黑洞喷射轮数 >= 10) return;
+        var priRankList = 筛选本轮接线玩家(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
+        for (int i = 0; i < priRankList.Count; i++)
+        {
+            // 黑洞字典已在生成时排好序
+            var bh = _udmP3Param.黑洞字典.ElementAt(i);
+            var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
+            绘制玩家向黑洞方位接线(sa, player.Key, bh.Value.region,
+                $"R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数} {player.Key} {bh.Value.region}");
+        }
+    }
+
+    private void 翻转黑洞有线状态()
+    {
+        foreach (var 黑洞 in _udmP3Param.黑洞字典.ToList())
+        {
+            var valueTuple = 黑洞.Value;
+            valueTuple.hasTether = !valueTuple.hasTether;
+            _udmP3Param.黑洞字典[黑洞.Key] = valueTuple;
+        }
+    }
+
+    private void 排序黑洞字典()
+    {
+        _udmP3Param.黑洞字典 = _udmP3Param.黑洞字典
+            .OrderByDescending(kvp => kvp.Value.hasTether)
+            .ThenBy(kvp => kvp.Value.relativeRegion)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    private List<int> 筛选本轮接线玩家(ScriptAccessory sa, int bhRound, int bhEffectRound)
+    {
+        List<int> priRankList = (bhRound, bhEffectRound) switch
+        {
+            (1, 0) => [0],
+            (1, 1) => [0, 1],
+            (2, 2) => [0, 1, 2],
+            (2, 3) => [3, 1, 2],
+            (2, 4) => [3, 4, 2],
+            (3, 5) => [3, 4, 5],
+            (3, 6) => [6, 4, 5],
+            (3, 7) => [6, 7, 5],
+            (4, 8) => [6, 7],
+            (4, 9) => [7],
+            (1, 2) or (2, 5) or (3, 8) or (4, 10) => [],
+            _ => []
+        };
+        var isKnownNoop = (bhRound, bhEffectRound) is (1, 2) or (2, 5) or (3, 8) or (4, 10);
+        if (priRankList.Count == 0 && !isKnownNoop)
+        {
+            sa.DebugMsg($"[筛选本轮接线玩家] 输入值错误 ({bhRound} {bhEffectRound})", Debugging);
+        }
+        return priRankList;
+    }
+    
+    private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, int playerIdx, int realRegion, string name)
+    {
+        if (sa.GetMyIndex() != playerIdx) return;
+        // 与黑洞本体的 Connection
+        var bhpos = BlackHoleBasePos.RotateAndExtend(Center, realRegion * -45f.DegToRad());
+        var color = new Vector4(1, 1, 0, 1);
+        sa.DrawConnection(sa.Data.PartyList[playerIdx], bhpos, 0, 7000, $"绘制黑洞接线 {name}", color);
+        
+        // 顺时针旋转45，向内延伸 17 - 17/sqrt(2)
+        var guidePos = bhpos.RotateAndExtend(Center, -45f.DegToRad(), -4.979f);
+        sa.DrawGuidance(sa.Data.PartyList[playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {name}", sa.Data.DefaultSafeColor);
+        
+        sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(playerIdx)} 接真实方位 {realRegion} 的黑洞", Debugging);
+    }
+
 
     #endregion P3B1 黑洞 3200
     
@@ -1468,7 +1659,7 @@ internal class PriorityDict
 #region 参数容器类
 internal class UDMP3Params
 {
-    public bool Debugging = false;
+    public bool Debugging = true;
     public int 当前阶段 = 0;
     public ulong ObjectId_卡奥斯 = 0;
     public ulong ObjectId_艾克斯迪司 = 0;
@@ -1499,7 +1690,14 @@ internal class UDMP3Params
     // ---- 二运 ----
     public int 二运状态记录次数 = 0;
     public ManualResetEvent 二运状态记录 = new(false);
-    public int 黑洞接线轮数 = 0;
+    public int 黑洞轮数 = 0;
+    public int 黑洞喷射轮数 = 0;
+    public Dictionary<ulong, (int round, int region, int relativeRegion, bool hasTether)> 黑洞字典 = new();
+    public ManualResetEvent 外黑洞获取完毕 = new(false);
+    public ManualResetEvent 黑洞轮数增加完毕 = new(false);
+    public ManualResetEvent 凯夫卡方位获取完毕 = new(false);
+    public int 凯夫卡方位 = 0;
+    public int 特殊轮黑洞线记录数 = 0;
     
     public void Reset(ScriptAccessory sa)
     {
@@ -1520,9 +1718,6 @@ internal class UDMP3Params
         ObjectId_卡奥斯 = 0;
         ObjectId_艾克斯迪司 = 0;
         
-        一运状态记录.Reset();
-        一运水晶记录.Reset();
-        一水火准备.Reset();
         一运状态记录 = new(false);
         一运水晶记录 = new(false);
         一水火准备 = new(false);
@@ -1537,9 +1732,15 @@ internal class UDMP3Params
         
         // 二运
         二运状态记录次数 = 0;
-        二运状态记录.Reset();
         二运状态记录 = new(false);
-        黑洞接线轮数 = 0;
+        黑洞轮数 = 0;
+        黑洞喷射轮数 = 0;
+        黑洞字典 = new Dictionary<ulong, (int round, int region, int relativeRegion, bool hasTether)>();
+        外黑洞获取完毕 = new(false);
+        黑洞轮数增加完毕 = new(false);
+        凯夫卡方位获取完毕 = new(false);
+        凯夫卡方位 = 0;
+        特殊轮黑洞线记录数 = 0;
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
@@ -1616,6 +1817,7 @@ internal static class P3BExtension
 {
     public static bool 二运状态记录完毕(this UDMP3Params prm) =>
         prm.二运状态记录次数 == 8;
+
 }
 
 #endregion 参数容器类
@@ -2346,12 +2548,12 @@ internal static class MarkerHelper
 
 internal static class DebugFunction
 {
-    public static void DebugMsg(this ScriptAccessory sa, string msg, bool enable = false, bool showInChatBox = false)
+    public static void DebugMsg(this ScriptAccessory sa, string msg, bool enable = true, bool showInChatBox = true)
     {
-        if (!enable) return;
-        sa.Log.Debug(msg);
-        if (!showInChatBox) return;
-        sa.Method.SendChat($"/e {msg}");
+        // if (!enable) return;
+        // sa.Log.Debug(msg);
+        // if (!showInChatBox) return;
+        // sa.Method.SendChat($"/e {msg}");
     }
 }
 
