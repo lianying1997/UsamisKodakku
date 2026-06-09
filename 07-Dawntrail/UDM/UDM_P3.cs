@@ -371,9 +371,9 @@ public class UDM_P3
     public void P3A_深层痛楚判定(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3100) return;
-        if (!_udmP3Param.一运状态记录.WaitOne(5000)) return;
+        if (!_udmP3Param.一运状态记录.WaitOne(2000)) return;
         sa.DebugMsg($"[P3A_深层痛楚判定] 一运状态记录完毕", Debugging);
-        if (!_udmP3Param.一运水晶记录.WaitOne(5000)) return;
+        if (!_udmP3Param.一运水晶记录.WaitOne(2000)) return;
         sa.DebugMsg($"[P3A_深层痛楚判定] 一运水晶记录完毕", Debugging);
 
         _udmP3Param.一运状态记录.Reset();
@@ -407,7 +407,7 @@ public class UDM_P3
     {
         var runId = _runId;
         if (_udmP3Param.当前阶段 != 3100) return;
-        if (!_udmP3Param.一水火准备.WaitOne(5000)) return;
+        if (!_udmP3Param.一水火准备.WaitOne(2000)) return;
 
         sa.DebugMsg($"[P3A_一水火指路] 开始", Debugging);
         var myIndex = sa.GetMyIndex();
@@ -1217,21 +1217,21 @@ public class UDM_P3
             _udmP3Param.二运状态记录.Set();
     }
 
-    [ScriptMethod(name: "P3B1_指挥标点", eventType: EventTypeEnum.StatusAdd,
+    [ScriptMethod(name: "P3B1_二运黑洞指挥标点", eventType: EventTypeEnum.StatusAdd,
         eventCondition: ["StatusID:regex:^(300[456])$", "SourceId:E0000000"],
         suppress: 10000, userControl: Debugging)]
-    public void P3B1_指挥标点(Event ev, ScriptAccessory sa)
+    public void P3B1_二运黑洞指挥标点(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3200) return;
         if (!P3B1CaptainMode) return;
-        _udmP3Param.二运状态记录.WaitOne();
-        sa.DebugMsg($"[P3B1_指挥标点] 进入指挥标点", Debugging);
+        if (!_udmP3Param.二运状态记录.WaitOne(2000)) return;
+        sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 进入指挥标点", Debugging);
         for (int i = 0; i < 8; i++)
         {
             var kvp = _pd.SelectSpecificPriorityIndex(i);
             var marker = GetMarkTypeByRankBh(i);
             sa.MarkPlayerByIdx(kvp.Key, marker);
-            sa.DebugMsg($"[P3B1_指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
+            sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
         }
         _udmP3Param.二运状态记录.Reset();
     }
