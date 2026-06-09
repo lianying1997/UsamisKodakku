@@ -51,13 +51,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 占卜了一些 Bug 进行修复
-        2. 更改了些许策略名，一运策略增加 TLB_拉火水晶_夜音式
-        3. 修复真空波击退与指路源不同的问题，现固定为艾克斯迪司
+        1. 修复 TLB_拉火水晶_夜音 策略下 火Buff 指路以风水晶为圆心向内分散的问题，应为火水晶
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.11";
+    private const string Version = "0.0.0.12";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -92,7 +90,7 @@ public class UDM_P3
     public void Init(ScriptAccessory sa)
     {
         _runId++;
-        sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化.");
+        sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
         _udmP3Param.Reset(sa);
         sa.Method.RemoveDraw(".*");
         sa.Method.MarkClear();
@@ -574,8 +572,8 @@ public class UDM_P3
             sa.Method.TTS($"远离吃水钢铁", 3);
         }
 
-        guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.风水晶方位);
-        sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawGuide_CCHH_Wf 指路", sa.Data.DefaultSafeColor);
+        guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
+        sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawFireGuide_YY_Wf 指路", sa.Data.DefaultSafeColor);
 
     }
 
