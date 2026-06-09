@@ -558,7 +558,7 @@ public class UDM_P3
             0 => -45f,
             1 => 45f,
         };
-        var basePos = CrystalBasePos.RotateAndExtend(Center, 0, -5f);
+        var basePos = CrystalBasePos.RotateAndExtend(Center, 0, -10f);
         var guidePos = basePos.RotateAndExtend(CrystalBasePos, angleBias.DegToRad());
 
         if (_udmP3Param.当前轮为火())
