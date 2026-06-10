@@ -2284,7 +2284,7 @@ internal static class P3BExtension
             : (obj.Rotation.RadianToRegion(8, isDiagDiv: true) + 4) % 8;
         
         // prm.凯夫卡方位 = region;
-        prm.Dbg(sa, $"[巨大凯夫卡方位获取] 凯夫卡方位 {prm.凯夫卡方位} {(cwFromA ? "A顺" : "C逆")}");
+        prm.Dbg(sa, $"[巨大凯夫卡方位获取] 凯夫卡方位 {region} {(cwFromA ? "A顺" : "C逆")}");
         return region;
     }
 
