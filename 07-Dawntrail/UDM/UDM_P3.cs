@@ -51,11 +51,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 增加P3二运黑洞接线指路，站定方向顺时针。
+        1. 修复P3二运指挥模式标点逻辑错误
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.14";
+    private const string Version = "0.0.0.15";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -1181,7 +1181,7 @@ public class UDM_P3
         
         // 尽可能让坦克不参与第一轮黑洞
         _pdCaptain.Init(sa, "P3二运指挥");
-        _pdCaptain.AddPriorities([7, 8, 3, 4, 5, 6, 7, 8]);
+        _pdCaptain.AddPriorities([7, 8, 1, 2, 3, 4, 5, 6]);
         
         _udmP3Param.当前阶段 = 3200;
         sa.Method.MarkClear();
