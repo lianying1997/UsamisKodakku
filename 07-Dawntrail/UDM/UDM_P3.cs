@@ -42,7 +42,7 @@ public class UDM_P3
         二运：含黑洞指路与指挥模式，需在用户设置开启。
         - * 黑洞指路依赖标点，建议开启指挥模式。
         - * 因为黑洞模式指路需在黑洞出现前完成标点，手慢则乱。
-        - 标点优先级 H > D > T，站定方向顺时针
+        - 可在用户设置配置指挥模式标点优先级，输入半角引号与三个大写字母如"HDT"，在前的优先级高，若输入格式错误则默认"HDT"。
         - 其余机制暂未完成，可以配合已有功能的脚本使用。
 
         特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线
@@ -51,7 +51,7 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 增加 P3 二运指挥模式优先级配置
+        1. 增加 P3 二运黑洞指挥模式标点优先级
         2. 增加 P3 二运黑洞策略：接两根变种
         """;
 
@@ -90,6 +90,9 @@ public class UDM_P3
     [UserSetting("P3B1 - 二运黑洞指挥模式")]
     public bool P3B1CaptainMode { get; set; } = false;
 
+    [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
+    public string P3B1BhPriority { get; set; } = "HDT";
+    
     [UserSetting("P3B1 - 二运黑洞策略")]
     public static BhStgEnum BhStg { get; set; } = BhStgEnum.一人一根线;
     public enum BhStgEnum
@@ -1190,18 +1193,47 @@ public class UDM_P3
         
         // 尽可能让坦克不参与第一轮黑洞
         _pdCaptain.Init(sa, "P3二运指挥");
-        _pdCaptain.AddPriorities([7, 8, 1, 2, 3, 4, 5, 6]);
+        
+        List<int> priority = 构筑指挥优先级字段(P3B1BhPriority);
+        _pdCaptain.AddPriorities(priority);
         
         _udmP3Param.当前阶段 = 3200;
         sa.Method.MarkClear();
         sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
     }
 
+    private static List<int> 构筑指挥优先级字段(string prioritySetting)
+    {
+        var normalized = (prioritySetting ?? "").Trim().ToUpperInvariant();
+        if (normalized.Length != 3 || normalized.Distinct().Count() != 3 || normalized.Any(c => c is not ('T' or 'H' or 'D')))
+            normalized = "HDT";
+
+        var roleIndices = new Dictionary<char, List<int>>
+        {
+            ['T'] = [0, 1],
+            ['H'] = [2, 3],
+            ['D'] = [4, 5, 6, 7],
+        };
+        var priority = new int[8];
+        var currentPriority = 1;
+
+        foreach (var role in normalized)
+        {
+            foreach (var index in roleIndices[role])
+            {
+                priority[index] = currentPriority;
+                currentPriority++;
+            }
+        }
+
+        return priority.ToList();
+    }
+
     #endregion P3B 地震 通用部分
     
     #region P3B1 黑洞 3200
     
-    [ScriptMethod(name: "=============《P3B1 黑洞》=============", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    [ScriptMethod(name: "———————— 《P3B1 黑洞》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: true)]
     public void P3B1_分割线(Event ev, ScriptAccessory sa)
     {
@@ -1511,7 +1543,8 @@ public class UDM_P3
 
     private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, int playerIdx, List<int> realRegions, string name)
     {
-        if (sa.GetMyIndex() != playerIdx) return;
+        if (!Debugging)
+            if (sa.GetMyIndex() != playerIdx) return;
         var color = new Vector4(1, 1, 0, 1);
 
         foreach (var realRegion in realRegions)
