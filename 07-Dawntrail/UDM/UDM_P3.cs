@@ -33,30 +33,39 @@ public class UDM_P3
     const string NoteStr =
         $"""
         {Version}
-        一运：全程
+        一运
         - 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位
         - TLB_相反水晶_盗火文档：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊
         - TLB_纯固定_NoCCHH：无视水晶，近战贴 Boss，远程远离于两水晶分组
         - TLB_拉火水晶_夜音：拉火水晶6人集合，只有火 Buff 在外
 
-        二运：含黑洞指路与指挥模式，需在用户设置开启。
+        二运黑洞
+        - 含指路与指挥模式，需在用户设置开启。
         - * 黑洞指路依赖标点，建议开启指挥模式。
         - * 因为黑洞模式指路需在黑洞出现前完成标点，手慢则乱。
         - 可在用户设置配置指挥模式标点优先级，输入半角引号与三个大写字母如"HDT"，在前的优先级高，若输入格式错误则默认"HDT"。
         - 其余机制暂未完成，可以配合已有功能的脚本使用。
+        
+        二运冰封
+        - 从上下引导后四角_盗火文档：基于凯夫卡面基，上TN下DPS，然后基于场中四角分开引导
+        - 从场中引导后四角_POIKOS：先场中，然后基于场中四角分开引导
+        - 从场中引导后上下_NoCCHH：先场中，然后TN上DPS下分开引导
+        - 以凯夫卡所在方位为北：若勾选，则以最后一次“本色出演的我”所在位置为北，否则以对面（起身后能看到凯夫卡正脸的方位）为北。
 
-        特殊方法为屏蔽艾克斯迪司释放钢铁暴雷时的连线
+        特殊方法
+        - 屏蔽艾克斯迪司释放钢铁暴雷时的连线
+        - 巨大凯夫卡释放上桌技能时透明化
         """;
     
     const string UpdateInfo =
         $"""
         {Version}
-        1. 增加 P3 二运黑洞指挥模式标点优先级
-        2. 增加 P3 二运黑洞策略：接两根变种
+        1. 补全 P3 二运，设置项较多，请仔细阅读并确认作战策略。
+        2. 二运黑洞指挥模式标点优先级支持字符"N"，等价于"H"。（扶额）
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.16";
+    private const string Version = "0.0.0.17";
     private const string DebugVersion = "b";
     private int _runId = 0;
 
@@ -101,6 +110,18 @@ public class UDM_P3
         攻1禁2接两根,
     }
     
+    [UserSetting("P3B2 - 冰封初始黄圈引导策略")]
+    public static BlizStgEnum BlizStg { get; set; } = BlizStgEnum.从上下引导后四角_盗火文档;
+    public enum BlizStgEnum
+    {
+        从上下引导后四角_盗火文档,
+        从场中引导后四角_POIKOS,
+        从场中引导后上下_NoCCHH,
+    }
+    
+    [UserSetting("P3B2 - 以凯夫卡所在方位为北")]
+    public static bool BlizKefkaIsNorth { get; set; } = true;
+    
     public void Init(ScriptAccessory sa)
     {
         _runId++;
@@ -135,14 +156,6 @@ public class UDM_P3
     {
         _udmP3Param.打印水晶与分组(sa, _pd);
         sa.DebugMsg($"{_udmP3Param.当前轮为火()}", Debugging);
-    }
-
-    [ScriptMethod(name: "测试项：初始化参数与本地标点", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 初始化参数与本地标点(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.Reset(sa);
-        sa.MarkClear(local: true);
     }
 
     [ScriptMethod(name: "测试项：一运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -211,6 +224,25 @@ public class UDM_P3
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
         
         sa.DebugMsg($"[测试项：二运赋值] 赋值完毕", Debugging);
+    }
+    
+    [ScriptMethod(name: "测试项：冰封赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 冰封赋值(Event ev, ScriptAccessory sa)
+    {
+        _udmP3Param.当前阶段 = 3210;
+
+        _udmP3Param.凯夫卡方位 = 1;  // C逆
+        
+        _udmP3Param.冰封北方位 = BlizKefkaIsNorth ? _udmP3Param.凯夫卡方位 : (_udmP3Param.凯夫卡方位 + 4) % 8;
+        _udmP3Param.西塔方位 = (_udmP3Param.冰封北方位 + 2) % 8;
+        _udmP3Param.东塔方位 = (_udmP3Param.冰封北方位 - 2 + 8) % 8;
+        
+        _udmP3Param.分摊点TN = false;
+        _udmP3Param.绘制冰封引导路径 = true;
+        _udmP3Param.是第一次分摊 = false;
+
+        sa.DebugMsg($"[测试项：冰封赋值] 赋值完毕", Debugging);
     }
         
     
@@ -1204,7 +1236,7 @@ public class UDM_P3
 
     private static List<int> 构筑指挥优先级字段(string prioritySetting)
     {
-        var normalized = (prioritySetting ?? "").Trim().ToUpperInvariant();
+        var normalized = (prioritySetting ?? "").Trim().ToUpperInvariant().Replace('N', 'H');
         if (normalized.Length != 3 || normalized.Distinct().Count() != 3 || normalized.Any(c => c is not ('T' or 'H' or 'D')))
             normalized = "HDT";
 
@@ -1227,6 +1259,155 @@ public class UDM_P3
         }
 
         return priority.ToList();
+    }
+    
+    [ScriptMethod(name: "P3B_地震后拉回场中提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:50545"],
+        userControl: true, suppress: 10000)]
+    public void P3B_地震后拉回场中提示(Event ev, ScriptAccessory sa)
+    {
+        if (sa.GetMyIndex() > 1) return;
+        sa.DrawGuidance(Center, 0, 3000, $"P3B_地震后拉回场中", sa.Data.DefaultSafeColor);
+        sa.Method.TextInfo($"将 双BOSS 拉回场中", 3000);
+        sa.Method.TTS($"将双BOSS拉回场中", 3);
+    }
+    
+    [ScriptMethod(name: "P3B_响亮亮耳光范围与指路", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(4784[67])$"], userControl: true)]
+    public void P3B_响亮亮耳光范围与指路(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3200) return;
+        
+        const uint 右手接分摊 = 47846;
+        const uint 左手接职能 = 47847;
+        var aid = ev.ActionId;
+        var actionStr = aid switch
+        {
+            右手接分摊 => "右手接分摊",
+            左手接职能 => "左手接职能",
+        };
+
+        var isStack = aid == 右手接分摊;
+        
+        _udmP3Param.凯夫卡方位 = _udmP3Param.巨大凯夫卡方位获取(sa, true);
+        var (attackRegion, safeRegion) = _udmP3Param.巨大凯夫卡半场刀方向(sa, aid == 右手接分摊);
+        
+        // 画半场刀与钢铁范围
+        sa.DrawCircle(Center, 0, 8000, $"[P3B_响亮亮耳光] 场中钢铁", 6f, sa.Data.DefaultDangerColor.WithW(2f));
+        var biasCenter = (Center - new Vector3(0, 0, 3.8f)).RotateAndExtend(Center, -45f.DegToRad() * safeRegion);
+        sa.DrawRect(biasCenter, Center, 0, 7000, $"[P3B_响亮亮耳光] 半场刀", 0, 60f, 60f, sa.Data.DefaultDangerColor.WithW(2f));
+    
+        // 画分摊或职能线
+        List<float> biasDeg = [0, -45f, 45f]; // H T D
+        var lineCount = isStack ? 1 : 3;
+        var myRole = sa.GetMyIndex() switch
+        {
+            0 or 1 => 1,
+            2 or 3 => 0,
+            _ => 2
+        };
+        
+        for (int i = 0; i < lineCount; i++)
+        {
+            var guidePos = biasCenter.RotateAndExtend(Center, biasDeg[i].DegToRad(), 3.5f);
+            var dp = sa.DrawLine(Center, guidePos, 0, 8000, $"响亮亮耳光 指引线{i}",
+                0, 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
+            dp.Color = i switch
+            {
+                0 => new Vector4(0.1f, 1f, 0.1f, 1),    // Healer
+                1 => new Vector4(0.1f, 0.1f, 1f, 1),    // Tank
+                2 => new Vector4(1f, 0.1f, 0.1f, 1),    // DPS
+            };
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
+            
+            if (myRole == i || isStack)
+                sa.DrawGuidance(guidePos, 0, 8000, $"响亮亮耳光 指路", sa.Data.DefaultSafeColor);
+        }
+        
+        sa.DebugMsg($"[P3B_响亮亮耳光] {actionStr}");
+        sa.Method.TextInfo($"响亮亮耳光 {actionStr}", 3000);
+        sa.Method.TTS($"{actionStr}", 3);
+    }
+
+    [ScriptMethod(name: "*P3B_重构时恢复卡夫卡透明度", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47842)$"], userControl: Debugging)]
+    public void P3B_重构时恢复卡夫卡透明度(Event ev, ScriptAccessory sa)
+    {
+        var obj = sa.GetById(ev.SourceId);
+        sa.Method.RunOnMainThreadAsync(Action);
+        unsafe void Action()
+        {
+            if (obj == null) return;
+
+            Character* charaStruct = (Character*)obj.Address;
+            if (!obj.IsValid() || !charaStruct->IsReadyToDraw())
+            {
+                sa.Log.Error($"传入的IGameObject不合法。");
+                return;
+            }
+
+            if (!charaStruct->IsCharacter())
+            {
+                sa.Log.Error($"传入的IGameObject不是Character，无法修改透明度。");
+                return;
+            }
+            if (charaStruct->Alpha > 0.8f) return;
+            
+            charaStruct->Alpha = 1;
+            charaStruct->DisableDraw();
+            charaStruct->EnableDraw();
+        }
+    }
+    
+    [ScriptMethod(name: "*P3B_凯夫卡上桌透明化", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(4784[67]|4785[235])$"], userControl: true)]
+    public async void P3B_凯夫卡透明化(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+        var runId = _runId; 
+        var obj = sa.GetById(ev.SourceId);
+        sa.AlphaModify(obj, 0.3f);
+        await Task.Delay(9000);
+        if (runId != _runId) return;
+        sa.AlphaModify(obj, 1f);
+    }
+
+    [ScriptMethod(name: "P3B_诅咒敕令半场刀", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47873)$"], userControl: true)]
+    public void P3B_诅咒敕令半场刀(Event ev, ScriptAccessory sa)
+    {
+        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, sa.Data.DefaultDangerColor.WithW(2f), byTime: true);
+    }
+    
+    [ScriptMethod(name: "P3B_本色出演的我辣尾", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47854)$"], userControl: true)]
+    public void P3B_本色出演的我辣尾(Event ev, ScriptAccessory sa)
+    {
+        var dp = sa.DrawRect(ev.SourceId, 0, 5000, $"本色出演的我辣尾", 0, 16, 100, sa.Data.DefaultDangerColor.WithW(2f),
+            draw: false);
+        dp.Offset = new Vector3(0, 0, 40);
+        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+    }
+    
+    [ScriptMethod(name: "P3B_白洞抬血提示", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(48486)$"], userControl: true)]
+    public void P3B_白洞抬血提示(Event ev, ScriptAccessory sa)
+    {
+        if (sa.GetMyIndex() is not 2 and not 3) return;
+        sa.Method.TextInfo($"抬满全队！", 3000, true);
+        sa.Method.TTS($"抬满全队", 3);
+    }
+
+    [ScriptMethod(name: "P3B_追踪巨大凯夫卡", eventType: EventTypeEnum.PlayActionTimeline,
+        eventCondition: ["Id:7748", "SourceDataId:19504"], userControl: Debugging)]
+    public void P3B_追踪巨大凯夫卡(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3200) return;
+        var region = _udmP3Param.巨大凯夫卡方位获取(sa, false);
+        var kefkaPos = new Vector3(100, 0, 120);
+        kefkaPos = kefkaPos.RotateAndExtend(Center, region * 45f.DegToRad());
+        var color = new Vector4(0.1f, 1f, 1f, 1f);
+        sa.DrawConnection(sa.Data.Me, kefkaPos, 0, 3000, $"跟踪巨大凯夫卡", color);
+        sa.Method.TextInfo($"凯夫卡重新出现了！", 1000);
     }
 
     #endregion P3B 地震 通用部分
@@ -1356,13 +1537,8 @@ public class UDM_P3
         eventCondition: ["DataId:19512"], userControl: Debugging, suppress: 5000)]
     public void P3B1_凯夫卡方位获取(Event ev, ScriptAccessory sa)
     {
-        // 每次增加黑洞都再次获取凯夫卡方位
-        var obj = sa.GetByDataId(19504u).FirstOrDefault();
-        if (obj == null) return;
-        // A顺计数
-        _udmP3Param.凯夫卡方位 = (obj.Rotation.RadianToRegion(8, 4, isDiagDiv: true, isCw: true) + 4) % 8;
+        _udmP3Param.凯夫卡方位 = _udmP3Param.巨大凯夫卡方位获取(sa, true);
         _udmP3Param.凯夫卡方位获取完毕.Set();
-        sa.DebugMsg($"[P3B1_凯夫卡方位获取] 凯夫卡方位 {_udmP3Param.凯夫卡方位}", Debugging);
     }
     
     [ScriptMethod(name: "P3B1_外黑洞获取", eventType: EventTypeEnum.AddCombatant,
@@ -1583,6 +1759,166 @@ public class UDM_P3
 
     #endregion P3B1 黑洞 3200
     
+    #region P3B2 冰封 3210
+    
+    [ScriptMethod(name: "———————— 《P3B2 冰封》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: true)]
+    public void P3B2_分割线(Event ev, ScriptAccessory sa)
+    {
+    }
+    
+    [ScriptMethod(name: "P3B2_冰封_转阶段", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:47887"], userControl: Debugging)]
+    public void P3B2_冰封_转阶段(Event ev, ScriptAccessory sa)
+    {
+        _udmP3Param.当前阶段 = 3210;
+        sa.DebugMsg($"当前阶段为：P3B2 二运 冰封 {_udmP3Param.当前阶段}", Debugging);
+        _udmP3Param.凯夫卡方位 = _udmP3Param.巨大凯夫卡方位获取(sa, false);
+        _udmP3Param.冰封北方位 = BlizKefkaIsNorth ? _udmP3Param.凯夫卡方位 : (_udmP3Param.凯夫卡方位 + 4) % 8;
+        _udmP3Param.西塔方位 = (_udmP3Param.冰封北方位 + 2) % 8;
+        _udmP3Param.东塔方位 = (_udmP3Param.冰封北方位 - 2 + 8) % 8;
+        sa.Method.MarkClear();
+        _udmP3Param.凯夫卡方位获取完毕.Set();
+        sa.DebugMsg($"[P3B2_冰封_指路] 冰封北方位 继承自 凯夫卡方位 {_udmP3Param.凯夫卡方位} C逆");
+    }
+    
+    [ScriptMethod(name: "P3B2_冰封_引导路径", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:47887"], userControl: true)]
+    public void P3B2_冰封_引导路径一(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.冰封北方位 == -1)
+        {
+            if (!_udmP3Param.凯夫卡方位获取完毕.WaitOne(2000)) return;
+            _udmP3Param.凯夫卡方位获取完毕.Reset();
+        }
+        
+        if (_udmP3Param.当前阶段 != 3210) return;
+        _udmP3Param.绘制冰封引导路径 = true;
+        var myIndex = sa.GetMyIndex();
+        
+        // 盗火策略，第一步在上下；其余，第一步在场中
+        var relativeUpDownPos = myIndex <= 3 ? new Vector3(100, 0, 107.5f) : new Vector3(100, 0, 92.5f);
+        var initPos = BlizStg == BlizStgEnum.从上下引导后四角_盗火文档 ? relativeUpDownPos: Center;
+        initPos = _udmP3Param.基于凯夫卡旋转(initPos, _udmP3Param.冰封北方位);
+        
+        // 在这里画一与二
+        var targetPos = new Vector3(100, 0, 107.5f);
+        // 根据位置旋转特定角度
+        var rotDeg = myIndex switch
+        {
+            0 or 2 => BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? 0f : -45f,
+            1 or 3 => BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? 0f : 45f,
+            4 or 6 => BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? 180f : 135f,
+            5 or 7 => BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? 180f : -135f
+        };
+        targetPos = targetPos.RotateAndExtend(Center, rotDeg.DegToRad());
+        targetPos = _udmP3Param.基于凯夫卡旋转(targetPos, _udmP3Param.冰封北方位);
+        _udmP3Param.第二枚黄圈引导位置 = targetPos;
+        
+        sa.DrawGuidance(initPos, 0, 3000, $"冰封路径一 黄圈 1", sa.Data.DefaultSafeColor);
+        sa.DrawGuidance(initPos, targetPos, 0, 3000, $"冰封路径一 黄圈 1->2", sa.Data.DefaultDangerColor);
+        sa.DrawGuidance(targetPos, 3000, 3000, $"冰封路径一 黄圈 2", sa.Data.DefaultSafeColor);
+    }
+
+    [ScriptMethod(name: "P3B2_冰封_引导路径二", eventType: EventTypeEnum.TargetIcon,
+        eventCondition: ["Id:00A1"], userControl: Debugging)]
+    public void P3B2_冰封_引导路径二(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3210) return;
+        if (!_udmP3Param.绘制冰封引导路径) return;
+        _udmP3Param.是第一次分摊 = !_udmP3Param.是第一次分摊;
+        
+        var targetIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+        _udmP3Param.分摊点TN = targetIdx <= 3;
+        var myIndex = sa.GetMyIndex();
+
+        if (_udmP3Param.需要踩塔(myIndex))
+            绘制冰封踩塔路径(sa);
+        else
+            绘制冰封分摊路径(sa);
+    }
+
+    private int 获得踩塔方位(ScriptAccessory sa)
+    {
+        // NoCCHH 踩塔为场基（面向凯夫卡分左右），西塔 MT/H1/D1/D3，东塔 ST/H2/D2/D4
+        // 其余踩塔为面基（面向场中分左右），西塔 ST/H2/D1/D3，东塔 MT/H1/D2/D4
+        var myIndex = sa.GetMyIndex();
+        if (BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH)
+            return myIndex is 0 or 2 or 4 or 6 ? _udmP3Param.西塔方位 : _udmP3Param.东塔方位;
+        else
+            return myIndex is 1 or 3 or 4 or 6 ? _udmP3Param.西塔方位 : _udmP3Param.东塔方位;
+    }
+    
+    private void 绘制冰封踩塔路径(ScriptAccessory sa)
+    {
+        Vector3 stackPos = Center;
+        var towerRegion = 获得踩塔方位(sa);
+        Vector3 towerPos = new Vector3(100, 0, 110).RotateAndExtend(Center, towerRegion * 45f.DegToRad());
+
+        if (_udmP3Param.是第一次分摊)
+        {
+            sa.DrawGuidance(_udmP3Param.第二枚黄圈引导位置, towerPos, 0, 3000, $"冰封路径二 黄圈 2->塔", sa.Data.DefaultDangerColor);
+            sa.DrawCircle(towerPos, 0, 3000, $"冰封路径二 塔范围", 5f, sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(towerPos, 3000, 3000, $"冰封路径二 黄圈 塔", sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(towerPos, stackPos, 3000, 3000, $"冰封路径二 踩塔->分摊", sa.Data.DefaultDangerColor);
+        }
+        else
+        {
+            sa.DrawCircle(towerPos, 500, 3000, $"冰封路径二 塔范围", 6f, sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(towerPos, 500, 3000, $"冰封路径二 塔 第二轮", sa.Data.DefaultSafeColor);
+        }
+
+    }
+    
+    private void 绘制冰封分摊路径(ScriptAccessory sa)
+    {
+        Vector3 stackPos = Center;
+        var towerRegion = 获得踩塔方位(sa);
+        Vector3 towerPos = new Vector3(100, 0, 110).RotateAndExtend(Center, towerRegion * 45f.DegToRad());
+        
+        if (_udmP3Param.是第一次分摊)
+        {
+            sa.DrawGuidance(_udmP3Param.第二枚黄圈引导位置, stackPos, 0, 3000, $"冰封路径二 黄圈 2->分摊", sa.Data.DefaultDangerColor);
+            sa.DrawGuidance(stackPos, 3000, 3000, $"冰封路径二 黄圈 分摊", sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(stackPos, towerPos, 3000, 3000, $"冰封路径二 分摊->踩塔", sa.Data.DefaultDangerColor);
+        }
+        else
+        {
+            sa.DrawGuidance(stackPos, 500, 3000, $"冰封路径二 分摊 第二轮", sa.Data.DefaultSafeColor);
+        }
+    }
+
+    [ScriptMethod(name: "P3B2_轰击/顶起", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47875", "TargetIndex:1"], userControl: true)]
+    public void P3B2_轰击旋风(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3210) return;
+        sa.DrawCircle(ev.TargetPosition, 0, 15000, $"轰击旋风", 6, sa.Data.DefaultDangerColor.WithW(2f));
+    }
+    
+    [ScriptMethod(name: "P3B2_顶起删除轰击旋风", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47878", "TargetIndex:1"], userControl: Debugging)]
+    public void P3B2_顶起删除轰击旋风(Event ev, ScriptAccessory sa)
+    {
+        sa.Method.RemoveDraw($"轰击旋风.*");
+    }
+    
+    [ScriptMethod(name: "P3B2_冰封移动提示", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:47889"], userControl: true)]
+    public async void P3B2_冰封移动提示(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3210) return;
+        
+        var runId = _runId;
+        await Task.Delay(1000);
+        if (runId != _runId) return;
+        if (_udmP3Param.当前阶段 != 3210) return;
+        
+        sa.Method.TextInfo($"远离场中 动动动", 3000);
+        sa.Method.TTS($"远离场中 动动动", 3);
+    }
+    
+    #endregion P3B2 冰封 3210
 }
 
 
@@ -1798,7 +2134,14 @@ internal class UDMP3Params
     public ManualResetEvent 黑洞轮数增加完毕 = new(false);
     public ManualResetEvent 凯夫卡方位获取完毕 = new(false);
     public int 凯夫卡方位 = 0;
-    public int 特殊轮黑洞线记录数 = 0;
+
+    public int 冰封北方位 = -1;
+    public int 西塔方位 = -1;
+    public int 东塔方位 = -1;
+    public bool 分摊点TN = false;
+    public bool 绘制冰封引导路径 = false;
+    public bool 是第一次分摊 = false;
+    public Vector3 第二枚黄圈引导位置 = new Vector3(100, 0, 100);
     
     public void Reset(ScriptAccessory sa)
     {
@@ -1841,7 +2184,14 @@ internal class UDMP3Params
         黑洞轮数增加完毕 = new(false);
         凯夫卡方位获取完毕 = new(false);
         凯夫卡方位 = 0;
-        特殊轮黑洞线记录数 = 0;
+        
+        冰封北方位 = -1;
+        西塔方位 = -1;
+        东塔方位 = -1;
+        分摊点TN = false;
+        绘制冰封引导路径 = false;
+        是第一次分摊 = false;
+        第二枚黄圈引导位置 = new Vector3(100, 0, 100);
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
@@ -1919,6 +2269,49 @@ internal static class P3BExtension
     public static bool 二运状态记录完毕(this UDMP3Params prm) =>
         prm.二运状态记录次数 == 8;
 
+    public static int 巨大凯夫卡方位获取(this UDMP3Params prm, ScriptAccessory sa, bool cwFromA = true)
+    {
+        var obj = sa.GetByDataId(19504u).FirstOrDefault();
+        if (obj == null)
+        {
+            prm.Dbg(sa, $"[巨大凯夫卡方位获取] 获取失败");
+            return 0;
+        }
+        
+        // ? A顺计数 : C逆计数
+        var region = cwFromA
+            ? (obj.Rotation.RadianToRegion(8, 4, isDiagDiv: true, isCw: true) + 4) % 8
+            : (obj.Rotation.RadianToRegion(8, isDiagDiv: true) + 4) % 8;
+        
+        // prm.凯夫卡方位 = region;
+        prm.Dbg(sa, $"[巨大凯夫卡方位获取] 凯夫卡方位 {prm.凯夫卡方位} {(cwFromA ? "A顺" : "C逆")}");
+        return region;
+    }
+
+    public static (int attackRegion, int safeRegion) 巨大凯夫卡半场刀方向(this UDMP3Params prm, ScriptAccessory sa, bool isRightHand)
+    {
+        // A顺，
+        var bossRegion = prm.凯夫卡方位;
+        var attackRegion = (bossRegion + 8 + (isRightHand ? -2 : 2)) % 8;
+        var safeRegion = (bossRegion + 8 + (isRightHand ? 2 : -2)) % 8;
+        prm.Dbg(sa, $"[巨大凯夫卡半场刀方向] 攻击 {attackRegion} 安全 {safeRegion} A顺");
+        return (attackRegion, safeRegion);
+    }
+    
+    public static Vector3 基于凯夫卡旋转(this UDMP3Params prm, Vector3 basePos, int bossRegion)
+    {
+        var center = new Vector3(100, 0, 100);
+        return basePos.RotateAndExtend(center, (bossRegion * 45f).DegToRad());
+    }
+
+    public static bool 需要踩塔(this UDMP3Params prm, int myIndex)
+    {
+        // 分摊TN 我是TN 我分摊 false
+        // 分摊TN 我是D  我踩塔 true
+        // 分摊D  我是TN 我踩塔 true
+        // 分摊D  我是TN 我分摊 false
+        return prm.分摊点TN ^ (myIndex <= 3);
+    }
 }
 
 #endregion 参数容器类
@@ -1961,11 +2354,6 @@ internal static class EventExtensions
         return ParseHexId(ev["Id"], out var id) ? id : 0;
     }
     
-    public static uint Index(this Event ev)
-    {
-        return JsonConvert.DeserializeObject<uint>(ev["Index"]);
-    }
-    
     public static uint DurationMilliseconds(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["DurationMilliseconds"]);
@@ -1983,34 +2371,10 @@ internal static class IbcHelper
     {
         return sa.Data.Objects.SearchById(gameObjectId);
     }
-    
-    public static IGameObject? GetMe(this ScriptAccessory sa)
-    {
-        return sa.Data.Objects.LocalPlayer;
-    }
-
     public static IEnumerable<IGameObject?> GetByDataId(this ScriptAccessory sa, uint dataId)
     {
         return sa.Data.Objects.Where(x => x.DataId == dataId);
     }
-
-    public static string GetPlayerJob(this ScriptAccessory sa, IPlayerCharacter? playerObject, bool fullName = false)
-    {
-        if (playerObject == null) return "None";
-        return fullName ? playerObject.ClassJob.Value.Name.ToString() : playerObject.ClassJob.Value.Abbreviation.ToString();
-    }
-
-    public static float GetStatusRemainingTime(this ScriptAccessory sa, IBattleChara? battleChara, uint statusId)
-    {
-        if (battleChara == null || !battleChara.IsValid()) return 0;
-        unsafe
-        {
-            BattleChara* charaStruct = (BattleChara*)battleChara.Address;
-            var statusIdx = charaStruct->GetStatusManager()->GetStatusIndex(statusId);
-            return charaStruct->GetStatusManager()->GetRemainingTime(statusIdx);
-        }
-    }
-    
     public static List<ulong> GetTetherSource(this ScriptAccessory sa, IBattleChara? battleChara, uint tetherId)
     {
         List<ulong> tetherSourceId = [];
@@ -2027,13 +2391,6 @@ internal static class IbcHelper
             }
         }
         return tetherSourceId;
-    }
-    
-    public static unsafe byte? GetTransformationId(this ScriptAccessory sa, IGameObject? obj)
-    {
-        if (obj == null) return null;
-        Character* objStruct = (Character*)obj.Address;
-        return objStruct->Timeline.ModelState;
     }
 }
 #region 计算函数
@@ -2186,20 +2543,6 @@ internal static class IndexHelper
     }
 
     /// <summary>
-    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
-    /// </summary>
-    /// <param name="pid">玩家SourceId</param>
-    /// <param name="sa"></param>
-    /// <returns>该玩家对应的位置称呼</returns>
-    public static string GetPlayerJobById(this ScriptAccessory sa, uint pid)
-    {
-        // 获得玩家职能简称，无用处，仅作DEBUG输出
-        var idx = sa.Data.PartyList.IndexOf(pid);
-        var str = sa.GetPlayerJobByIndex(idx);
-        return str;
-    }
-
-    /// <summary>
     /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
     /// </summary>
     /// <param name="idx">位置index</param>
@@ -2215,23 +2558,6 @@ internal static class IndexHelper
         return fourPeople ? role4[idx] : role8[idx];
     }
     
-    /// <summary>
-    /// 将List内信息转换为字符串。
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="myList"></param>
-    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
-    /// <typeparam name="T"></typeparam>
-    /// <returns></returns>
-    public static string BuildListStr<T>(this ScriptAccessory sa, List<T> myList, bool isJob = false)
-    {
-        return string.Join(", ", myList.Select(item =>
-        {
-            if (isJob && item != null && item is int i)
-                return sa.GetPlayerJobByIndex(i);
-            return item?.ToString() ?? "";
-        }));
-    }
 }
 #endregion 位置序列函数
 
@@ -2438,41 +2764,6 @@ internal static class DrawTools
         => sa.DrawRect(ownerObj, 0, delay, destroy, name, rotation, width, length, color, byTime, byY, draw);
     
     /// <summary>
-    /// 返回背对绘图
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="targetObj">目标</param>
-    /// <param name="delay">延时</param>
-    /// <param name="destroy">消失时间</param>
-    /// <param name="name">绘图名字</param>
-    /// <param name="color">使用颜色</param>
-    /// <param name="draw">是否直接绘制</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory sa,
-        object targetObj, int delay, int destroy, string name, Vector4 color, bool draw = true)
-        => sa.DrawOwnerBase(sa.Data.Me, targetObj, delay, destroy, name, 0, 0, 0, 0, 0, 0,
-            DrawModeEnum.Default, DrawTypeEnum.SightAvoid, color, false, false, draw);
-
-    /// <summary>
-    /// 返回击退绘图
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="targetObj">击退源</param>
-    /// <param name="delay">延时</param>
-    /// <param name="destroy">消失时间</param>
-    /// <param name="name">绘图名字</param>
-    /// <param name="width">箭头宽</param>
-    /// <param name="length">箭头长</param>
-    /// <param name="color">使用颜色</param>
-    /// <param name="draw">是否直接绘制</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory sa,
-        object targetObj, int delay, int destroy, string name, float width, float length,
-        Vector4 color, bool draw = true)
-        => sa.DrawOwnerBase(sa.Data.Me, targetObj, delay, destroy, name, 0, float.Pi, width, length, 0, 0,
-            DrawModeEnum.Default, DrawTypeEnum.Displacement, color, false, false, draw);
-
-    /// <summary>
     /// 返回线型绘图
     /// </summary>
     /// <param name="sa"></param>
@@ -2529,47 +2820,6 @@ internal static class DrawTools
         self.CentreOrderIndex = orderIdx;
         return self;
     }
-    
-    /// <summary>
-    /// 赋予输入的dp以ownerId为源的仇恨顺序绘图
-    /// </summary>
-    /// <param name="self"></param>
-    /// <param name="orderIdx">仇恨顺序，从1开始</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit SetOwnersEnmityOrder(this DrawPropertiesEdit self, uint orderIdx)
-    {
-        self.CentreResolvePattern = PositionResolvePatternEnum.OwnerEnmityOrder;
-        self.CentreOrderIndex = orderIdx;
-        return self;
-    }
-    
-    /// <summary>
-    /// 赋予输入的dp以position为源的远近目标绘图
-    /// </summary>
-    /// <param name="self"></param>
-    /// <param name="isNearOrder">从owner计算，近顺序或远顺序</param>
-    /// <param name="orderIdx">从1开始</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit SetPositionDistanceOrder(this DrawPropertiesEdit self, bool isNearOrder,
-        uint orderIdx)
-    {
-        self.TargetResolvePattern = isNearOrder
-            ? PositionResolvePatternEnum.PlayerNearestOrder
-            : PositionResolvePatternEnum.PlayerFarestOrder;
-        self.TargetOrderIndex = orderIdx;
-        return self;
-    }
-    
-    /// <summary>
-    /// 赋予输入的dp以ownerId施法目标为源的绘图
-    /// </summary>
-    /// <param name="self"></param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit SetOwnersTarget(this DrawPropertiesEdit self)
-    {
-        self.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
-        return self;
-    }
 }
 
 #endregion 绘图函数
@@ -2578,45 +2828,6 @@ internal static class DrawTools
 
 internal static class MarkerHelper
 {
-    public static void LocalMarkClear(this ScriptAccessory sa)
-    {
-        sa.Log.Debug($"删除本地标点。");
-        sa.Method.Mark(0xE000000, MarkType.Attack1, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack2, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack3, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack4, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack5, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack6, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack7, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack8, true);
-        sa.Method.Mark(0xE000000, MarkType.Bind1, true);
-        sa.Method.Mark(0xE000000, MarkType.Bind2, true);
-        sa.Method.Mark(0xE000000, MarkType.Bind3, true);
-        sa.Method.Mark(0xE000000, MarkType.Stop1, true);
-        sa.Method.Mark(0xE000000, MarkType.Stop2, true);
-        sa.Method.Mark(0xE000000, MarkType.Square, true);
-        sa.Method.Mark(0xE000000, MarkType.Circle, true);
-        sa.Method.Mark(0xE000000, MarkType.Cross, true);
-        sa.Method.Mark(0xE000000, MarkType.Triangle, true);
-    }
-
-    public static void MarkClear(this ScriptAccessory sa,
-        bool enable = true, bool local = false, bool localString = false)
-    {
-        if (!enable) return;
-        sa.Log.Debug($"接收命令：删除标点");
-        
-        if (local)
-        {
-            if (localString)
-                sa.Log.Debug($"[字符模拟] 删除本地标点。");
-            else
-                sa.LocalMarkClear();
-        }
-        else
-            sa.Method.MarkClear();
-    }
-
     public static void MarkPlayerByIdx(this ScriptAccessory sa, int idx, MarkType marker,
         bool enable = true, bool local = false, bool localString = false)
     {
@@ -2625,16 +2836,6 @@ internal static class MarkerHelper
             sa.Log.Debug($"[本地字符模拟] 为{idx}({sa.GetPlayerJobByIndex(idx)})标上{marker}。");
         else
             sa.Method.Mark(sa.Data.PartyList[idx], marker, local);
-    }
-
-    public static void MarkPlayerById(this ScriptAccessory sa, uint id, MarkType marker,
-        bool enable = true, bool local = false, bool localString = false)
-    {
-        if (!enable) return;
-        if (localString)
-            sa.Log.Debug($"[本地字符模拟] 为{sa.GetPlayerIdIndex(id)}({sa.GetPlayerJobById(id)})标上{marker}。");
-        else
-            sa.Method.Mark(id, marker, local);
     }
 
     public static int GetMarkedPlayerIndex(this ScriptAccessory sa, List<MarkType> markerList, MarkType marker)
@@ -2664,119 +2865,6 @@ internal static class DebugFunction
 
 internal static class SpecialFunction
 {
-    public static void SetTargetable(this ScriptAccessory sa, IGameObject? obj, bool targetable)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            if (targetable)
-            {
-                if (obj.IsDead || obj.IsTargetable) return;
-                charaStruct->TargetableStatus |= ObjectTargetableFlags.IsTargetable;
-            }
-            else
-            {
-                if (!obj.IsTargetable) return;
-                charaStruct->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
-            }
-        }
-        sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
-    }
-
-    public static unsafe void ScaleModify(this ScriptAccessory sa, IGameObject? obj, float scale, bool vfxScaled = true)
-    {
-        sa.Method.RunOnMainThreadAsync(Action);
-        void Action()
-        {
-            if (obj == null) return;
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            if (!obj.IsValid() || !charaStruct->IsReadyToDraw())
-            {
-                sa.Log.Error($"传入的IGameObject不合法。");
-                return;
-            }
-            charaStruct->Scale = scale;
-            if (vfxScaled)
-                charaStruct->VfxScale = scale;
-
-            if (charaStruct->IsCharacter())
-                ((BattleChara*)charaStruct)->Character.CharacterData.ModelScale = scale;
-        
-            charaStruct->DisableDraw();
-            charaStruct->EnableDraw();
-        
-            sa.Log.Debug($"ScaleModify => {obj.Name.TextValue} | {obj} => {scale}");
-        }
-    }
-
-    public static void SetRotation(this ScriptAccessory sa, IGameObject? obj, float radian, bool show = false)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->SetRotation(radian);
-        }
-        sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.EntityId} => {radian.RadToDeg()}");
-        
-        if (!show) return;
-        var ownerObj = sa.GetById(obj.EntityId);
-        if (ownerObj == null) return;
-        var dp = sa.DrawGuidance(ownerObj, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", sa.Data.DefaultSafeColor, radian, draw: false);
-        dp.FixRotation = true;
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
-        
-    }
-
-    public static void SetPosition(this ScriptAccessory sa, IGameObject? obj, Vector3 position, bool show = false)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->SetPosition(position.X, position.Y, position.Z);
-        }
-        sa.Log.Debug($"改变位置 => {obj.Name.TextValue} | {obj.EntityId} => {position}");
-        
-        if (!show) return;
-        var dp = sa.DrawCircle(position, 0, 2000, $"传送点 {obj.Name.TextValue}", 0.5f, sa.Data.DefaultSafeColor, draw: false);
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
-    }
-    
-    public static unsafe void WriteVisible(this ScriptAccessory sa, IGameObject? actor, bool visible)
-    {
-        const VisibilityFlags VISIBLE_FLAG = VisibilityFlags.None;
-        const VisibilityFlags INVISIBILITY_FLAG = VisibilityFlags.Model;
-        if (actor == null || !actor.IsValid())
-        {
-            sa.Log.Error("WriteVisible 失败：传入的 IGameObject 不合法。");
-            return;
-        }
-        try
-        {
-            var flagsPtr = &((GameObject*)actor.Address)->RenderFlags;
-            *flagsPtr = visible ? VISIBLE_FLAG : INVISIBILITY_FLAG;
-        }
-        catch (Exception e)
-        {
-            sa.Log.Error(e.ToString());
-            throw;
-        }
-    }
-    
     public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha)
     {
         alpha = Math.Clamp(alpha, 0f, 1f);
@@ -2797,10 +2885,10 @@ internal static class SpecialFunction
                 sa.Log.Error($"传入的IGameObject不是Character，无法修改透明度。");
                 return;
             }
-            
+
             charaStruct->Alpha = alpha;
-            charaStruct->DisableDraw();
-            charaStruct->EnableDraw();
+            // charaStruct->DisableDraw();
+            // charaStruct->EnableDraw();
 
             sa.Log.Debug($"AlphaModify => {obj.Name.TextValue} | {obj} => {alpha}");
         }
