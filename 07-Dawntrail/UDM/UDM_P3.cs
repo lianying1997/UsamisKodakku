@@ -51,11 +51,12 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复P3二运指挥模式标点逻辑错误
+        1. 增加 P3 二运指挥模式优先级配置
+        2. 增加 P3 二运黑洞策略：接两根变种
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.15";
+    private const string Version = "0.0.0.16";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -88,6 +89,14 @@ public class UDM_P3
     
     [UserSetting("P3B1 - 二运黑洞指挥模式")]
     public bool P3B1CaptainMode { get; set; } = false;
+
+    [UserSetting("P3B1 - 二运黑洞策略")]
+    public static BhStgEnum BhStg { get; set; } = BhStgEnum.一人一根线;
+    public enum BhStgEnum
+    {
+        一人一根线,
+        攻1禁2接两根,
+    }
     
     public void Init(ScriptAccessory sa)
     {
@@ -1385,14 +1394,10 @@ public class UDM_P3
         // 第三轮黑洞起始，锁链1，锁链2，锁链3
         // 第四轮黑洞起始，禁止1，禁止2
 
-        var priRankList = 筛选本轮接线玩家(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
-        for (int i = 0; i < priRankList.Count; i++)
+        var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
+        foreach (var task in tetherTasks)
         {
-            // 黑洞字典已在生成时排好序
-            var bh = _udmP3Param.黑洞字典.ElementAt(i);
-            var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
-            绘制玩家向黑洞方位接线(sa, player.Key, bh.Value.region,
-                $"R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数} {player.Key} {bh.Value.region}");
+            绘制玩家向黑洞方位接线(sa, task.playerIdx, task.realRegions, task.name);
         }
         _udmP3Param.外黑洞获取完毕.Reset();
     }
@@ -1410,14 +1415,10 @@ public class UDM_P3
             排序黑洞字典();
         }
         if (_udmP3Param.黑洞喷射轮数 >= 10) return;
-        var priRankList = 筛选本轮接线玩家(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
-        for (int i = 0; i < priRankList.Count; i++)
+        var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
+        foreach (var task in tetherTasks)
         {
-            // 黑洞字典已在生成时排好序
-            var bh = _udmP3Param.黑洞字典.ElementAt(i);
-            var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
-            绘制玩家向黑洞方位接线(sa, player.Key, bh.Value.region,
-                $"R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数} {player.Key} {bh.Value.region}");
+            绘制玩家向黑洞方位接线(sa, task.playerIdx, task.realRegions, task.name);
         }
     }
 
@@ -1441,21 +1442,41 @@ public class UDM_P3
 
     private List<int> 筛选本轮接线玩家(ScriptAccessory sa, int bhRound, int bhEffectRound)
     {
-        List<int> priRankList = (bhRound, bhEffectRound) switch
-        {
-            (1, 0) => [0],
-            (1, 1) => [0, 1],
-            (2, 2) => [0, 1, 2],
-            (2, 3) => [3, 1, 2],
-            (2, 4) => [3, 4, 2],
-            (3, 5) => [3, 4, 5],
-            (3, 6) => [6, 4, 5],
-            (3, 7) => [6, 7, 5],
-            (4, 8) => [6, 7],
-            (4, 9) => [7],
-            (1, 2) or (2, 5) or (3, 8) or (4, 10) => [],
-            _ => []
-        };
+        List<int> priRankList;
+
+        if (BhStg == BhStgEnum.一人一根线)
+            priRankList = (bhRound, bhEffectRound) switch
+            {
+                (1, 0) => [0],
+                (1, 1) => [0, 1],
+                (2, 2) => [0, 1, 2],
+                (2, 3) => [3, 1, 2],
+                (2, 4) => [3, 4, 2],
+                (3, 5) => [3, 4, 5],
+                (3, 6) => [6, 4, 5],
+                (3, 7) => [6, 7, 5],
+                (4, 8) => [6, 7],
+                (4, 9) => [7],
+                (1, 2) or (2, 5) or (3, 8) or (4, 10) => [],
+                _ => []
+            };
+        else
+            priRankList = (bhRound, bhEffectRound) switch
+            {
+                (1, 0) => [1],
+                (1, 1) => [0, 0],
+                (2, 2) => [0, 1, 2],
+                (2, 3) => [3, 1, 2],
+                (2, 4) => [3, 4, 2],
+                (3, 5) => [3, 4, 5],
+                (3, 6) => [6, 4, 5],
+                (3, 7) => [6, 7, 5],
+                (4, 8) => [7, 7],
+                (4, 9) => [6],
+                (1, 2) or (2, 5) or (3, 8) or (4, 10) => [],
+                _ => []
+            };
+
         var isKnownNoop = (bhRound, bhEffectRound) is (1, 2) or (2, 5) or (3, 8) or (4, 10);
         if (priRankList.Count == 0 && !isKnownNoop)
         {
@@ -1464,19 +1485,66 @@ public class UDM_P3
         return priRankList;
     }
     
-    private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, int playerIdx, int realRegion, string name)
+    private List<(int playerIdx, List<int> realRegions, string name)> 获取本轮黑洞接线任务(ScriptAccessory sa, int bhRound, int bhEffectRound)
+    {
+        var priRankList = 筛选本轮接线玩家(sa, bhRound, bhEffectRound);
+        var tasks = new List<(int playerIdx, List<int> realRegions, string name)>();
+
+        for (int i = 0; i < priRankList.Count; i++)
+        {
+            // 黑洞字典已在生成时排好序
+            var realRegions = new List<int> { _udmP3Param.黑洞字典.ElementAt(i).Value.region };
+            var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
+
+            if (i + 1 < priRankList.Count && priRankList[i + 1] == priRankList[i])
+            {
+                realRegions.Add(_udmP3Param.黑洞字典.ElementAt(i + 1).Value.region);
+                i++;
+            }
+
+            var regionStr = string.Join(",", realRegions);
+            tasks.Add((player.Key, realRegions, $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}"));
+        }
+
+        return tasks;
+    }
+
+    private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, int playerIdx, List<int> realRegions, string name)
     {
         if (sa.GetMyIndex() != playerIdx) return;
-        // 与黑洞本体的 Connection
-        var bhpos = BlackHoleBasePos.RotateAndExtend(Center, realRegion * -45f.DegToRad());
         var color = new Vector4(1, 1, 0, 1);
-        sa.DrawConnection(sa.Data.PartyList[playerIdx], bhpos, 0, 7000, $"绘制黑洞接线 {name}", color);
+
+        foreach (var realRegion in realRegions)
+        {
+            var bhpos = BlackHoleBasePos.RotateAndExtend(Center, realRegion * -45f.DegToRad());
+            sa.DrawConnection(sa.Data.PartyList[playerIdx], bhpos, 0, 7000, $"绘制黑洞接线 {name} C{realRegion}", color);
+        }
+
+        var guidePos = realRegions.Count == 1
+            ? 计算黑洞顺时针侧指路点(realRegions[0])
+            : 计算两黑洞之间指路点(realRegions[0], realRegions[1]);
+        sa.DrawGuidance(sa.Data.PartyList[playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {name} G", sa.Data.DefaultSafeColor);
+
+        sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(playerIdx)} 接真实方位 {string.Join(",", realRegions)} 的黑洞", Debugging);
+    }
+
+    private Vector3 计算黑洞顺时针侧指路点(int realRegion)
+    {
+        var bhpos = BlackHoleBasePos.RotateAndExtend(Center, realRegion * -45f.DegToRad());
+        return bhpos.RotateAndExtend(Center, -45f.DegToRad(), -4.979f);
+    }
         
-        // 顺时针旋转45，向内延伸 17 - 17/sqrt(2)
-        var guidePos = bhpos.RotateAndExtend(Center, -45f.DegToRad(), -4.979f);
-        sa.DrawGuidance(sa.Data.PartyList[playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {name}", sa.Data.DefaultSafeColor);
+    private Vector3 计算两黑洞之间指路点(int realRegion1, int realRegion2)
+    {
+        var bhpos1 = BlackHoleBasePos.RotateAndExtend(Center, realRegion1 * -45f.DegToRad());
+        var bhpos2 = BlackHoleBasePos.RotateAndExtend(Center, realRegion2 * -45f.DegToRad());
+        var guideDir = bhpos1 + bhpos2 - Center * 2;
         
-        sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(playerIdx)} 接真实方位 {realRegion} 的黑洞", Debugging);
+        if (guideDir.LengthSquared() < 0.001f)
+            return 计算黑洞顺时针侧指路点(realRegion1);
+
+        guideDir = Vector3.Normalize(guideDir);
+        return Center + guideDir * (BlackHoleBasePos.GetLength(Center) - 4.979f);
     }
 
 
