@@ -1169,7 +1169,7 @@ public class UDM_P3
     }
 
     [ScriptMethod(name: "*P3A1_真空波_自动面向辅助结束", eventType: EventTypeEnum.ActionEffect,
-        eventCondition: ["ActionId:regex:^(47891)$"], suppress: 10000, userControl: true)]
+        eventCondition: ["ActionId:regex:^(47891)$"], suppress: 10000, userControl: Debugging)]
     public void P3A1_真空波_自动面向辅助结束(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
