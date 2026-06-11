@@ -55,18 +55,18 @@ public class UDM_P3
         特殊方法
         - 屏蔽艾克斯迪司释放钢铁暴雷时的连线
         - 巨大凯夫卡释放上桌技能时透明化
+        - 真空波击退基于艾克斯迪司面向校正
         """;
     
     const string UpdateInfo =
         $"""
         {Version}
-        1. 补全 P3 二运，设置项较多，请仔细阅读并确认作战策略。
-        2. 二运黑洞指挥模式标点优先级支持字符"N"，等价于"H"。（扶额）
+        1. 增加真空波击退自动面向辅助
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.17";
-    private const string DebugVersion = "b";
+    private const string Version = "0.0.0.18";
+    private const string DebugVersion = "a";
     private int _runId = 0;
 
     private const bool Debugging = false;
@@ -1093,15 +1093,15 @@ public class UDM_P3
         Vector3 bossPos = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司).Position;
         var basePos = bossPos.RotateAndExtend(Center, 0, -3.8f);
         var guidePos = basePos.RotateAndExtend(bossPos, angleBias[myIndex].DegToRad());
-        sa.DrawGuidance(guidePos, 0, _udmP3Param.真空波指路时间, $"执行真空波相反水晶指路逻辑 指路", sa.Data.DefaultSafeColor);
+        sa.DrawGuidance(guidePos, 0, _udmP3Param.真空波指路时间, $"执行真空波逃课指路逻辑 指路", sa.Data.DefaultSafeColor);
 
         // 面向指示
         var myPriVal = _pd.Priorities[myIndex];
         var needBack = _udmP3Param.需要背对(myPriVal);
         var needBackStr = needBack ? "背对" : "面向";
-        DrawFacingArrow(sa, 0, false, $"执行真空波相反水晶指路逻辑 面向辅助自身", _udmP3Param.真空波指路时间);
+        DrawFacingArrow(sa, 0, false, $"执行真空波逃课指路逻辑 面向辅助自身", _udmP3Param.真空波指路时间);
 
-        var dp = sa.DrawLine(sa.Data.Me, _udmP3Param.ObjectId_艾克斯迪司, 0, _udmP3Param.真空波指路时间, $"执行真空波相反水晶指路逻辑 面向辅助正确面向",
+        var dp = sa.DrawLine(sa.Data.Me, _udmP3Param.ObjectId_艾克斯迪司, 0, _udmP3Param.真空波指路时间, $"执行真空波逃课指路逻辑 面向辅助正确面向",
             needBack ? 180f.DegToRad() : 0, 1f, 4.5f, sa.Data.DefaultSafeColor, draw: false);
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
 
@@ -1126,10 +1126,60 @@ public class UDM_P3
         }
     }
 
+    [ScriptMethod(name: "*P3A1_真空波_自动面向辅助", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(47891)$"], userControl: true)]
+    public void P3A1_真空波_自动面向辅助(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3111) return;
+        if (!SpecialMode) return;
+
+        sa.DebugMsg($"[P3A1_真空波_自动面向辅助] 开始", Debugging);
+
+        var myObject = sa.Data.MyObject;
+        if (myObject == null) return;
+
+        // 判断进入条件
+        const uint 混沌之风 = 1602;
+        const uint 混沌之逆风 = 1603;
+        var hasStatus = sa.Data.MyObject.HasStatusAny([混沌之风, 混沌之逆风]);
+        if (!hasStatus) return;
+        var myPriVal = _pd.Priorities[sa.GetMyIndex()];
+        var needBack = _udmP3Param.需要背对(myPriVal);
+
+        // 计算正确面向角度
+        var bossObj = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司);
+        if (bossObj == null) return;
+        var bossPos = bossObj.Position;
+        var myPos = myObject.Position;
+        var correctFaceRotation = myPos.GetRadian(bossPos) + (needBack ? 0 : float.Pi);
+
+        // 开启触发
+        _udmP3Param.真空波面向辅助Framework = sa.Method.RegistFrameworkUpdateAction(Action);
+        return;
+
+        void Action()
+        {
+            var myRotation = myObject.Rotation;
+            var rotationDiff = MathF.Abs(myRotation.GetDiffRad(correctFaceRotation));
+            if (!sa.IsMoving() && rotationDiff > 0.1f && (DateTime.Now - _udmP3Param.真空波面向辅助触发时间).TotalMilliseconds > 250)
+            {
+                _udmP3Param.真空波面向辅助触发时间 = DateTime.Now;
+                sa.SetRotation(myObject, correctFaceRotation);
+            }
+        }
+    }
+
+    [ScriptMethod(name: "*P3A1_真空波_自动面向辅助结束", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:regex:^(47891)$"], suppress: 10000, userControl: true)]
+    public void P3A1_真空波_自动面向辅助结束(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3111) return;
+        sa.Method.UnregistFrameworkUpdateAction(_udmP3Param.真空波面向辅助Framework);
+    }
+
     #endregion P3A1 真空波 3111
 
     #region P3A1 究极冲击波 3111
-    
+
     [ScriptMethod(name: "———————— 《P3A1 究极冲击波》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: true)]
     public void P3A1_究极冲击波分割线(Event ev, ScriptAccessory sa)
@@ -1559,7 +1609,7 @@ public class UDM_P3
             if (Vector3.Distance(pos, Center) < 16.5f) return;
             
             // A顺计数
-            var region = (pos.GetRadian(Center).RadianToRegion(8, 4, isDiagDiv: true, isCw: true)) % 8;
+            var region = pos.GetRadian(Center).RadianToRegion(8, 4, isDiagDiv: true, isCw: true) % 8;
             var relativeRegion = (region + 8 - _udmP3Param.凯夫卡方位) % 8;
             
             _udmP3Param.黑洞字典.TryAdd(sid,
@@ -2123,6 +2173,8 @@ internal class UDMP3Params
     public int 一水火指路与绘图时间 = 10000;
     public int 二水火指路与绘图时间 = 9000;
     public int 真空波指路时间 = 7000;
+    public string 真空波面向辅助Framework = "";
+    public DateTime 真空波面向辅助触发时间 = DateTime.MinValue;
     
     // ---- 二运 ----
     public int 二运状态记录次数 = 0;
@@ -2161,10 +2213,13 @@ internal class UDMP3Params
         
         ObjectId_卡奥斯 = 0;
         ObjectId_艾克斯迪司 = 0;
-        
+
         一运状态记录 = new(false);
         一运水晶记录 = new(false);
         一水火准备 = new(false);
+        sa.Method.UnregistFrameworkUpdateAction(真空波面向辅助Framework);
+        真空波面向辅助Framework = "";
+        真空波面向辅助触发时间 = DateTime.MinValue;
         
         火组 = new();
         水组 = new();
@@ -2173,7 +2228,7 @@ internal class UDMP3Params
         一水火指路与绘图时间 = 10000;
         二水火指路与绘图时间 = 9000;
         真空波指路时间 = 7000;
-        
+
         // 二运
         二运状态记录次数 = 0;
         二运状态记录 = new(false);
@@ -2865,6 +2920,34 @@ internal static class DebugFunction
 
 internal static class SpecialFunction
 {
+    public static void SetRotation(this ScriptAccessory sa, IGameObject? obj, float radian, bool show = false)
+    {
+        if (obj == null || !obj.IsValid())
+        {
+            sa.Log.Error($"传入的IGameObject不合法。");
+            return;
+        }
+        unsafe
+        {
+            GameObject* charaStruct = (GameObject*)obj.Address;
+            charaStruct->SetRotation(radian);
+        }
+        // sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.EntityId} => {radian.RadToDeg()}");
+        
+        if (!show) return;
+        var ownerObj = sa.GetById(obj.EntityId);
+        if (ownerObj == null) return;
+        var dp = sa.DrawGuidance(ownerObj, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", radian, draw: false);
+        dp.FixRotation = true;
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
+    }
+
+    public static unsafe bool IsMoving(this ScriptAccessory sa)
+    {
+        FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap* ptr = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
+        return ptr is not null && ptr->IsPlayerMoving;
+    }
+    
     public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha)
     {
         alpha = Math.Clamp(alpha, 0f, 1f);
@@ -2890,7 +2973,7 @@ internal static class SpecialFunction
             // charaStruct->DisableDraw();
             // charaStruct->EnableDraw();
 
-            sa.Log.Debug($"AlphaModify => {obj.Name.TextValue} | {obj} => {alpha}");
+            // sa.Log.Debug($"AlphaModify => {obj.Name.TextValue} | {obj} => {alpha}");
         }
     }
 }
