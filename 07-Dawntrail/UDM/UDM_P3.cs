@@ -65,7 +65,7 @@ public class UDM_P3
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.18";
+    private const string Version = "0.0.0.19";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -2937,7 +2937,7 @@ internal static class SpecialFunction
         if (!show) return;
         var ownerObj = sa.GetById(obj.EntityId);
         if (ownerObj == null) return;
-        var dp = sa.DrawGuidance(ownerObj, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", radian, draw: false);
+        var dp = sa.DrawGuidance(ownerObj, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", sa.Data.DefaultSafeColor, radian, draw: false);
         dp.FixRotation = true;
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
     }
