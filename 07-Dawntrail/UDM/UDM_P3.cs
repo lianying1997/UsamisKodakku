@@ -61,11 +61,14 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 增加真空波击退自动面向辅助
+        1. 调整 P3 二运冰封踩塔的路径，使更偏向场外。
+        2. 修复真空波指引线（画在场地上的线）错误的 Bug
+        3. 修复自动面向辅助 Bug
+        4. 调整 P3 轰击（分摊后旋风）的出现时间为一起于第二次分摊后出现
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.19";
+    private const string Version = "0.0.0.20";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -191,13 +194,12 @@ public class UDM_P3
         sa.DebugMsg($"[测试项：究极冲击波赋值] 赋值完毕", Debugging);
     }
     
-    [ScriptMethod(name: "测试项：测试TTS", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    [ScriptMethod(name: "测试项：测试指引线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
     public void 测试TTS(Event ev, ScriptAccessory sa)
     {
-        var needBack = "背对";
-        sa.Method.TextInfo($"{needBack} 吃火月环", 3000);
-        sa.Method.TTS($"{needBack}吃火月环", 2);
+        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
+        DrawStaticGuideLineVw(sa, 1500);
     }
     
     [ScriptMethod(name: "测试项：测试黑洞线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -210,6 +212,20 @@ public class UDM_P3
         if (bc == null) return;
         var hasTether = sa.GetTetherSource((IBattleChara)bc, tetherId).Count > 0;
         sa.DebugMsg($"{hasTether}", Debugging);
+    }
+    
+    [ScriptMethod(name: "测试项：真空波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 真空波赋值(Event ev, ScriptAccessory sa)
+    {
+        _udmP3Param.当前阶段 = 3111;
+        _pd.Init(sa, "P3一运");
+        _pd.AddPriorities([11, 112, 13, 214, 15, 26, 127, 228]);
+        
+        _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
+        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
+        
+        sa.DebugMsg($"[测试项：真空波赋值] 赋值完毕", Debugging);
     }
     
     [ScriptMethod(name: "测试项：二运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -1116,12 +1132,12 @@ public class UDM_P3
         var baseRadian = 180f.DegToRad() + bossPos.GetRadian(Center);
         
         List<float> biasDeg = [-20, 20, -60, 60];
-        List<int> partner = [2, 3, 0, 1];
+        List<int> lineIdx = [2, 3, 0, 1, 0, 1, 2, 3];
         for (int i = 0; i < 4; i++)
         {
             var dp = sa.DrawLine(bossPos, 0, 0, destroyTime, $"DrawStaticGuideLineVw 指引线{i}",
                 baseRadian + biasDeg[i].DegToRad(), 20f, 50f, sa.Data.DefaultSafeColor, draw: false);
-            dp.Color = i == partner[myIndex % 4] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor;
+            dp.Color = i == lineIdx[myIndex] ? sa.Data.DefaultSafeColor : sa.Data.DefaultDangerColor;
             sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
         }
     }
@@ -1144,26 +1160,26 @@ public class UDM_P3
         if (!hasStatus) return;
         var myPriVal = _pd.Priorities[sa.GetMyIndex()];
         var needBack = _udmP3Param.需要背对(myPriVal);
-
+        
         // 计算正确面向角度
         var bossObj = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司);
         if (bossObj == null) return;
         var bossPos = bossObj.Position;
-        var myPos = myObject.Position;
-        var correctFaceRotation = myPos.GetRadian(bossPos) + (needBack ? 0 : float.Pi);
-
         // 开启触发
         _udmP3Param.真空波面向辅助Framework = sa.Method.RegistFrameworkUpdateAction(Action);
         return;
 
         void Action()
         {
+            var myPos = myObject.Position;
             var myRotation = myObject.Rotation;
+            var correctFaceRotation = myPos.GetRadian(bossPos) + (needBack ? 0 : float.Pi);
+            
             var rotationDiff = MathF.Abs(myRotation.GetDiffRad(correctFaceRotation));
             if (!sa.IsMoving() && rotationDiff > 0.1f && (DateTime.Now - _udmP3Param.真空波面向辅助触发时间).TotalMilliseconds > 250)
             {
                 _udmP3Param.真空波面向辅助触发时间 = DateTime.Now;
-                sa.SetRotation(myObject, correctFaceRotation);
+                sa.SetRotation(myObject, correctFaceRotation, Debugging);
             }
         }
     }
@@ -1847,12 +1863,12 @@ public class UDM_P3
         var myIndex = sa.GetMyIndex();
         
         // 盗火策略，第一步在上下；其余，第一步在场中
-        var relativeUpDownPos = myIndex <= 3 ? new Vector3(100, 0, 107.5f) : new Vector3(100, 0, 92.5f);
+        var relativeUpDownPos = myIndex <= 3 ? new Vector3(100, 0, 110f) : new Vector3(100, 0, 90f);
         var initPos = BlizStg == BlizStgEnum.从上下引导后四角_盗火文档 ? relativeUpDownPos: Center;
         initPos = _udmP3Param.基于凯夫卡旋转(initPos, _udmP3Param.冰封北方位);
         
         // 在这里画一与二
-        var targetPos = new Vector3(100, 0, 107.5f);
+        var targetPos = new Vector3(100, 0, 114.14f);
         // 根据位置旋转特定角度
         var rotDeg = myIndex switch
         {
@@ -1943,7 +1959,14 @@ public class UDM_P3
     public void P3B2_轰击旋风(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3210) return;
-        sa.DrawCircle(ev.TargetPosition, 0, 15000, $"轰击旋风", 6, sa.Data.DefaultDangerColor.WithW(2f));
+        if (Vector3.Distance(_udmP3Param.第一次轰击位置, ev.TargetPosition) > 80)
+            _udmP3Param.第一次轰击位置 = ev.TargetPosition;
+        else
+        {
+            sa.DrawCircle(ev.TargetPosition, 0, 15000, $"轰击旋风1", 6, sa.Data.DefaultDangerColor.WithW(2f));
+            sa.DrawCircle(_udmP3Param.第一次轰击位置, 0, 15000, $"轰击旋风2", 6, sa.Data.DefaultDangerColor.WithW(2f));
+        }
+            
     }
     
     [ScriptMethod(name: "P3B2_顶起删除轰击旋风", eventType: EventTypeEnum.ActionEffect,
@@ -2194,6 +2217,7 @@ internal class UDMP3Params
     public bool 绘制冰封引导路径 = false;
     public bool 是第一次分摊 = false;
     public Vector3 第二枚黄圈引导位置 = new Vector3(100, 0, 100);
+    public Vector3 第一次轰击位置 = new Vector3(0, 0, 0);
     
     public void Reset(ScriptAccessory sa)
     {
@@ -2247,6 +2271,7 @@ internal class UDMP3Params
         绘制冰封引导路径 = false;
         是第一次分摊 = false;
         第二枚黄圈引导位置 = new Vector3(100, 0, 100);
+        第一次轰击位置 = new Vector3(0, 0, 0);
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
@@ -2932,12 +2957,12 @@ internal static class SpecialFunction
             GameObject* charaStruct = (GameObject*)obj.Address;
             charaStruct->SetRotation(radian);
         }
-        // sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.EntityId} => {radian.RadToDeg()}");
+        // sa.Log.Debug($"改变面向 {obj.Name.TextValue} | {obj.GameObjectId} => {radian.RadToDeg()}");
         
         if (!show) return;
-        var ownerObj = sa.GetById(obj.EntityId);
+        var ownerObj = sa.GetById(obj.GameObjectId);
         if (ownerObj == null) return;
-        var dp = sa.DrawGuidance(ownerObj, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", sa.Data.DefaultSafeColor, radian, draw: false);
+        var dp = sa.DrawGuidance(obj.GameObjectId, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", sa.Data.DefaultSafeColor, radian, draw: false);
         dp.FixRotation = true;
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
     }
