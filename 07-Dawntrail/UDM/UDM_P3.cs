@@ -61,14 +61,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 调整 P3 二运冰封踩塔的路径，使更偏向场外。
-        2. 修复真空波指引线（画在场地上的线）错误的 Bug
-        3. 修复自动面向辅助 Bug
-        4. 调整 P3 轰击（分摊后旋风）的出现时间为一起于第二次分摊后出现
+        1. 调整 P3 黑洞轮次的判定时机，避免出现黑洞攻击时间不一致导致的轮次判断错误问题。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.20";
+    private const string Version = "0.0.0.21";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -1677,7 +1674,7 @@ public class UDM_P3
     }
     
     [ScriptMethod(name: "P3B1_接线逻辑_中途", eventType: EventTypeEnum.ActionEffect,
-        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 1000)]
+        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 2500)]
     public void P3B1_接线逻辑_中途(Event ev, ScriptAccessory sa)
     {
         // 删掉上一轮的连线
