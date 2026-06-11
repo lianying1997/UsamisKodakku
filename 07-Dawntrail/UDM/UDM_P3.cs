@@ -1464,7 +1464,7 @@ public class UDM_P3
     }
 
     [ScriptMethod(name: "P3B_追踪巨大凯夫卡", eventType: EventTypeEnum.PlayActionTimeline,
-        eventCondition: ["Id:7748", "SourceDataId:19504"], userControl: Debugging)]
+        eventCondition: ["Id:7748", "SourceDataId:19504"], userControl: true)]
     public void P3B_追踪巨大凯夫卡(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3200) return;
