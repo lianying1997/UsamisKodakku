@@ -61,11 +61,13 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 调整 P3 黑洞轮次的判定时机，避免出现黑洞攻击时间不一致导致的轮次判断错误问题。
+        1. 调整 P3 黑洞绘图逻辑，将连向黑洞的线改变为 需要接的线与对应的攻击范围。
+        2. 脚本初始化时（战斗重新开始时）不再执行清除头标。
+        3. 调整了屏蔽钢铁暴雷连线的方式。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.21";
+    private const string Version = "0.0.0.22";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -128,7 +130,7 @@ public class UDM_P3
         sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
         _udmP3Param.Reset(sa);
         sa.Method.RemoveDraw(".*");
-        sa.Method.MarkClear();
+        // sa.Method.MarkClear();
         sa.Method.ClearFrameworkUpdateAction(this);
     }
     
@@ -422,11 +424,15 @@ public class UDM_P3
     
     [ScriptMethod(name: "*P3A_移除暴雷连线", eventType: EventTypeEnum.VfxEvent,
         eventCondition: ["Type:Channeling", "Id:64"], userControl: true)]
-    public void P3A_移除暴雷连线(Event ev, ScriptAccessory sa)
+    public async void P3A_移除暴雷连线(Event ev, ScriptAccessory sa)
     {
         if (!SpecialMode) return;
-        if (!ev.TryParseVfxHandle(out var handleId)) return;
-        sa.Method.VfxMethod.RemoveVfx(handleId, VfxType.Channeling);
+        var runId = _runId; 
+        var obj = sa.GetById(ev.TargetId);
+        sa.WriteVisible(obj, false);
+        await Task.Delay(7000);
+        if (runId != _runId) return;
+        sa.WriteVisible(obj, true);
     }
 
     [ScriptMethod(name: "P3A_深层痛楚判定", eventType: EventTypeEnum.ActionEffect,
@@ -1668,7 +1674,7 @@ public class UDM_P3
         var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
         foreach (var task in tetherTasks)
         {
-            绘制玩家向黑洞方位接线(sa, task.playerIdx, task.realRegions, task.name);
+            绘制玩家向黑洞方位接线(sa, task);
         }
         _udmP3Param.外黑洞获取完毕.Reset();
     }
@@ -1689,7 +1695,7 @@ public class UDM_P3
         var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
         foreach (var task in tetherTasks)
         {
-            绘制玩家向黑洞方位接线(sa, task.playerIdx, task.realRegions, task.name);
+            绘制玩家向黑洞方位接线(sa, task);
         }
     }
 
@@ -1756,48 +1762,61 @@ public class UDM_P3
         return priRankList;
     }
     
-    private List<(int playerIdx, List<int> realRegions, string name)> 获取本轮黑洞接线任务(ScriptAccessory sa, int bhRound, int bhEffectRound)
+    private List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)> 获取本轮黑洞接线任务(ScriptAccessory sa, int bhRound, int bhEffectRound)
     {
         var priRankList = 筛选本轮接线玩家(sa, bhRound, bhEffectRound);
-        var tasks = new List<(int playerIdx, List<int> realRegions, string name)>();
+        var tasks = new List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)>();
 
         for (int i = 0; i < priRankList.Count; i++)
         {
             // 黑洞字典已在生成时排好序
-            var realRegions = new List<int> { _udmP3Param.黑洞字典.ElementAt(i).Value.region };
+            var bh = _udmP3Param.黑洞字典.ElementAt(i);
+            var blackHoles = new List<ulong> { bh.Key };
+            var realRegions = new List<int> { bh.Value.region };
             var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
-
+            
             if (i + 1 < priRankList.Count && priRankList[i + 1] == priRankList[i])
             {
-                realRegions.Add(_udmP3Param.黑洞字典.ElementAt(i + 1).Value.region);
+                var bh2 = _udmP3Param.黑洞字典.ElementAt(i + 1);
+                blackHoles.Add(bh2.Key);
+                realRegions.Add(bh2.Value.region);
                 i++;
             }
 
             var regionStr = string.Join(",", realRegions);
-            tasks.Add((player.Key, realRegions, $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}"));
+            tasks.Add((player.Key, realRegions, blackHoles, $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}"));
         }
 
         return tasks;
     }
 
-    private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, int playerIdx, List<int> realRegions, string name)
+    private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, 
+        (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
     {
         if (!Debugging)
-            if (sa.GetMyIndex() != playerIdx) return;
+            if (sa.GetMyIndex() != task.playerIdx) return;
         var color = new Vector4(1, 1, 0, 1);
 
-        foreach (var realRegion in realRegions)
+        for (int i = 0; i < task.blackHoles.Count; i++)
         {
-            var bhpos = BlackHoleBasePos.RotateAndExtend(Center, realRegion * -45f.DegToRad());
-            sa.DrawConnection(sa.Data.PartyList[playerIdx], bhpos, 0, 7000, $"绘制黑洞接线 {name} C{realRegion}", color);
+            var dp = sa.DrawLine(task.blackHoles[i], 0, 0, 7000, $"绘制黑洞接线 {task.name} L{task.realRegions[i]}",
+                0, 1, 40, color, byY: true, draw: false);
+            dp.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp);
+
+            var dp2 = sa.DrawRect(task.blackHoles[i], 0, 0, 7000, $"绘制黑洞接线 {task.name} R{task.realRegions[i]}",
+                0, 6, 40, sa.Data.DefaultDangerColor, draw: false);
+            dp2.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp2);
         }
+        
+        var guidePos = task.realRegions.Count == 1
+            ? 计算黑洞顺时针侧指路点(task.realRegions[0])
+            : 计算两黑洞之间指路点(task.realRegions[0], task.realRegions[1]);
+        sa.DrawGuidance(sa.Data.PartyList[task.playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {task.name} G", sa.Data.DefaultSafeColor);
 
-        var guidePos = realRegions.Count == 1
-            ? 计算黑洞顺时针侧指路点(realRegions[0])
-            : 计算两黑洞之间指路点(realRegions[0], realRegions[1]);
-        sa.DrawGuidance(sa.Data.PartyList[playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {name} G", sa.Data.DefaultSafeColor);
-
-        sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(playerIdx)} 接真实方位 {string.Join(",", realRegions)} 的黑洞", Debugging);
+        sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
+            Debugging);
     }
 
     private Vector3 计算黑洞顺时针侧指路点(int realRegion)
@@ -2968,6 +2987,22 @@ internal static class SpecialFunction
     {
         FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap* ptr = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
         return ptr is not null && ptr->IsPlayerMoving;
+    }
+    
+    public static unsafe void WriteVisible(this ScriptAccessory sa, IGameObject? actor, bool visible)
+    {
+        const VisibilityFlags VISIBLE_FLAG = VisibilityFlags.None;
+        const VisibilityFlags INVISIBILITY_FLAG = VisibilityFlags.Model;
+        try
+        {
+            var flagsPtr = &((GameObject*)actor?.Address)->RenderFlags;
+            *flagsPtr = visible ? VISIBLE_FLAG : INVISIBILITY_FLAG;
+        }
+        catch (Exception e)
+        {
+            sa.Log.Error(e.ToString());
+            throw;
+        }
     }
     
     public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha)
