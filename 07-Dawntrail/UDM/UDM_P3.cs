@@ -42,9 +42,8 @@ public class UDM_P3
         二运黑洞
         - 含指路与指挥模式，需在用户设置开启。
         - * 黑洞指路依赖标点，建议开启指挥模式。
-        - * 因为黑洞模式指路需在黑洞出现前完成标点，手慢则乱。
+        - * 黑洞出现前需完成整个标点流程，若使用手摇，标错可以修正。
         - 可在用户设置配置指挥模式标点优先级，输入半角引号与三个大写字母如"HDT"，在前的优先级高，若输入格式错误则默认"HDT"。
-        - 其余机制暂未完成，可以配合已有功能的脚本使用。
         
         二运冰封
         - 从上下引导后四角_盗火文档：基于凯夫卡面基，上TN下DPS，然后基于场中四角分开引导
@@ -60,11 +59,17 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 删除真空波击退自动面向校正。
+        尝试修复 P3 二运指挥模式的神秘狂暴头标 Bug，修改如下：
+        - [x] 调整了 return 的位置。（与作为玩家的您无关）
+        - [x] 卡奥斯读条地震时，不再移除原有的头标。（防止本地头标偷袭）
+        - [x] 在获得第一个状态前，清空优先级列表。（与作为玩家的您无关）
+        - [x] 优先级列表的计算由“+”改为“=”。（与作为玩家的您无关）
+        - [x] 增加掉人少 Buff 导致后续逻辑出错的补齐状态优先级方案。（依123麻与优先级顺序分配）
+        - [x] 增加用户设置项“帮助调试的指挥模式聊天框输出”，如果标点是来源于可达鸭，会在默语频道输出信息。如果这个选项困扰了你，可以关闭。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.23";
+    private const string Version = "0.0.0.24";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -97,6 +102,9 @@ public class UDM_P3
     
     [UserSetting("P3B1 - 二运黑洞指挥模式")]
     public bool P3B1CaptainMode { get; set; } = false;
+    
+    [UserSetting("P3B1 - 帮助调试的指挥模式聊天框输出")]
+    public bool P3B1CaptainModeDevHelper { get; set; } = true;
 
     [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
     public string P3B1BhPriority { get; set; } = "HDT";
@@ -125,6 +133,10 @@ public class UDM_P3
     {
         _runId++;
         sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
+        
+        _pd.Init(sa, "初始化");
+        _pdCaptain.Init(sa, "初始化");
+        
         _udmP3Param.Reset(sa);
         sa.Method.RemoveDraw(".*");
         // sa.Method.MarkClear();
@@ -1290,15 +1302,8 @@ public class UDM_P3
     {
         _pd.Init(sa, "P3二运");
         _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
-        
-        // 尽可能让坦克不参与第一轮黑洞
-        _pdCaptain.Init(sa, "P3二运指挥");
-        
-        List<int> priority = 构筑指挥优先级字段(P3B1BhPriority);
-        _pdCaptain.AddPriorities(priority);
-        
         _udmP3Param.当前阶段 = 3200;
-        sa.Method.MarkClear();
+        
         sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
     }
 
@@ -1500,6 +1505,14 @@ public class UDM_P3
 
         lock (_pdCaptain)
         {
+            if (!_udmP3Param.获得过第一个黑洞状态)
+            {
+                _pdCaptain.Init(sa, "P3二运指挥");
+                List<int> priority = 构筑指挥优先级字段(P3B1BhPriority);
+                _pdCaptain.AddPriorities(priority);
+                _udmP3Param.获得过第一个黑洞状态 = true;
+            }
+           
             var statusId = ev.StatusId;
             var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var priVal = ev.StatusId switch
@@ -1524,20 +1537,78 @@ public class UDM_P3
         suppress: 10000, userControl: Debugging)]
     public void P3B1_二运黑洞指挥标点(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 != 3200) return;
-        
-        if (!_udmP3Param.二运状态记录.WaitOne(2000)) return;
-        _udmP3Param.二运状态记录.Reset();
-        
         if (!P3B1CaptainMode) return;
+        if (_udmP3Param.当前阶段 != 3200) return;
+        if (!_udmP3Param.二运状态记录.WaitOne(2000))
+            补齐黑洞状态优先级(sa);
+        
         sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 进入指挥标点", Debugging);
+        sa.DebugMsg(_pdCaptain.ShowPriorities(), Debugging);
         for (int i = 0; i < 8; i++)
         {
             var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
             var marker = GetMarkTypeByRankBh(i);
             sa.MarkPlayerByIdx(kvp.Key, marker);
             sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
+            
+            if (P3B1CaptainModeDevHelper)
+                sa.Method.SendChat($"/e 可达鸭偷偷给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
         }
+        _udmP3Param.二运状态记录.Reset();
+    }
+
+    private void 补齐黑洞状态优先级(ScriptAccessory sa)
+    {
+        // 通过修改 _pdCaptain 的值，伪造 Buff 出现在倒下的队友身上
+        
+        var count_1 = 0;
+        var count_2 = 0;
+        var count_3 = 0;
+        List<int> noBuffIdx = [];
+        
+        foreach (var kvp in _pdCaptain.Priorities)
+        {
+            if (kvp.Value >= 30)
+                count_3++;
+            else if (kvp.Value >= 20)
+                count_2++;
+            else if (kvp.Value >= 10)
+                count_1++;
+            else
+            {
+                noBuffIdx.Add(kvp.Key);
+                sa.DebugMsg($"检测到 {sa.GetPlayerJobByIndex(kvp.Key)} 没有获得状态");
+            }
+                
+        }
+
+        for (int i = 0; i < noBuffIdx.Count; i++)
+        {
+            var addVal = 输出补救模式优先级增加值(count_1, count_2, count_3);
+            
+            if (addVal == 30)
+                count_3++;
+            else if (addVal == 20)
+                count_2++;
+            else if (addVal == 10)
+                count_1++;
+            else
+            {
+                sa.DebugMsg($"输出补救模式优先级增加值 输入统计值错误 {count_1} {count_2} {count_3}");
+                continue;
+            }
+
+            _pdCaptain.Priorities[noBuffIdx[i]] += addVal;
+            sa.DebugMsg($"黑洞状态添加补救 令 {sa.GetPlayerJobByIndex(noBuffIdx[i])} 被点麻将 {addVal / 10}");
+        }
+    }
+
+    private int 输出补救模式优先级增加值(int count_1, int count_2, int count_3)
+    {
+        if (count_1 < 3) return 10;
+        if (count_2 < 3) return 20;
+        if (count_3 < 2) return 30;
+        return 0; 
     }
 
     private MarkType GetMarkTypeByRankBh(int rank)
@@ -1561,15 +1632,13 @@ public class UDM_P3
     {
         // 取攻击123、锁链123、禁止12
         if (_udmP3Param.当前阶段 != 3200) return;
-        
         lock (_pd)
         {
+            if (_udmP3Param.黑洞已出现) return;
+            
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var targetJob = sa.GetPlayerJobByIndex(tidx);
-            
-            _pd.AddActionCount();
-            sa.DebugMsg($"[P3B1_获得二运黑洞标点] #{_pd.ActionCount} {targetJob} 被标 ev.Id {mark}", Debugging);
             
             var pdVal = mark switch
             {
@@ -1583,11 +1652,9 @@ public class UDM_P3
                 0x10 => 320,   // 禁止2
                 _ => 0
             };
-            _pd.AddPriority(tidx, pdVal);
-            if (_pd.ActionCount != 8) return;
             
-            sa.DebugMsg($"[P3B1_获得二运黑洞标点] 头标记录完毕", Debugging);
-            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
+            _pd.Priorities[tidx] = (tidx + 1) + pdVal;
+            sa.DebugMsg($"[P3B1_获得二运黑洞标点] {targetJob} 被标 {mark} == {_pd.Priorities[tidx]}", Debugging);
         }
     }
 
@@ -1595,6 +1662,12 @@ public class UDM_P3
         eventCondition: ["DataId:19512"], userControl: Debugging, suppress: 5000)]
     public void P3B1_黑洞轮数增加(Event ev, ScriptAccessory sa)
     {
+        if (!_udmP3Param.黑洞已出现)
+        {
+            _udmP3Param.黑洞已出现 = true;
+            sa.DebugMsg($"[P3B1_黑洞轮数增加] 头标记录完毕", Debugging);
+            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
+        }
         _udmP3Param.黑洞字典.Clear();
         _udmP3Param.黑洞轮数++;
         sa.DebugMsg($"[P3B1_黑洞轮数增加] 当前阶段 {_udmP3Param.当前阶段}，清除黑洞字典 {_udmP3Param.黑洞字典.Count}", Debugging);
@@ -2233,6 +2306,9 @@ internal class UDMP3Params
     public bool 是第一次分摊 = false;
     public Vector3 第二枚黄圈引导位置 = new Vector3(100, 0, 100);
     public Vector3 第一次轰击位置 = new Vector3(0, 0, 0);
+
+    public bool 获得过第一个黑洞状态 = false;
+    public bool 黑洞已出现 = false;
     
     public void Reset(ScriptAccessory sa)
     {
@@ -2287,6 +2363,9 @@ internal class UDMP3Params
         是第一次分摊 = false;
         第二枚黄圈引导位置 = new Vector3(100, 0, 100);
         第一次轰击位置 = new Vector3(0, 0, 0);
+        
+        获得过第一个黑洞状态 = false;
+        黑洞已出现 = false;
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
