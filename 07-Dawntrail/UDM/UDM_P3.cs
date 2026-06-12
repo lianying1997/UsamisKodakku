@@ -55,19 +55,16 @@ public class UDM_P3
         特殊方法
         - 屏蔽艾克斯迪司释放钢铁暴雷时的连线
         - 巨大凯夫卡释放上桌技能时透明化
-        - 真空波击退基于艾克斯迪司面向校正
         """;
     
     const string UpdateInfo =
         $"""
         {Version}
-        1. 调整 P3 黑洞绘图方式，将连向黑洞的线改变为 需要接的线与对应的攻击范围。
-        2. 脚本初始化时（战斗重新开始时）不再执行清除头标。
-        3. 调整了屏蔽钢铁暴雷连线的方式。
+        1. 删除真空波击退自动面向校正。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.22";
+    private const string Version = "0.0.0.23";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -1145,9 +1142,10 @@ public class UDM_P3
         }
     }
 
-    [ScriptMethod(name: "*P3A1_真空波_自动面向辅助", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(47891)$"], userControl: true)]
+    [ScriptMethod(name: "*P3A1_真空波_自动面向辅助", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(47891)$"], userControl: Debugging)]
     public void P3A1_真空波_自动面向辅助(Event ev, ScriptAccessory sa)
     {
+        return;
         if (_udmP3Param.当前阶段 != 3111) return;
         if (!SpecialMode) return;
 
@@ -1191,6 +1189,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47891)$"], suppress: 10000, userControl: Debugging)]
     public void P3A1_真空波_自动面向辅助结束(Event ev, ScriptAccessory sa)
     {
+        return;
         if (_udmP3Param.当前阶段 != 3111) return;
         sa.Method.UnregistFrameworkUpdateAction(_udmP3Param.真空波面向辅助Framework);
     }
