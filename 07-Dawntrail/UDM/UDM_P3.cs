@@ -59,13 +59,12 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 现在 P3 二运黑洞的指路只与自己相关。
-        - 即便你的队友统统在乱标/不标/晚标，只要你自己的头标正确就可正确指路，以黑洞出现前最后一次在头上的标为准。
-        - （麻了）
+        1. 现在暴雷死刑范围的绘图时间将延长至第二次死刑判定（5秒 -> 8秒）
+        2. 增加大量控制双 Boss 透明度事件，在释放需关注的技能时，会取消透明度，其他时刻会保持透明。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.25";
+    private const string Version = "0.0.0.26";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -279,6 +278,38 @@ public class UDM_P3
         _udmP3Param.当前阶段 = 3000;
         sa.DebugMsg($"当前阶段为：P3 重构 {_udmP3Param.当前阶段}", Debugging);
     }
+    
+    [ScriptMethod(name: "*P3B_重构时恢复凯夫卡透明度", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47842)$"], userControl: Debugging)]
+    public void P3B_重构时恢复凯夫卡透明度(Event ev, ScriptAccessory sa)
+    {
+        var obj = sa.GetById(ev.SourceId);
+        sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+    }
+    
+    [ScriptMethod(name: "P3_获得艾克斯迪司ObjId", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:49891"],
+        userControl: Debugging)]
+    public void P3_获得艾克斯迪司ObjId(Event ev, ScriptAccessory sa)
+    {
+        _udmP3Param.ObjectId_艾克斯迪司 = ev.SourceId;
+        sa.DebugMsg($"[P3_获得艾克斯迪司ObjId] {_udmP3Param.ObjectId_艾克斯迪司:X8}", Debugging);
+
+        // 顺便恢复透明度
+        var obj = sa.GetById(ev.SourceId);
+        sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+    }
+    
+    [ScriptMethod(name: "P3_获得卡奥斯ObjId", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:49890"],
+        userControl: Debugging)]
+    public void P3_获得卡奥斯ObjId(Event ev, ScriptAccessory sa)
+    {
+        _udmP3Param.ObjectId_卡奥斯 = ev.SourceId;
+        sa.DebugMsg($"[P3_获得卡奥斯ObjId] {_udmP3Param.ObjectId_卡奥斯:X8}", Debugging);
+        
+        // 顺便恢复透明度
+        var obj = sa.GetById(ev.SourceId);
+        sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+    }
 
     #region P3A 深层痛楚 通用部分
 
@@ -372,7 +403,7 @@ public class UDM_P3
         eventCondition: ["ActionId:47881"], userControl: true)]
     public void P3A_暴雷死刑范围(Event ev, ScriptAccessory sa)
     {
-        var dp = sa.DrawCircle(ev.SourceId, 0, 5000, $"靠近死刑", 5f, sa.Data.DefaultDangerColor.WithW(2f), draw: false);
+        var dp = sa.DrawCircle(ev.SourceId, 0, 8000, $"靠近死刑", 5f, sa.Data.DefaultDangerColor.WithW(2f), draw: false);
         dp.SetOwnersDistanceOrder(true, 1);
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
@@ -1019,6 +1050,23 @@ public class UDM_P3
             // 其余逃课都是执行固定站位逻辑
             执行真空波逃课指路逻辑(sa);
     }
+    
+    [ScriptMethod(name: "*P3A_真空波读条期间卡奥斯透明", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47891)$"], userControl: true)]
+    public async void P3A_真空波读条期间卡奥斯透明(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+        
+        if (_udmP3Param.当前阶段 != 3111) return;
+        sa.DebugMsg($"[P3A_真空波_卡奥斯透明] 执行", Debugging);
+        
+        var runId = _runId; 
+        var obj = sa.GetById(_udmP3Param.ObjectId_卡奥斯);
+        sa.AlphaModify(obj, 0.3f);
+        await Task.Delay(8000);
+        if (runId != _runId) return;
+        sa.AlphaModify(obj, 1f);
+    }
 
     [ScriptMethod(name: "P3A_真空波指引线", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:regex:^(47891)$"], userControl: true)]
@@ -1149,7 +1197,7 @@ public class UDM_P3
             sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Line, dp);
         }
     }
-
+    
     [ScriptMethod(name: "*P3A1_真空波_自动面向辅助", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(47891)$"], userControl: Debugging)]
     public void P3A1_真空波_自动面向辅助(Event ev, ScriptAccessory sa)
     {
@@ -1330,6 +1378,65 @@ public class UDM_P3
         return priority.ToList();
     }
     
+    [ScriptMethod(name: "*P3B_黑洞、冰封期间双Boss透明", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47867)$"], userControl: true)]
+    public void P3B_黑洞期间双Boss透明(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+
+        const uint 黑洞 = 47867;
+        var obj1 = sa.GetById(_udmP3Param.ObjectId_卡奥斯);
+        var obj2 = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司);
+        sa.AlphaModify(obj1, 0.3f);
+        sa.AlphaModify(obj2, ev.ActionId == 黑洞 ? 0.75f : 0.3f);
+    }
+    
+    [ScriptMethod(name: "*P3B_凯夫卡上桌透明化", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(4784[67]|4785[235])$"], userControl: true)]
+    public async void P3B_凯夫卡上桌透明化(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+        var runId = _runId; 
+        var obj = sa.GetById(ev.SourceId);
+        sa.AlphaModify(obj, 0.3f);
+        await Task.Delay(10000);
+        if (runId != _runId) return;
+        sa.AlphaModify(obj, 1f);
+    }
+    
+    [ScriptMethod(name: "*P3B_卡奥斯非技能期间透明化", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47867|47869|47870)$"], userControl: true)]
+    public async void P3B_卡奥斯非技能期间透明化(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+        if (_udmP3Param.当前阶段 != 3200) return;
+
+        const uint 诅咒敕令 = 47867;
+        var awaitTime = ev.ActionId == 诅咒敕令 ? 5000 : 7500;
+        
+        var runId = _runId; 
+        var obj = sa.GetById(_udmP3Param.ObjectId_卡奥斯);
+        sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+        await Task.Delay(awaitTime);
+        if (runId != _runId) return;
+        sa.AlphaModify(obj, 0.5f, currentAlpha => currentAlpha >= 0.8f);
+    }
+    
+    [ScriptMethod(name: "*P3B_艾克斯迪司非技能期间透明化", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47881)$"], userControl: true)]
+    public async void P3B_艾克斯迪司非技能期间透明化(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+        if (_udmP3Param.当前阶段 != 3200) return;
+        
+        var runId = _runId; 
+        var obj = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司);
+        sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+        await Task.Delay(5000);
+        if (runId != _runId) return;
+        sa.AlphaModify(obj, 0.75f, currentAlpha => currentAlpha >= 0.8f);
+    }
+    
     [ScriptMethod(name: "P3B_地震后拉回场中提示", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:50545"],
         userControl: true, suppress: 10000)]
     public void P3B_地震后拉回场中提示(Event ev, ScriptAccessory sa)
@@ -1395,49 +1502,6 @@ public class UDM_P3
         sa.DebugMsg($"[P3B_响亮亮耳光] {actionStr}");
         sa.Method.TextInfo($"响亮亮耳光 {actionStr}", 3000);
         sa.Method.TTS($"{actionStr}", 3);
-    }
-
-    [ScriptMethod(name: "*P3B_重构时恢复卡夫卡透明度", eventType: EventTypeEnum.StartCasting,
-        eventCondition: ["ActionId:regex:^(47842)$"], userControl: Debugging)]
-    public void P3B_重构时恢复卡夫卡透明度(Event ev, ScriptAccessory sa)
-    {
-        var obj = sa.GetById(ev.SourceId);
-        sa.Method.RunOnMainThreadAsync(Action);
-        unsafe void Action()
-        {
-            if (obj == null) return;
-
-            Character* charaStruct = (Character*)obj.Address;
-            if (!obj.IsValid() || !charaStruct->IsReadyToDraw())
-            {
-                sa.Log.Error($"传入的IGameObject不合法。");
-                return;
-            }
-
-            if (!charaStruct->IsCharacter())
-            {
-                sa.Log.Error($"传入的IGameObject不是Character，无法修改透明度。");
-                return;
-            }
-            if (charaStruct->Alpha > 0.8f) return;
-            
-            charaStruct->Alpha = 1;
-            charaStruct->DisableDraw();
-            charaStruct->EnableDraw();
-        }
-    }
-    
-    [ScriptMethod(name: "*P3B_凯夫卡上桌透明化", eventType: EventTypeEnum.StartCasting,
-        eventCondition: ["ActionId:regex:^(4784[67]|4785[235])$"], userControl: true)]
-    public async void P3B_凯夫卡透明化(Event ev, ScriptAccessory sa)
-    {
-        if (!SpecialMode) return;
-        var runId = _runId; 
-        var obj = sa.GetById(ev.SourceId);
-        sa.AlphaModify(obj, 0.3f);
-        await Task.Delay(9000);
-        if (runId != _runId) return;
-        sa.AlphaModify(obj, 1f);
     }
 
     [ScriptMethod(name: "P3B_诅咒敕令半场刀", eventType: EventTypeEnum.StartCasting,
@@ -2071,6 +2135,12 @@ public class UDM_P3
         {
             sa.DrawCircle(ev.TargetPosition, 0, 15000, $"轰击旋风1", 6, sa.Data.DefaultDangerColor.WithW(2f));
             sa.DrawCircle(_udmP3Param.第一次轰击位置, 0, 15000, $"轰击旋风2", 6, sa.Data.DefaultDangerColor.WithW(2f));
+            
+            // 顺便恢复透明度
+            var obj1 = sa.GetById(_udmP3Param.ObjectId_卡奥斯);
+            sa.AlphaModify(obj1, 1f, currentAlpha => currentAlpha <= 0.8f);
+            var obj2 = sa.GetById(_udmP3Param.ObjectId_艾克斯迪司);
+            sa.AlphaModify(obj2, 1f, currentAlpha => currentAlpha <= 0.8f);
         }
             
     }
@@ -3101,7 +3171,8 @@ internal static class SpecialFunction
         }
     }
     
-    public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha)
+    public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha,
+        Func<float, bool>? shouldModify = null)
     {
         alpha = Math.Clamp(alpha, 0f, 1f);
         sa.Method.RunOnMainThreadAsync(Action);
@@ -3121,6 +3192,9 @@ internal static class SpecialFunction
                 sa.Log.Error($"传入的IGameObject不是Character，无法修改透明度。");
                 return;
             }
+            
+            if (shouldModify != null && !shouldModify(charaStruct -> Alpha))
+                return;
 
             charaStruct->Alpha = alpha;
             // charaStruct->DisableDraw();
