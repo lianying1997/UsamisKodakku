@@ -59,17 +59,13 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        尝试修复 P3 二运指挥模式的神秘狂暴头标 Bug，修改如下：
-        - [x] 调整了 return 的位置。（与作为玩家的您无关）
-        - [x] 卡奥斯读条地震时，不再移除原有的头标。（防止本地头标偷袭）
-        - [x] 在获得第一个状态前，清空优先级列表。（与作为玩家的您无关）
-        - [x] 优先级列表的计算由“+”改为“=”。（与作为玩家的您无关）
-        - [x] 增加掉人少 Buff 导致后续逻辑出错的补齐状态优先级方案。（依123麻与优先级顺序分配）
-        - [x] 增加用户设置项“帮助调试的指挥模式聊天框输出”，如果标点是来源于可达鸭，会在默语频道输出信息。如果这个选项困扰了你，可以关闭。
+        1. 现在 P3 二运黑洞的指路只与自己相关。
+        - 即便你的队友统统在乱标/不标/晚标，只要你自己的头标正确就可正确指路，以黑洞出现前最后一次在头上的标为准。
+        - （麻了）
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.24";
+    private const string Version = "0.0.0.25";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -1791,63 +1787,85 @@ public class UDM_P3
 
     private List<int> 筛选本轮接线玩家(ScriptAccessory sa, int bhRound, int bhEffectRound)
     {
-        List<int> priRankList;
+        List<int> markFeatureList;
 
         if (BhStg == BhStgEnum.一人一根线)
-            priRankList = (bhRound, bhEffectRound) switch
+            markFeatureList = (bhRound, bhEffectRound) switch
             {
-                (1, 0) => [0],
-                (1, 1) => [0, 1],
-                (2, 2) => [0, 1, 2],
-                (2, 3) => [3, 1, 2],
-                (2, 4) => [3, 4, 2],
-                (3, 5) => [3, 4, 5],
-                (3, 6) => [6, 4, 5],
-                (3, 7) => [6, 7, 5],
-                (4, 8) => [6, 7],
-                (4, 9) => [7],
+                (1, 0) => [110],
+                (1, 1) => [110, 120],
+                (2, 2) => [110, 120, 130],
+                (2, 3) => [210, 120, 130],
+                (2, 4) => [210, 220, 130],
+                (3, 5) => [210, 220, 230],
+                (3, 6) => [310, 220, 230],
+                (3, 7) => [310, 320, 230],
+                (4, 8) => [310, 320],
+                (4, 9) => [320],
                 (1, 2) or (2, 5) or (3, 8) or (4, 10) => [],
                 _ => []
             };
         else
-            priRankList = (bhRound, bhEffectRound) switch
+            markFeatureList = (bhRound, bhEffectRound) switch
             {
-                (1, 0) => [1],
-                (1, 1) => [0, 0],
-                (2, 2) => [0, 1, 2],
-                (2, 3) => [3, 1, 2],
-                (2, 4) => [3, 4, 2],
-                (3, 5) => [3, 4, 5],
-                (3, 6) => [6, 4, 5],
-                (3, 7) => [6, 7, 5],
-                (4, 8) => [7, 7],
-                (4, 9) => [6],
+                (1, 0) => [120],
+                (1, 1) => [110, 110],
+                (2, 2) => [110, 120, 130],
+                (2, 3) => [210, 120, 130],
+                (2, 4) => [210, 220, 130],
+                (3, 5) => [210, 220, 230],
+                (3, 6) => [310, 220, 230],
+                (3, 7) => [310, 320, 230],
+                (4, 8) => [320, 320],
+                (4, 9) => [310],
                 (1, 2) or (2, 5) or (3, 8) or (4, 10) => [],
                 _ => []
             };
 
         var isKnownNoop = (bhRound, bhEffectRound) is (1, 2) or (2, 5) or (3, 8) or (4, 10);
-        if (priRankList.Count == 0 && !isKnownNoop)
+        if (markFeatureList.Count == 0 && !isKnownNoop)
         {
             sa.DebugMsg($"[筛选本轮接线玩家] 输入值错误 ({bhRound} {bhEffectRound})", Debugging);
         }
-        return priRankList;
+        return markFeatureList;
+    }
+    
+    private KeyValuePair<int, int> 按黑洞头标特征找玩家(ScriptAccessory sa, int markFeature)
+    {
+        var matchedPlayers = _pd.Priorities
+            .Where(kvp => kvp.Value / 10 * 10 == markFeature)
+            .OrderBy(kvp => kvp.Value)
+            .ToList();
+        
+        if (matchedPlayers.Count == 0)
+            return new KeyValuePair<int, int>(-1, 0);
+
+        var myIndex = sa.GetMyIndex();
+        var myIndexInMatchedPlayersList = matchedPlayers.FindIndex(kvp => kvp.Key == myIndex);
+
+        return myIndexInMatchedPlayersList >= 0 ? matchedPlayers[myIndexInMatchedPlayersList] : matchedPlayers[0];
     }
     
     private List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)> 获取本轮黑洞接线任务(ScriptAccessory sa, int bhRound, int bhEffectRound)
     {
-        var priRankList = 筛选本轮接线玩家(sa, bhRound, bhEffectRound);
+        var markFeatureList = 筛选本轮接线玩家(sa, bhRound, bhEffectRound);
         var tasks = new List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)>();
 
-        for (int i = 0; i < priRankList.Count; i++)
+        for (int i = 0; i < markFeatureList.Count; i++)
         {
             // 黑洞字典已在生成时排好序
             var bh = _udmP3Param.黑洞字典.ElementAt(i);
             var blackHoles = new List<ulong> { bh.Key };
             var realRegions = new List<int> { bh.Value.region };
-            var player = _pd.SelectSpecificPriorityIndex(priRankList[i]);
             
-            if (i + 1 < priRankList.Count && priRankList[i + 1] == priRankList[i])
+            var player = 按黑洞头标特征找玩家(sa, markFeatureList[i]);
+            if (player.Key < 0)
+            {
+                sa.DebugMsg($"[获取本轮黑洞接线任务] 未找到头标特征 {markFeatureList[i]} 对应玩家", Debugging);
+                continue;
+            }
+            
+            if (i + 1 < markFeatureList.Count && markFeatureList[i + 1] == markFeatureList[i])
             {
                 var bh2 = _udmP3Param.黑洞字典.ElementAt(i + 1);
                 blackHoles.Add(bh2.Key);
