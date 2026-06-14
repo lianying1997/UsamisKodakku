@@ -34,20 +34,19 @@ public class UDM_P3
         $"""
         {Version}
         一运
-        - 正攻：相同水晶，卡奥斯场中，真空波按Buff->职能站位
-        - TLB_相反水晶_盗火文档：相反水晶，卡奥斯风水晶，真空波按小队身份站位，TLB吃两层风分摊
-        - TLB_纯固定_NoCCHH：无视水晶，近战贴 Boss，远程远离于两水晶分组
         - TLB_拉火水晶_夜音：拉火水晶6人集合，只有火 Buff 在外
 
         二运黑洞
         - 含指路与指挥模式，需在用户设置开启。
-        - * 黑洞指路依赖标点，建议开启指挥模式。
-        - * 黑洞出现前需完成整个标点流程，若使用手摇，标错可以修正。
-        - 可在用户设置配置指挥模式标点优先级，输入半角引号与三个大写字母如"HDT"，在前的优先级高，若输入格式错误则默认"HDT"。
+        - * 黑洞指路依赖标点，黑洞出现前需完成整个标点流程。
+        - 共有三种优先级配置：
+        - HTD：采用 H2 > H1 > D3 > D2 > D1 > D4 > MT > ST
+        - THD：采用 MT > ST > H1 > H2 > D1 > D2 > D3 > D4
+        - HTD 如此分布的目的是减少接双线玩家的罚站情况，三麻时优先级将取反。
+        - MT 指“卡奥斯T”，ST 指“艾克斯迪司T”，会根据用户设置中“P3A1 - 拉艾克斯迪司的是 MT”设置调整。
         
         二运冰封
         - 从上下引导后四角_盗火文档：基于凯夫卡面基，上TN下DPS，然后基于场中四角分开引导
-        - 从场中引导后四角_POIKOS：先场中，然后基于场中四角分开引导
         - 从场中引导后上下_NoCCHH：先场中，然后TN上DPS下分开引导
         - 以凯夫卡所在方位为北：若勾选，则以最后一次“本色出演的我”所在位置为北，否则以对面（起身后能看到凯夫卡正脸的方位）为北。
 
@@ -59,13 +58,15 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 现在暴雷死刑范围的绘图时间将延长至第二次死刑判定（5秒 -> 8秒）
-        2. 增加大量控制双 Boss 透明度事件，在释放需关注的技能时，会取消透明度，其他时刻会保持透明。
+        1. 脚本说明中删除了一些被野队淘汰的打法。配置项中未删除，但具体细节请看相关文档。
+        2. 现在 P3 二运黑洞指路会先指向接线点，只有接全线后才会指路到放黑洞的安全区。（真难写！！！）
+        3. 现在卡奥斯读条的诅咒敕令会拉高对比度，方便分辨 诅咒敕令+响亮亮巴掌 的阴间组合。
+        4. 现在黑洞指挥模式的标点优先级变为可配置的三种：HTD/THD/远程双线，且职能内部优先级稍有变更。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.26";
-    private const string DebugVersion = "a";
+    private const string Version = "0.0.0.27";
+    private const string DebugVersion = "b";
     private int _runId = 0;
 
     private const bool Debugging = false;
@@ -79,7 +80,7 @@ public class UDM_P3
     private PriorityDict _pdCaptain = new PriorityDict();
 
     [UserSetting("启用方法设置中带*的特殊功能")]
-    public bool SpecialMode { get; set; } = false;
+    public static bool SpecialMode { get; set; } = false;
     
     [UserSetting("P3A1 - 一运深层痛楚策略")]
     public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB_纯固定_NoCCHH;
@@ -93,17 +94,24 @@ public class UDM_P3
     }
 
     [UserSetting("P3A1 - 拉艾克斯迪司的是 MT")]
-    public bool ExDeathMT { get; set; } = false;
+    public static bool ExDeathMT { get; set; } = false;
     
     [UserSetting("P3B1 - 二运黑洞指挥模式")]
-    public bool P3B1CaptainMode { get; set; } = false;
+    public static bool P3B1CaptainMode { get; set; } = false;
     
     [UserSetting("P3B1 - 帮助调试的指挥模式聊天框输出")]
-    public bool P3B1CaptainModeDevHelper { get; set; } = true;
+    public static bool P3B1CaptainModeDevHelper { get; set; } = true;
 
-    [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
-    public string P3B1BhPriority { get; set; } = "HDT";
     
+    [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
+    public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.HDT;
+    
+    public enum BhPriStgEnum
+    {
+        HDT,
+        THD,
+    }
+
     [UserSetting("P3B1 - 二运黑洞策略")]
     public static BhStgEnum BhStg { get; set; } = BhStgEnum.一人一根线;
     public enum BhStgEnum
@@ -137,6 +145,8 @@ public class UDM_P3
         // sa.Method.MarkClear();
         sa.Method.ClearFrameworkUpdateAction(this);
     }
+    
+    #region 测试项
     
     [ScriptMethod(name: "———————— 《测试项》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
@@ -211,10 +221,14 @@ public class UDM_P3
     {
         // 判断是否有线
         uint tetherId = 0x54;
-        var bc = sa.GetById(0x40001CD8);
+        var bc = sa.GetById(0x4000359E);
         if (bc == null) return;
-        var hasTether = sa.GetTetherSource((IBattleChara)bc, tetherId).Count > 0;
-        sa.DebugMsg($"{hasTether}", Debugging);
+        
+        var ls = sa.GetTetherSource((IBattleChara)bc, tetherId);
+        var hasTether = ls.Count > 0;
+
+        var playerJob = hasTether ? sa.GetPlayerJobById((uint)ls[0]) : "";
+        sa.DebugMsg($"{string.Join(",", ls.Select(x => x.ToString("X8")))} | {playerJob} | {hasTether}", Debugging);
     }
     
     [ScriptMethod(name: "测试项：真空波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -264,6 +278,7 @@ public class UDM_P3
         sa.DebugMsg($"[测试项：冰封赋值] 赋值完毕", Debugging);
     }
         
+    #endregion 测试项
     
     [ScriptMethod(name: "———————— 《P3》 ————————", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
@@ -665,6 +680,7 @@ public class UDM_P3
         {
             0 => -45f,
             1 => 45f,
+            _ => 45f
         };
         var basePos = CrystalBasePos.RotateAndExtend(Center, 0, -10f);
         var guidePos = basePos.RotateAndExtend(CrystalBasePos, angleBias.DegToRad());
@@ -697,7 +713,8 @@ public class UDM_P3
             2 => -30f,
             3 => 30f,
             6 => -75f,
-            7 => 75f
+            7 => 75f,
+            _ => 75f
         };
         bool isMelee = (myIndex % 4) <= 1;
         var basePos = CrystalBasePos.RotateAndExtend(Center, 0, isMelee ? -4f : -14.5f);
@@ -1351,32 +1368,44 @@ public class UDM_P3
         sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
     }
 
-    private static List<int> 构筑指挥优先级字段(string prioritySetting)
+    private static List<int> 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
     {
-        var normalized = (prioritySetting ?? "").Trim().ToUpperInvariant().Replace('N', 'H');
-        if (normalized.Length != 3 || normalized.Distinct().Count() != 3 || normalized.Any(c => c is not ('T' or 'H' or 'D')))
-            normalized = "HDT";
-
-        var roleIndices = new Dictionary<char, List<int>>
+        var chaosTank = ExDeathMT ? 2 : 1;
+        var exDeathTank = ExDeathMT ? 1 : 2;
+        List<int> priority = prioritySetting switch
         {
-            ['T'] = [0, 1],
-            ['H'] = [2, 3],
-            ['D'] = [4, 5, 6, 7],
+            BhPriStgEnum.THD => [chaosTank, exDeathTank, 4, 3, 7, 6, 5, 8],
+            _ => [4, 3, 7, 6, 5, 8, chaosTank, exDeathTank],
         };
-        var priority = new int[8];
-        var currentPriority = 1;
-
-        foreach (var role in normalized)
-        {
-            foreach (var index in roleIndices[role])
-            {
-                priority[index] = currentPriority;
-                currentPriority++;
-            }
-        }
-
-        return priority.ToList();
+        return priority;
     }
+    
+    // private static List<int> 构筑指挥优先级字段(string prioritySetting)
+    // {
+    //     var normalized = (prioritySetting ?? "").Trim().ToUpperInvariant().Replace('N', 'H');
+    //     if (normalized.Length != 3 || normalized.Distinct().Count() != 3 || normalized.Any(c => c is not ('T' or 'H' or 'D')))
+    //         normalized = "HDT";
+    //
+    //     var roleIndices = new Dictionary<char, List<int>>
+    //     {
+    //         ['T'] = [0, 1],
+    //         ['H'] = [2, 3],
+    //         ['D'] = [4, 5, 6, 7],
+    //     };
+    //     var priority = new int[8];
+    //     var currentPriority = 1;
+    //
+    //     foreach (var role in normalized)
+    //     {
+    //         foreach (var index in roleIndices[role])
+    //         {
+    //             priority[index] = currentPriority;
+    //             currentPriority++;
+    //         }
+    //     }
+    //
+    //     return priority.ToList();
+    // }
     
     [ScriptMethod(name: "*P3B_黑洞、冰封期间双Boss透明", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:regex:^(47867)$"], userControl: true)]
@@ -1508,7 +1537,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47873)$"], userControl: true)]
     public void P3B_诅咒敕令半场刀(Event ev, ScriptAccessory sa)
     {
-        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, sa.Data.DefaultDangerColor.WithW(2f), byTime: true);
+        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, sa.Data.DefaultDangerColor.WithW(4f), byTime: true);
     }
     
     [ScriptMethod(name: "P3B_本色出演的我辣尾", eventType: EventTypeEnum.StartCasting,
@@ -1568,7 +1597,7 @@ public class UDM_P3
             if (!_udmP3Param.获得过第一个黑洞状态)
             {
                 _pdCaptain.Init(sa, "P3二运指挥");
-                List<int> priority = 构筑指挥优先级字段(P3B1BhPriority);
+                List<int> priority = 构筑指挥优先级字段(BhMarkPriority);
                 _pdCaptain.AddPriorities(priority);
                 _udmP3Param.获得过第一个黑洞状态 = true;
             }
@@ -1681,8 +1710,8 @@ public class UDM_P3
             3 => MarkType.Bind1,
             4 => MarkType.Bind2,
             5 => MarkType.Bind3,
-            6 => MarkType.Stop1,
-            _ => MarkType.Stop2
+            6 => MarkType.Stop2,    // 三麻取反
+            _ => MarkType.Stop1
         };
     }
     
@@ -1797,6 +1826,7 @@ public class UDM_P3
     public void P3B1_接线逻辑_每轮初始(Event ev, ScriptAccessory sa)
     {
         if (!_udmP3Param.外黑洞获取完毕.WaitOne(2000)) return;
+        清理接线Framework(sa);
         
         // 第一轮黑洞起始，攻击1
         // 第二轮黑洞起始，攻击1，攻击2，攻击3
@@ -1808,6 +1838,7 @@ public class UDM_P3
         {
             绘制玩家向黑洞方位接线(sa, task);
         }
+        执行接线Framework(sa, tetherTasks);
         _udmP3Param.外黑洞获取完毕.Reset();
     }
     
@@ -1816,6 +1847,7 @@ public class UDM_P3
     public void P3B1_接线逻辑_中途(Event ev, ScriptAccessory sa)
     {
         // 删掉上一轮的连线
+        清理接线Framework(sa);
         sa.Method.RemoveDraw($"绘制黑洞接线 R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数}.*");
         _udmP3Param.黑洞喷射轮数++;
         if (_udmP3Param.黑洞轮数 is 1 or 4)
@@ -1829,6 +1861,7 @@ public class UDM_P3
         {
             绘制玩家向黑洞方位接线(sa, task);
         }
+        执行接线Framework(sa, tetherTasks);
     }
 
     private void 翻转黑洞有线状态()
@@ -1917,15 +1950,16 @@ public class UDM_P3
 
         for (int i = 0; i < markFeatureList.Count; i++)
         {
+            var markFeature = markFeatureList[i];
             // 黑洞字典已在生成时排好序
             var bh = _udmP3Param.黑洞字典.ElementAt(i);
             var blackHoles = new List<ulong> { bh.Key };
             var realRegions = new List<int> { bh.Value.region };
             
-            var player = 按黑洞头标特征找玩家(sa, markFeatureList[i]);
+            var player = 按黑洞头标特征找玩家(sa, markFeature);
             if (player.Key < 0)
             {
-                sa.DebugMsg($"[获取本轮黑洞接线任务] 未找到头标特征 {markFeatureList[i]} 对应玩家", Debugging);
+                sa.DebugMsg($"[获取本轮黑洞接线任务] 未找到头标特征 {markFeature} 对应玩家", Debugging);
                 continue;
             }
             
@@ -1938,26 +1972,42 @@ public class UDM_P3
             }
 
             var regionStr = string.Join(",", realRegions);
-            tasks.Add((player.Key, realRegions, blackHoles, $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}"));
+            var taskName = $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}";
+            tasks.Add((player.Key, realRegions, blackHoles, taskName));
+            sa.DebugMsg(
+                $"[获取本轮黑洞接线任务] {taskName} | 玩家 {sa.GetPlayerJobByIndex(player.Key)}({player.Key}) | 特征 {markFeature} | 方位 {regionStr} | 黑洞 {string.Join(",", blackHoles.Select(x => x.ToString("X8")))}",
+                Debugging);
         }
 
+        sa.DebugMsg($"[获取本轮黑洞接线任务] R{bhRound} T{bhEffectRound} 共 {tasks.Count} 个任务", Debugging);
         return tasks;
     }
-
+    
+    // BACKUP
     private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, 
         (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
     {
         if (!Debugging)
             if (sa.GetMyIndex() != task.playerIdx) return;
         var color = new Vector4(1, 1, 0, 1);
-
+    
+        // task
+        // -- playerIdx 需接线的玩家
+        // -- realRegions 需接线黑洞所在方位
+        // -- blackHoles 需接线黑洞 ObjId
+        // -- name 任务名称 $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}
+        // ---- bhRound 黑洞轮数
+        // ---- bhEffectRound 黑洞喷射轮数
+        // ---- player.Key 同 playerIdx
+        // ---- regionStr 需接线黑洞所在方位的集合，即 realRegions 的 Join
+        
         for (int i = 0; i < task.blackHoles.Count; i++)
         {
             var dp = sa.DrawLine(task.blackHoles[i], 0, 0, 7000, $"绘制黑洞接线 {task.name} L{task.realRegions[i]}",
                 0, 1, 40, color, byY: true, draw: false);
             dp.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
             sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp);
-
+            
             var dp2 = sa.DrawRect(task.blackHoles[i], 0, 0, 7000, $"绘制黑洞接线 {task.name} R{task.realRegions[i]}",
                 0, 6, 40, sa.Data.DefaultDangerColor, draw: false);
             dp2.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
@@ -1967,10 +2017,217 @@ public class UDM_P3
         var guidePos = task.realRegions.Count == 1
             ? 计算黑洞顺时针侧指路点(task.realRegions[0])
             : 计算两黑洞之间指路点(task.realRegions[0], task.realRegions[1]);
-        sa.DrawGuidance(sa.Data.PartyList[task.playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {task.name} G", sa.Data.DefaultSafeColor);
-
+        
+        // // 万一炸了就回退
+        // sa.DrawGuidance(sa.Data.PartyList[task.playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {task.name} G", sa.Data.DefaultSafeColor);
+        
+        // 建立接线 Framework
+        挂载接线Framework(sa, guidePos, task);
+    
         sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
             Debugging);
+    }
+
+    private void 挂载接线Framework(ScriptAccessory sa, Vector3 guidePos,
+        (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
+    {
+        // task
+        // -- playerIdx：需接线的玩家
+        // -- realRegions：需接线黑洞所在方位
+        // -- blackHoles：需接线黑洞 ObjId
+        // -- name：任务名称 $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}
+        // ---- bhRound：黑洞轮数
+        // ---- bhEffectRound：黑洞喷射轮数
+        // ---- player.Key：同 playerIdx
+        // ---- regionStr：需接线黑洞所在方位的集合，即 realRegions 的 Join
+        
+        // 绘图指路条件：task.blackHoles 中的黑洞产生的线都被接到
+        // 每有一根线，需一个 fwElement 进行控制
+        // fwElement
+        // -- Name：Framework 的 Name，计划用 {player.Key} {blackHoles[i]}
+        // -- PlayerIndex：需接线 Player 的 Index
+        // -- BlackHoleId：需接线的黑洞源
+        // -- PlayerObjId：需接线 Player 的 ObjectId
+        // -- FwHandle：用于挂载 sa.Method.RegistFrameworkUpdateAction(Action)
+        // -- Tethered：若成功接上线则为 true
+        // -- GuidePos：接到线/接全线后的指路位置
+        
+        // List 中一个 Framework 去控制每个黑洞
+        // 外部一个 Framework 检查 List 中的元素是否都是 tethered，然后画指路线
+        
+        for (int i = 0; i < task.blackHoles.Count; i++)
+        {
+            ulong playerObjId = sa.Data.PartyList[task.playerIdx];
+            bool tethered = false;
+            
+            var fwElement = new 接线Framework元素
+            {
+                Name = $"{task.playerIdx} {task.blackHoles[i]}",
+                TaskName = task.name,
+                PlayerIndex = task.playerIdx,
+                BlackHoleId = task.blackHoles[i],
+                PlayerObjId = playerObjId,
+                Tethered = tethered,
+                FwHandle = "",
+                GuidePos = guidePos
+            };
+            
+            _udmP3Param.接线FrameworkList.Add(fwElement);
+            sa.DebugMsg(
+                $"[挂载接线Framework] {fwElement.TaskName} | {sa.GetPlayerJobByIndex(fwElement.PlayerIndex)}({fwElement.PlayerIndex}) 玩家 {fwElement.PlayerObjId:X8} | 黑洞 {fwElement.BlackHoleId:X8} | 真实方位 {task.realRegions[i]} | 元素 {fwElement.Name}",
+                Debugging);
+        }
+    }
+
+    private void 执行接线Framework(ScriptAccessory sa,
+        List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)> tasks)
+    {
+        // 筛选出本轮相关的线元素
+        List<接线Framework元素> 当前接线任务Fws = _udmP3Param.接线FrameworkList.ToList();
+        if (当前接线任务Fws.Count == 0) return;
+        sa.DebugMsg(
+            $"[执行接线Framework] 本轮任务 {tasks.Count} 个，接线元素 {当前接线任务Fws.Count} 个：{string.Join(" | ", tasks.Select(task => $"{task.name}:{task.blackHoles.Count}"))}",
+            Debugging);
+
+        Dictionary<string, bool> 去站位指路绘制状态 = tasks.ToDictionary(task => task.name, _ => false);
+        Dictionary<string, bool> 上一次任务接线完成状态 = tasks.ToDictionary(task => task.name, _ => false);
+        string 去站位指路绘图名(string taskName) => $"绘制黑洞接线 {taskName} G去站位";
+
+        _udmP3Param.当前接线任务Framework = sa.Method.RegistFrameworkUpdateAction(Action);
+        void Action()
+        {
+            foreach (var fw in 当前接线任务Fws)
+            {
+                var bh = sa.GetById(fw.BlackHoleId);
+                if (bh == null)
+                {
+                    if (fw.上一次黑洞存在状态)
+                    {
+                        sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 黑洞 {fw.BlackHoleId:X8} 当前取不到", Debugging);
+                        fw.上一次黑洞存在状态 = false;
+                    }
+                    continue;
+                }
+                if (!fw.上一次黑洞存在状态)
+                {
+                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 黑洞 {fw.BlackHoleId:X8} 已重新取到", Debugging);
+                    fw.上一次黑洞存在状态 = true;
+                }
+                var 当前接线目标 = sa.GetTetherSource((IBattleChara)bh, 0x54);
+                var 当前接线目标列表 = string.Join(",", 当前接线目标.Select(x => x.ToString("X8")));
+                if (当前接线目标列表 != fw.上一次接线目标列表)
+                {
+                    var 当前接线目标Job列表 = string.Join(",", 当前接线目标.Select(x => sa.GetPlayerJobById((uint)x)));
+                    sa.DebugMsg(
+                        $"[Action] {fw.TaskName} | {fw.Name} 线目标变化：{(当前接线目标列表 == "" ? "无" : 当前接线目标列表)} | {当前接线目标Job列表}",
+                        Debugging);
+                    fw.上一次接线目标列表 = 当前接线目标列表;
+                }
+                var 刚才已接到线 = fw.Tethered;
+                var 当前已接到线 = 当前接线目标.Contains(fw.PlayerObjId);
+                fw.Tethered = 当前已接到线;
+
+                if (当前已接到线)
+                {
+                    // 如果接到线了，就不需要画去接这根线的指路，清空上一次去接线的相关绘图。
+                    if (!fw.去接线指路已绘制 && 刚才已接到线) continue;
+                    if (fw.上一次去接线指路绘图名 != "")
+                        sa.Method.RemoveDraw(fw.上一次去接线指路绘图名);
+                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 接到线了，目标 {fw.PlayerObjId:X8}/{sa.GetPlayerJobByIndex(fw.PlayerIndex)}", Debugging);
+                    fw.去接线指路已绘制 = false;
+                    fw.上一次接线目标 = 0;
+                    fw.上一次去接线指路绘图名 = "";
+                    continue;
+                }
+
+                if (当前接线目标.Count != 1)
+                {
+                    // 如果这根线没有处在“明确连到一个玩家”的状态（没有玩家给你连了），则清空“去接线”与“去站位”绘图
+                    if (去站位指路绘制状态.GetValueOrDefault(fw.TaskName))
+                    {
+                        sa.Method.RemoveDraw(去站位指路绘图名(fw.TaskName));
+                        去站位指路绘制状态[fw.TaskName] = false;
+                        sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 线目标数量 {当前接线目标.Count}，移除去站位指路", Debugging);
+                    }
+                    if (!fw.去接线指路已绘制) continue;
+                    if (fw.上一次去接线指路绘图名 != "")
+                        sa.Method.RemoveDraw(fw.上一次去接线指路绘图名);
+                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 线目标数量 {当前接线目标.Count}，移除去接线指路", Debugging);
+                    fw.去接线指路已绘制 = false;
+                    fw.上一次接线目标 = 0;
+                    fw.上一次去接线指路绘图名 = "";
+                    continue;
+                }
+
+                // 如果这根线连着错误的玩家
+                var 当前接线目标ObjId = 当前接线目标[0];
+                if (fw.去接线指路已绘制 && 当前接线目标ObjId == fw.上一次接线目标) continue;
+                if (去站位指路绘制状态.GetValueOrDefault(fw.TaskName))
+                {
+                    sa.Method.RemoveDraw(去站位指路绘图名(fw.TaskName));
+                    去站位指路绘制状态[fw.TaskName] = false;
+                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 线被错误目标 {当前接线目标ObjId:X8}/{sa.GetPlayerJobById((uint)当前接线目标ObjId)} 接到，移除去站位指路", Debugging);
+                }
+                if (fw.上一次去接线指路绘图名 != "")
+                    sa.Method.RemoveDraw(fw.上一次去接线指路绘图名);
+
+                // 顺利来到这里：当前没接到线，黑洞明确有线连着玩家，这根线连着错误的玩家
+                var 当前去接线指路绘图名 = $"{fw.去接线指路绘图名前缀} {当前接线目标ObjId:X8}";
+                sa.DebugMsg(
+                    $"[Action] {fw.TaskName} | {fw.Name} 快去接线：{sa.GetPlayerJobByIndex(fw.PlayerIndex)}({fw.PlayerObjId:X8}) -> {sa.GetPlayerJobById((uint)当前接线目标ObjId)}({当前接线目标ObjId:X8})",
+                    Debugging);
+                sa.DrawGuidance(fw.PlayerObjId, 当前接线目标ObjId, 0, 7000, 当前去接线指路绘图名, sa.Data.DefaultSafeColor);
+                fw.去接线指路已绘制 = true;
+                fw.上一次接线目标 = 当前接线目标ObjId;
+                fw.上一次去接线指路绘图名 = 当前去接线指路绘图名;
+            }
+
+            foreach (var taskFws in 当前接线任务Fws.GroupBy(fw => fw.TaskName))
+            {
+                // 使用 groupby 将所有线元素进行分组，若一人接两根，会有 R1 T1 5 0,2 这种同名 TaskName 的情况
+                var taskName = taskFws.Key;
+                var allTethered = taskFws.All(fw => fw.Tethered);
+                if (allTethered != 上一次任务接线完成状态.GetValueOrDefault(taskName))
+                {
+                    sa.DebugMsg(
+                        $"[ActionGuide] {taskName} 接线完成状态变化：{allTethered} | {string.Join(",", taskFws.Select(fw => $"{fw.Name}={fw.Tethered}"))}",
+                        Debugging);
+                    上一次任务接线完成状态[taskName] = allTethered;
+                }
+                if (!allTethered)
+                {
+                    if (!去站位指路绘制状态.GetValueOrDefault(taskName)) continue;
+                    sa.Method.RemoveDraw(去站位指路绘图名(taskName));
+                    去站位指路绘制状态[taskName] = false;
+                    sa.DebugMsg($"[ActionGuide] {taskName} 未全接到，移除去站位指路", Debugging);
+                    continue;
+                }
+
+                if (去站位指路绘制状态.GetValueOrDefault(taskName)) continue;
+                foreach (var fw in taskFws)
+                    sa.Method.RemoveDraw($"绘制黑洞接线 {taskName} G去接线 {fw.Name}.*");
+
+                var guideFw = taskFws.First();
+                sa.DebugMsg($"[ActionGuide] 去站位吧 {taskName} | 玩家 {sa.GetPlayerJobByIndex(guideFw.PlayerIndex)}({guideFw.PlayerObjId:X8}) | GuidePos {guideFw.GuidePos}", Debugging);
+                // $"绘制黑洞接线 {taskName} G去站位";
+                sa.DrawGuidance(guideFw.PlayerObjId, guideFw.GuidePos, 0, 7000, 去站位指路绘图名(taskName), sa.Data.DefaultSafeColor);
+                去站位指路绘制状态[taskName] = true;
+            }
+        }
+    }
+
+    private void 清理接线Framework(ScriptAccessory sa)
+    {
+        foreach (var fw in _udmP3Param.接线FrameworkList)
+        {
+            if (fw.FwHandle != "")
+                sa.Method.UnregistFrameworkUpdateAction(fw.FwHandle);
+        }
+        _udmP3Param.接线FrameworkList.Clear();
+
+        if (_udmP3Param.当前接线任务Framework != "")
+            sa.Method.UnregistFrameworkUpdateAction(_udmP3Param.当前接线任务Framework);
+        _udmP3Param.当前接线任务Framework = "";
     }
 
     private Vector3 计算黑洞顺时针侧指路点(int realRegion)
@@ -2397,6 +2654,9 @@ internal class UDMP3Params
 
     public bool 获得过第一个黑洞状态 = false;
     public bool 黑洞已出现 = false;
+
+    public List<接线Framework元素> 接线FrameworkList = [];
+    public string 当前接线任务Framework = "";
     
     public void Reset(ScriptAccessory sa)
     {
@@ -2454,6 +2714,16 @@ internal class UDMP3Params
         
         获得过第一个黑洞状态 = false;
         黑洞已出现 = false;
+
+        foreach (var fw in 接线FrameworkList)
+        {
+            if (fw.FwHandle != "")
+                sa.Method.UnregistFrameworkUpdateAction(fw.FwHandle);
+        }
+        接线FrameworkList.Clear();
+        if (当前接线任务Framework != "")
+            sa.Method.UnregistFrameworkUpdateAction(当前接线任务Framework);
+        当前接线任务Framework = "";
         
         Dbg(sa, $"绝妖星乱舞 P3 参数重置");
     }
@@ -2574,6 +2844,24 @@ internal static class P3BExtension
         // 分摊D  我是TN 我分摊 false
         return prm.分摊点TN ^ (myIndex <= 3);
     }
+}
+
+internal class 接线Framework元素
+{
+    public string Name { get; init; } = "";
+    public string TaskName { get; init; } = "";
+    public int PlayerIndex { get; init; }
+    public string FwHandle { get; set; } = "";
+    public bool Tethered { get; set; } = false;
+    public ulong BlackHoleId { get; init; }
+    public ulong PlayerObjId { get; init; }
+    public Vector3 GuidePos { get; init; }
+    public bool 去接线指路已绘制 { get; set; } = false;
+    public ulong 上一次接线目标 { get; set; } = 0;
+    public string 上一次去接线指路绘图名 { get; set; } = "";
+    public string 上一次接线目标列表 { get; set; } = "";
+    public bool 上一次黑洞存在状态 { get; set; } = true;
+    public string 去接线指路绘图名前缀 => $"绘制黑洞接线 {TaskName} G去接线 {Name}";
 }
 
 #endregion 参数容器类
@@ -2802,6 +3090,20 @@ internal static class IndexHelper
     public static int GetMyIndex(this ScriptAccessory sa)
     {
         return sa.Data.PartyList.IndexOf(sa.Data.Me);
+    }
+    
+    /// <summary>
+    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="sa"></param>
+    /// <returns>该玩家对应的位置称呼</returns>
+    public static string GetPlayerJobById(this ScriptAccessory sa, uint pid)
+    {
+        // 获得玩家职能简称，无用处，仅作DEBUG输出
+        var idx = sa.Data.PartyList.IndexOf(pid);
+        var str = sa.GetPlayerJobByIndex(idx);
+        return str;
     }
 
     /// <summary>
