@@ -33,18 +33,17 @@ public class UDM_P3
     const string NoteStr =
         $"""
         {Version}
-        一运
-        - TLB_拉火水晶_夜音：拉火水晶6人集合，只有火 Buff 在外
-
         二运黑洞
         - 含指路与指挥模式，需在用户设置开启。
         - * 黑洞指路依赖标点，黑洞出现前需完成整个标点流程。
-        - 共有三种优先级配置：
-        - HTD：采用 H2 > H1 > D3 > D2 > D1 > D4 > MT > ST
-        - THD：采用 MT > ST > H1 > H2 > D1 > D2 > D3 > D4
-        - HTD 如此分布的目的是减少接双线玩家的罚站情况，三麻时优先级将取反。
+        - 共有四种优先级配置：
+        - * HDT("43765812")：采用 H2 > H1 > D3 > D2 > D1 > D4 > MT > ST
+        - * HDT三麻取反("437658120")：基于 HDT，三麻优先级取反（ST > MT > ... > H2)
+        - * THD("12345678")：采用 MT > ST > H1 > H2 > D1 > D2 > D3 > D4
+        - * 若选择自定义，可从左到右细分各职能标点顺序，支持8位或9位输入。
+        - * 前八位由"1~8"组成，分别代表 MT、ST、H1、H2、D1、D2、D3、D4，第九位输入"0"代表三麻取反，输入错误则回退到“HDT三麻取反”。
         - MT 指“卡奥斯T”，ST 指“艾克斯迪司T”，会根据用户设置中“P3A1 - 拉艾克斯迪司的是 MT”设置调整。
-        
+
         二运冰封
         - 从上下引导后四角_盗火文档：基于凯夫卡面基，上TN下DPS，然后基于场中四角分开引导
         - 从场中引导后上下_NoCCHH：先场中，然后TN上DPS下分开引导
@@ -58,12 +57,13 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复 HDT/THD 标点顺序错误问题。
+        1. [x] 脚本说明中删除对一运打法的说明。
+        2. [x] 现在黑洞指挥模式的标点优先级可自定义8人配置。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.28";
-    private const string DebugVersion = "b";
+    private const string Version = "0.0.0.29";
+    private const string DebugVersion = "a";
     private int _runId = 0;
 
     private const bool Debugging = false;
@@ -102,12 +102,17 @@ public class UDM_P3
     
     [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
     public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.HDT;
-    
+
     public enum BhPriStgEnum
     {
         HDT,
+        HDT三麻取反,
         THD,
+        自定义
     }
+
+    [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级（自定义设置）")]
+    public static string BhMarkPriorityStr { get; set; } = "437658120";
 
     [UserSetting("P3B1 - 二运黑洞策略")]
     public static BhStgEnum BhStg { get; set; } = BhStgEnum.一人一根线;
@@ -162,117 +167,37 @@ public class UDM_P3
         userControl: Debugging)]
     public void 展示优先级表格(Event ev, ScriptAccessory sa) =>
         sa.DebugMsg(_pd.ShowPriorities(), Debugging);
-
-    [ScriptMethod(name: "测试项：展示一运状态", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    
+    [ScriptMethod(name: "测试项：双Boss赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
-    public void 展示一运状态(Event ev, ScriptAccessory sa)
+    public void 双Boss赋值(Event ev, ScriptAccessory sa)
     {
-        _udmP3Param.打印水晶与分组(sa, _pd);
-        sa.DebugMsg($"{_udmP3Param.当前轮为火()}", Debugging);
-    }
-
-    [ScriptMethod(name: "测试项：一运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 一运赋值(Event ev, ScriptAccessory sa)
-    {
-        _pd.Init(sa, "P3一运");
-        _udmP3Param.当前阶段 = 3100;
-        
-        _pd.AddPriorities([21, 112, 13, 214, 15, 26, 127, 228]);
-        _udmP3Param.是长火 = true;
-        _udmP3Param.无水晶方位 = 0;
-        _udmP3Param.水水晶方位 = 3;
-        _udmP3Param.火水晶方位 = 1;
-        _udmP3Param.风水晶方位 = 2;
-        _udmP3Param.成员分组(sa, _pd);
-
         _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
+    }
+    
+    [ScriptMethod(name: "测试项：黑洞指挥模式测试 /e kdyhd", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:kdyhd"],
+        userControl: true)]
+    public void 黑洞指挥模式测试(Event ev, ScriptAccessory sa)
+    {
+        if (!P3B1CaptainMode) return;
+        lock (this)
+        {
+            sa.Method.SendChat($"/e 让可达鸭看看你的优先级！");
         
-        sa.DebugMsg($"[测试项：一运赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：究极冲击波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 究极冲击波赋值(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.当前阶段 = 3111;
-        _udmP3Param.究极冲击波起始方位 = 6;
-        _udmP3Param.究极冲击波为顺时针 = false;
-        _udmP3Param.究极冲击波记录完毕 = true;
-        _pd.AddPriorities([7000, 8000, 2000, 1000, 4000, 3000, 5000, 6000]);
-        sa.DebugMsg($"[测试项：究极冲击波赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：测试指引线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 测试TTS(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-        DrawStaticGuideLineVw(sa, 1500);
-    }
-    
-    [ScriptMethod(name: "测试项：测试黑洞线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 测试黑洞线(Event ev, ScriptAccessory sa)
-    {
-        // 判断是否有线
-        uint tetherId = 0x54;
-        var bc = sa.GetById(0x4000359E);
-        if (bc == null) return;
+            var (priority, reverseThirdMarker) = 构筑指挥优先级字段(BhMarkPriority);
+            _pdCaptain.AddPriorities(priority);
+            _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
         
-        var ls = sa.GetTetherSource((IBattleChara)bc, tetherId);
-        var hasTether = ls.Count > 0;
+            for (int i = 0; i < sa.Data.PartyList.Count; i++)
+            {
+                var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
+                var marker = GetMarkTypeByRankBh(i, _udmP3Param.黑洞三麻取反);
+                sa.MarkPlayerByIdx(kvp.Key, marker);
+                sa.Method.SendChat($"/e 可达鸭偷偷给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
+            }
+        }
 
-        var playerJob = hasTether ? sa.GetPlayerJobById((uint)ls[0]) : "";
-        sa.DebugMsg($"{string.Join(",", ls.Select(x => x.ToString("X8")))} | {playerJob} | {hasTether}", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：真空波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 真空波赋值(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.当前阶段 = 3111;
-        _pd.Init(sa, "P3一运");
-        _pd.AddPriorities([11, 112, 13, 214, 15, 26, 127, 228]);
-        
-        _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
-        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-        
-        sa.DebugMsg($"[测试项：真空波赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：二运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 二运赋值(Event ev, ScriptAccessory sa)
-    {
-        _pd.Init(sa, "P3二运");
-        _udmP3Param.当前阶段 = 3200;
-
-        _pd.AddPriorities([311, 232, 223, 134, 325, 216, 127, 118]);
-        _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
-        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-        
-        sa.DebugMsg($"[测试项：二运赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：冰封赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 冰封赋值(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.当前阶段 = 3210;
-
-        _udmP3Param.凯夫卡方位 = 1;  // C逆
-        
-        _udmP3Param.冰封北方位 = BlizKefkaIsNorth ? _udmP3Param.凯夫卡方位 : (_udmP3Param.凯夫卡方位 + 4) % 8;
-        _udmP3Param.西塔方位 = (_udmP3Param.冰封北方位 + 2) % 8;
-        _udmP3Param.东塔方位 = (_udmP3Param.冰封北方位 - 2 + 8) % 8;
-        
-        _udmP3Param.分摊点TN = false;
-        _udmP3Param.绘制冰封引导路径 = true;
-        _udmP3Param.是第一次分摊 = false;
-
-        sa.DebugMsg($"[测试项：冰封赋值] 赋值完毕", Debugging);
     }
         
     #endregion 测试项
@@ -1365,42 +1290,50 @@ public class UDM_P3
         sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
     }
 
-    private static List<int> 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
+    // 根据不同类的输入重载一次
+    private static (List<int> priority, bool reverseThirdMarker) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
     {
-        List<int> priority = prioritySetting switch
+        var priorityText = prioritySetting switch
         {
-            BhPriStgEnum.THD => [ExDeathMT ? 2 : 1, ExDeathMT ? 1 : 2, 3, 4, 5, 6, 7, 8],
-            _ => [ExDeathMT ? 8 : 7, ExDeathMT ? 7 : 8, 2, 1, 5, 4, 3, 6],
+            BhPriStgEnum.THD => "12345678",
+            BhPriStgEnum.自定义 => BhMarkPriorityStr,
+            BhPriStgEnum.HDT三麻取反 => "437658120",
+            _ => "43765812"
         };
-        return priority;
+        return 构筑指挥优先级字段(priorityText);
     }
-    
-    // private static List<int> 构筑指挥优先级字段(string prioritySetting)
-    // {
-    //     var normalized = (prioritySetting ?? "").Trim().ToUpperInvariant().Replace('N', 'H');
-    //     if (normalized.Length != 3 || normalized.Distinct().Count() != 3 || normalized.Any(c => c is not ('T' or 'H' or 'D')))
-    //         normalized = "HDT";
-    //
-    //     var roleIndices = new Dictionary<char, List<int>>
-    //     {
-    //         ['T'] = [0, 1],
-    //         ['H'] = [2, 3],
-    //         ['D'] = [4, 5, 6, 7],
-    //     };
-    //     var priority = new int[8];
-    //     var currentPriority = 1;
-    //
-    //     foreach (var role in normalized)
-    //     {
-    //         foreach (var index in roleIndices[role])
-    //         {
-    //             priority[index] = currentPriority;
-    //             currentPriority++;
-    //         }
-    //     }
-    //
-    //     return priority.ToList();
-    // }
+
+    private static (List<int> priority, bool reverseThirdMarker) 构筑指挥优先级字段(string prioritySetting)
+    {
+        var normalized = (prioritySetting ?? "").Trim();
+
+        // 长度必须为 8 或 9，若长度为 9，最后一位必须是 0
+        // 每一位都是 1~8，且互不相同
+        var isValid =
+            (normalized.Length == 8 || (normalized.Length == 9 && normalized[8] == '0')) &&
+            normalized[..8].All(c => c is >= '1' and <= '8') &&
+            normalized[..8].Distinct().Count() == 8;
+        if (!isValid)
+            normalized = "437658120";
+
+        var roleIdxMap = new Dictionary<char, int>
+        {
+            ['1'] = ExDeathMT ? 1 : 0,
+            ['2'] = ExDeathMT ? 0 : 1,
+            ['3'] = 2,
+            ['4'] = 3,
+            ['5'] = 4,
+            ['6'] = 5,
+            ['7'] = 6,
+            ['8'] = 7,
+        };
+        var priority = new int[8];
+        for (var i = 0; i < 8; i++)
+            // priority [职能] = 优先级，输入的"12345678"要再映射到"01(10)234567"
+            priority[roleIdxMap[normalized[i]]] = i + 1;
+
+        return (priority.ToList(), normalized.Length == 9 && normalized[8] == '0');
+    }
     
     [ScriptMethod(name: "*P3B_黑洞、冰封期间双Boss透明", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:regex:^(47867)$"], userControl: true)]
@@ -1592,11 +1525,12 @@ public class UDM_P3
             if (!_udmP3Param.获得过第一个黑洞状态)
             {
                 _pdCaptain.Init(sa, "P3二运指挥");
-                List<int> priority = 构筑指挥优先级字段(BhMarkPriority);
+                var (priority, reverseThirdMarker) = 构筑指挥优先级字段(BhMarkPriority);
                 _pdCaptain.AddPriorities(priority);
+                _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
                 _udmP3Param.获得过第一个黑洞状态 = true;
             }
-           
+
             var statusId = ev.StatusId;
             var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var priVal = ev.StatusId switch
@@ -1631,12 +1565,12 @@ public class UDM_P3
         for (int i = 0; i < 8; i++)
         {
             var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
-            var marker = GetMarkTypeByRankBh(i);
+            var marker = GetMarkTypeByRankBh(i, _udmP3Param.黑洞三麻取反);
             sa.MarkPlayerByIdx(kvp.Key, marker);
             sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
             
             if (P3B1CaptainModeDevHelper)
-                sa.Method.SendChat($"/e 可达鸭偷偷给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
+                sa.Method.SendChat($"/e 可达鸭明目张胆地把 {marker} 标给了 {sa.GetPlayerJobByIndex(kvp.Key)}");
         }
         _udmP3Param.二运状态记录.Reset();
     }
@@ -1695,7 +1629,7 @@ public class UDM_P3
         return 0; 
     }
 
-    private MarkType GetMarkTypeByRankBh(int rank)
+    private MarkType GetMarkTypeByRankBh(int rank, bool reverseThirdMarker)
     {
         return rank switch
         {
@@ -1705,8 +1639,8 @@ public class UDM_P3
             3 => MarkType.Bind1,
             4 => MarkType.Bind2,
             5 => MarkType.Bind3,
-            6 => MarkType.Stop2,    // 三麻取反
-            _ => MarkType.Stop1
+            6 => reverseThirdMarker ? MarkType.Stop2 : MarkType.Stop1,
+            _ => reverseThirdMarker ? MarkType.Stop1 : MarkType.Stop2
         };
     }
     
@@ -2649,6 +2583,7 @@ internal class UDMP3Params
 
     public bool 获得过第一个黑洞状态 = false;
     public bool 黑洞已出现 = false;
+    public bool 黑洞三麻取反 = false;
 
     public List<接线Framework元素> 接线FrameworkList = [];
     public string 当前接线任务Framework = "";
@@ -2709,6 +2644,7 @@ internal class UDMP3Params
         
         获得过第一个黑洞状态 = false;
         黑洞已出现 = false;
+        黑洞三麻取反 = false;
 
         foreach (var fw in 接线FrameworkList)
         {
