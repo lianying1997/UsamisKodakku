@@ -57,8 +57,8 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [ ] 脚本说明中删除对一运打法的说明。
-        2. [ ] 现在黑洞指挥模式的标点优先级可自定义8人配置。
+        1. [x] 脚本说明中删除对一运打法的说明。
+        2. [x] 现在黑洞指挥模式的标点优先级可自定义8人配置。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
@@ -167,117 +167,37 @@ public class UDM_P3
         userControl: Debugging)]
     public void 展示优先级表格(Event ev, ScriptAccessory sa) =>
         sa.DebugMsg(_pd.ShowPriorities(), Debugging);
-
-    [ScriptMethod(name: "测试项：展示一运状态", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+    
+    [ScriptMethod(name: "测试项：双Boss赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
-    public void 展示一运状态(Event ev, ScriptAccessory sa)
+    public void 双Boss赋值(Event ev, ScriptAccessory sa)
     {
-        _udmP3Param.打印水晶与分组(sa, _pd);
-        sa.DebugMsg($"{_udmP3Param.当前轮为火()}", Debugging);
-    }
-
-    [ScriptMethod(name: "测试项：一运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 一运赋值(Event ev, ScriptAccessory sa)
-    {
-        _pd.Init(sa, "P3一运");
-        _udmP3Param.当前阶段 = 3100;
-        
-        _pd.AddPriorities([21, 112, 13, 214, 15, 26, 127, 228]);
-        _udmP3Param.是长火 = true;
-        _udmP3Param.无水晶方位 = 0;
-        _udmP3Param.水水晶方位 = 3;
-        _udmP3Param.火水晶方位 = 1;
-        _udmP3Param.风水晶方位 = 2;
-        _udmP3Param.成员分组(sa, _pd);
-
         _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
+    }
+    
+    [ScriptMethod(name: "测试项：黑洞指挥模式测试 /e kdyhd", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:kdyhd"],
+        userControl: true)]
+    public void 黑洞指挥模式测试(Event ev, ScriptAccessory sa)
+    {
+        if (!P3B1CaptainMode) return;
+        lock (this)
+        {
+            sa.Method.SendChat($"/e 让可达鸭看看你的优先级！");
         
-        sa.DebugMsg($"[测试项：一运赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：究极冲击波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 究极冲击波赋值(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.当前阶段 = 3111;
-        _udmP3Param.究极冲击波起始方位 = 6;
-        _udmP3Param.究极冲击波为顺时针 = false;
-        _udmP3Param.究极冲击波记录完毕 = true;
-        _pd.AddPriorities([7000, 8000, 2000, 1000, 4000, 3000, 5000, 6000]);
-        sa.DebugMsg($"[测试项：究极冲击波赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：测试指引线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 测试TTS(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-        DrawStaticGuideLineVw(sa, 1500);
-    }
-    
-    [ScriptMethod(name: "测试项：测试黑洞线", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 测试黑洞线(Event ev, ScriptAccessory sa)
-    {
-        // 判断是否有线
-        uint tetherId = 0x54;
-        var bc = sa.GetById(0x4000359E);
-        if (bc == null) return;
+            var (priority, reverseThirdMarker) = 构筑指挥优先级字段(BhMarkPriority);
+            _pdCaptain.AddPriorities(priority);
+            _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
         
-        var ls = sa.GetTetherSource((IBattleChara)bc, tetherId);
-        var hasTether = ls.Count > 0;
+            for (int i = 0; i < sa.Data.PartyList.Count; i++)
+            {
+                var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
+                var marker = GetMarkTypeByRankBh(i, _udmP3Param.黑洞三麻取反);
+                sa.MarkPlayerByIdx(kvp.Key, marker);
+                sa.Method.SendChat($"/e 可达鸭偷偷给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
+            }
+        }
 
-        var playerJob = hasTether ? sa.GetPlayerJobById((uint)ls[0]) : "";
-        sa.DebugMsg($"{string.Join(",", ls.Select(x => x.ToString("X8")))} | {playerJob} | {hasTether}", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：真空波赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 真空波赋值(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.当前阶段 = 3111;
-        _pd.Init(sa, "P3一运");
-        _pd.AddPriorities([11, 112, 13, 214, 15, 26, 127, 228]);
-        
-        _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
-        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-        
-        sa.DebugMsg($"[测试项：真空波赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：二运赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 二运赋值(Event ev, ScriptAccessory sa)
-    {
-        _pd.Init(sa, "P3二运");
-        _udmP3Param.当前阶段 = 3200;
-
-        _pd.AddPriorities([311, 232, 223, 134, 325, 216, 127, 118]);
-        _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
-        _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-        
-        sa.DebugMsg($"[测试项：二运赋值] 赋值完毕", Debugging);
-    }
-    
-    [ScriptMethod(name: "测试项：冰封赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 冰封赋值(Event ev, ScriptAccessory sa)
-    {
-        _udmP3Param.当前阶段 = 3210;
-
-        _udmP3Param.凯夫卡方位 = 1;  // C逆
-        
-        _udmP3Param.冰封北方位 = BlizKefkaIsNorth ? _udmP3Param.凯夫卡方位 : (_udmP3Param.凯夫卡方位 + 4) % 8;
-        _udmP3Param.西塔方位 = (_udmP3Param.冰封北方位 + 2) % 8;
-        _udmP3Param.东塔方位 = (_udmP3Param.冰封北方位 - 2 + 8) % 8;
-        
-        _udmP3Param.分摊点TN = false;
-        _udmP3Param.绘制冰封引导路径 = true;
-        _udmP3Param.是第一次分摊 = false;
-
-        sa.DebugMsg($"[测试项：冰封赋值] 赋值完毕", Debugging);
     }
         
     #endregion 测试项
@@ -1650,7 +1570,7 @@ public class UDM_P3
             sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
             
             if (P3B1CaptainModeDevHelper)
-                sa.Method.SendChat($"/e 可达鸭偷偷给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
+                sa.Method.SendChat($"/e 可达鸭明目张胆地把 {marker} 标给了 {sa.GetPlayerJobByIndex(kvp.Key)}");
         }
         _udmP3Param.二运状态记录.Reset();
     }
