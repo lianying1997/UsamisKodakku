@@ -62,7 +62,7 @@ public class UDM_P3
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.28";
+    private const string Version = "0.0.0.29";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
