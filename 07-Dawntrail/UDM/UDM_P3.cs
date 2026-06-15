@@ -58,14 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 脚本说明中删除了一些被野队淘汰的打法。配置项中未删除，但具体细节请看相关文档。
-        2. 现在 P3 二运黑洞指路会先指向接线点，只有接全线后才会指路到放黑洞的安全区。（真难写！！！）
-        3. 现在卡奥斯读条的诅咒敕令会拉高对比度，方便分辨 诅咒敕令+响亮亮巴掌 的阴间组合。
-        4. 现在黑洞指挥模式的标点优先级变为可配置的三种：HTD/THD/远程双线，且职能内部优先级稍有变更。
+        1. 修复 HDT/THD 标点顺序错误问题。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.27";
+    private const string Version = "0.0.0.28";
     private const string DebugVersion = "b";
     private int _runId = 0;
 
@@ -1370,12 +1367,10 @@ public class UDM_P3
 
     private static List<int> 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
     {
-        var chaosTank = ExDeathMT ? 2 : 1;
-        var exDeathTank = ExDeathMT ? 1 : 2;
         List<int> priority = prioritySetting switch
         {
-            BhPriStgEnum.THD => [chaosTank, exDeathTank, 4, 3, 7, 6, 5, 8],
-            _ => [4, 3, 7, 6, 5, 8, chaosTank, exDeathTank],
+            BhPriStgEnum.THD => [ExDeathMT ? 2 : 1, ExDeathMT ? 1 : 2, 3, 4, 5, 6, 7, 8],
+            _ => [ExDeathMT ? 8 : 7, ExDeathMT ? 7 : 8, 2, 1, 5, 4, 3, 6],
         };
         return priority;
     }
