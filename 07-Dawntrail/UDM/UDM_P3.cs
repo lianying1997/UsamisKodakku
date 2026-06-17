@@ -34,7 +34,7 @@ public class UDM_P3
         $"""
         {Version}
         二运黑洞
-        - 含指路与指挥模式，需在用户设置开启。
+        - 含指路与指挥模式，需在用户设置开启，副本内使用 `/e kdyhd` 可测试标点优先级。
         - * 黑洞指路依赖标点，黑洞出现前需完成整个标点流程。
         - 共有四种优先级配置：
         - * HDT("43765812")：采用 H2 > H1 > D3 > D2 > D1 > D4 > MT > ST
@@ -57,12 +57,13 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [x] 脚本说明中删除对一运打法的说明。
-        2. [x] 现在黑洞指挥模式的标点优先级可自定义8人配置。
+        1. [x] 修复测试标点优先级时未重置数据导致优先级错误的 Bug。
+        2. [ ] 弃用“P3A1 - 拉艾克斯迪司的是 MT”的用户设置，脚本将根据决战 Buff 类型自主判断。
+        3. [ ] *对治疗与输出职业添加了特殊功能，决战 Buff 期间，不可选中无法造成伤害的 Boss。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.29";
+    private const string Version = "0.0.0.30";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -183,18 +184,22 @@ public class UDM_P3
         if (!P3B1CaptainMode) return;
         lock (this)
         {
-            sa.Method.SendChat($"/e 让可达鸭看看你的优先级！");
-        
-            var (priority, reverseThirdMarker) = 构筑指挥优先级字段(BhMarkPriority);
+            _pdCaptain.Init(sa, "测试");
+
+            var (priority, reverseThirdMarker, normalized) = 构筑指挥优先级字段(BhMarkPriority);
+            if (BhMarkPriority == BhPriStgEnum.自定义)
+                sa.Method.SendChat($"/e 输入值：{BhMarkPriorityStr}");
+            sa.Method.SendChat($"/e 实际作用值：{normalized}");
+
             _pdCaptain.AddPriorities(priority);
             _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
         
-            for (int i = 0; i < sa.Data.PartyList.Count; i++)
+            for (int i = 0; i < _pdCaptain.Priorities.Count; i++)
             {
                 var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
                 var marker = GetMarkTypeByRankBh(i, _udmP3Param.黑洞三麻取反);
                 sa.MarkPlayerByIdx(kvp.Key, marker);
-                sa.Method.SendChat($"/e 可达鸭偷偷给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
+                sa.Method.SendChat($"/e 可达鸭光明正大地给 {sa.GetPlayerJobByIndex(kvp.Key)} 标上了 {marker}");
             }
         }
 
@@ -1291,7 +1296,7 @@ public class UDM_P3
     }
 
     // 根据不同类的输入重载一次
-    private static (List<int> priority, bool reverseThirdMarker) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
+    private static (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
     {
         var priorityText = prioritySetting switch
         {
@@ -1303,7 +1308,7 @@ public class UDM_P3
         return 构筑指挥优先级字段(priorityText);
     }
 
-    private static (List<int> priority, bool reverseThirdMarker) 构筑指挥优先级字段(string prioritySetting)
+    private static (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(string prioritySetting)
     {
         var normalized = (prioritySetting ?? "").Trim();
 
@@ -1332,7 +1337,7 @@ public class UDM_P3
             // priority [职能] = 优先级，输入的"12345678"要再映射到"01(10)234567"
             priority[roleIdxMap[normalized[i]]] = i + 1;
 
-        return (priority.ToList(), normalized.Length == 9 && normalized[8] == '0');
+        return (priority.ToList(), normalized.Length == 9 && normalized[8] == '0', normalized);
     }
     
     [ScriptMethod(name: "*P3B_黑洞、冰封期间双Boss透明", eventType: EventTypeEnum.StartCasting,
@@ -1525,7 +1530,7 @@ public class UDM_P3
             if (!_udmP3Param.获得过第一个黑洞状态)
             {
                 _pdCaptain.Init(sa, "P3二运指挥");
-                var (priority, reverseThirdMarker) = 构筑指挥优先级字段(BhMarkPriority);
+                var (priority, reverseThirdMarker, _) = 构筑指挥优先级字段(BhMarkPriority);
                 _pdCaptain.AddPriorities(priority);
                 _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
                 _udmP3Param.获得过第一个黑洞状态 = true;
