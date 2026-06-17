@@ -42,7 +42,7 @@ public class UDM_P3
         - * THD("12345678")：采用 MT > ST > H1 > H2 > D1 > D2 > D3 > D4
         - * 若选择自定义，可从左到右细分各职能标点顺序，支持8位或9位输入。
         - * 前八位由"1~8"组成，分别代表 MT、ST、H1、H2、D1、D2、D3、D4，第九位输入"0"代表三麻取反，输入错误则回退到“HDT三麻取反”。
-        - MT 指“卡奥斯T”，ST 指“艾克斯迪司T”，会根据用户设置中“P3A1 - 拉艾克斯迪司的是 MT”设置调整。
+        - MT 指“卡奥斯T”，ST 指“艾克斯迪司T”，会根据决战 Buff 类型自主判断。
 
         二运冰封
         - 从上下引导后四角_盗火文档：基于凯夫卡面基，上TN下DPS，然后基于场中四角分开引导
@@ -57,9 +57,10 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [x] 修复测试标点优先级时未重置数据导致优先级错误的 Bug。
-        2. [ ] 弃用“P3A1 - 拉艾克斯迪司的是 MT”的用户设置，脚本将根据决战 Buff 类型自主判断。
-        3. [ ] *对治疗与输出职业添加了特殊功能，决战 Buff 期间，不可选中无法造成伤害的 Boss。
+        1. 修复测试标点优先级时未重置数据导致优先级错误的 Bug。
+        2. 弃用“P3A1 - 拉艾克斯迪司的是 MT”的用户设置，脚本将根据决战 Buff 类型自主判断。
+        3. 令 P3 冰封 NoCCHH 打法的第二枚黄圈引导路径少许靠近场中。
+        4. 增加用户配置项“P3 - 卡奥斯诅咒敕令绘图深度”，Imgui 玩家请适当调低。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
@@ -80,6 +81,9 @@ public class UDM_P3
     [UserSetting("启用方法设置中带*的特殊功能")]
     public static bool SpecialMode { get; set; } = false;
     
+    [UserSetting("P3 - 卡奥斯诅咒敕令绘图深度（Imgui请调2以内）")]
+    public static float CursedEdictWhiteVal { get; set; } = 4;
+    
     [UserSetting("P3A1 - 一运深层痛楚策略")]
     public static BoAStgEnum BoAStg { get; set; } = BoAStgEnum.TLB_纯固定_NoCCHH;
     public enum BoAStgEnum
@@ -90,16 +94,12 @@ public class UDM_P3
         TLB_相反水晶_盗火文档,
         正攻,
     }
-
-    [UserSetting("P3A1 - 拉艾克斯迪司的是 MT")]
-    public static bool ExDeathMT { get; set; } = false;
     
     [UserSetting("P3B1 - 二运黑洞指挥模式")]
     public static bool P3B1CaptainMode { get; set; } = false;
     
     [UserSetting("P3B1 - 帮助调试的指挥模式聊天框输出")]
     public static bool P3B1CaptainModeDevHelper { get; set; } = true;
-
     
     [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
     public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.HDT;
@@ -251,6 +251,28 @@ public class UDM_P3
         // 顺便恢复透明度
         var obj = sa.GetById(ev.SourceId);
         sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+    }
+    
+    [ScriptMethod(name: "P3_根据Buff判断MTST", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(419[24])$"],
+        userControl: Debugging)]
+    public void P3_根据Buff判断MTST(Event ev, ScriptAccessory sa)
+    {
+        const uint chaos_buff = 4192;
+        const uint exdeath_buff = 4194;
+
+        var idx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+        if (idx is < 0 or >= 2) return;
+
+        var statusId = ev.StatusId;
+
+        _udmP3Param.拉艾克斯迪司的是MT = idx switch
+        {
+            0 => statusId == exdeath_buff,
+            1 => statusId == chaos_buff
+        };
+        sa.DebugMsg(
+            $"[P3_根据Buff判断MTST] {sa.GetPlayerJobByIndex(idx)} 获得 {statusId}，拉艾克斯迪司的是 {(_udmP3Param.拉艾克斯迪司的是MT ? "MT" : "ST")}",
+            Debugging);
     }
 
     #region P3A 深层痛楚 通用部分
@@ -461,7 +483,7 @@ public class UDM_P3
         var myIndex = sa.GetMyIndex();
 
         // 艾克斯迪司 ST 无水晶
-        if (myIndex == (ExDeathMT ? 0 : 1))
+        if (myIndex == (_udmP3Param.拉艾克斯迪司的是MT ? 0 : 1))
         {
             var aimRegion = BoAStg switch
             {
@@ -472,7 +494,7 @@ public class UDM_P3
         }
             
         // 卡奥斯 MT 正攻场中，逃课风水晶
-        else if (myIndex == (ExDeathMT ? 1 : 0))
+        else if (myIndex == (_udmP3Param.拉艾克斯迪司的是MT ? 1 : 0))
         {
             var toCenter = BoAStg == BoAStgEnum.正攻;
             var aimRegion = BoAStg switch
@@ -844,7 +866,7 @@ public class UDM_P3
         _udmP3Param.当前阶段 = 3101;
         sa.DebugMsg($"[P3A_暴雷死刑] 暴雷死刑，一水火结束");
         
-        if (sa.GetMyIndex() != (ExDeathMT ? 0 : 1)) return;
+        if (sa.GetMyIndex() != (_udmP3Param.拉艾克斯迪司的是MT ? 0 : 1)) return;
         sa.DrawGuidance(ev.TargetId, 0, 5000, $"P3A_暴雷_死刑", sa.Data.DefaultSafeColor);
         sa.Method.TextInfo($"前往 艾克斯迪司 脚下吃死刑", 3000);
         sa.Method.TTS($"前往艾克斯迪司脚下吃死刑", 3);
@@ -859,7 +881,7 @@ public class UDM_P3
 
 
         // 非正攻情况下，死刑后，艾克斯迪司回人群
-        if (sa.GetMyIndex() == (ExDeathMT ? 0 : 1))
+        if (sa.GetMyIndex() == (_udmP3Param.拉艾克斯迪司的是MT ? 0 : 1))
         {
             if (BoAStg == BoAStgEnum.正攻) return;
             var aimRegion = BoAStg switch
@@ -872,7 +894,7 @@ public class UDM_P3
         }
 
         // 正攻情况下，死刑后，卡奥斯去场中
-        if (sa.GetMyIndex() == (ExDeathMT ? 1 : 0))
+        if (sa.GetMyIndex() == (_udmP3Param.拉艾克斯迪司的是MT ? 1 : 0))
         {
             if (BoAStg != BoAStgEnum.正攻) return;
             执行P3拉怪指路逻辑(sa, "卡奥斯", 0, 4000, true);
@@ -1296,7 +1318,7 @@ public class UDM_P3
     }
 
     // 根据不同类的输入重载一次
-    private static (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
+    private (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
     {
         var priorityText = prioritySetting switch
         {
@@ -1308,7 +1330,7 @@ public class UDM_P3
         return 构筑指挥优先级字段(priorityText);
     }
 
-    private static (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(string prioritySetting)
+    private (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(string prioritySetting)
     {
         var normalized = (prioritySetting ?? "").Trim();
 
@@ -1323,8 +1345,8 @@ public class UDM_P3
 
         var roleIdxMap = new Dictionary<char, int>
         {
-            ['1'] = ExDeathMT ? 1 : 0,
-            ['2'] = ExDeathMT ? 0 : 1,
+            ['1'] = _udmP3Param.拉艾克斯迪司的是MT ? 1 : 0,
+            ['2'] = _udmP3Param.拉艾克斯迪司的是MT ? 0 : 1,
             ['3'] = 2,
             ['4'] = 3,
             ['5'] = 4,
@@ -1470,7 +1492,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47873)$"], userControl: true)]
     public void P3B_诅咒敕令半场刀(Event ev, ScriptAccessory sa)
     {
-        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, sa.Data.DefaultDangerColor.WithW(4f), byTime: true);
+        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, sa.Data.DefaultDangerColor.WithW(CursedEdictWhiteVal), byTime: true);
     }
     
     [ScriptMethod(name: "P3B_本色出演的我辣尾", eventType: EventTypeEnum.StartCasting,
@@ -2238,7 +2260,8 @@ public class UDM_P3
             4 or 6 => BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? 180f : 135f,
             5 or 7 => BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? 180f : -135f
         };
-        targetPos = targetPos.RotateAndExtend(Center, rotDeg.DegToRad());
+        targetPos = targetPos.RotateAndExtend(Center, rotDeg.DegToRad(),
+            BlizStg == BlizStgEnum.从场中引导后上下_NoCCHH ? -3 : 0);
         targetPos = _udmP3Param.基于凯夫卡旋转(targetPos, _udmP3Param.冰封北方位);
         _udmP3Param.第二枚黄圈引导位置 = targetPos;
         
@@ -2540,6 +2563,7 @@ internal class UDMP3Params
     public int 当前阶段 = 0;
     public ulong ObjectId_卡奥斯 = 0;
     public ulong ObjectId_艾克斯迪司 = 0;
+    public bool 拉艾克斯迪司的是MT = false;
     
     // ---- 一运 ----
     public bool 是长火 = false;
@@ -2604,6 +2628,7 @@ internal class UDMP3Params
         水水晶方位 = -1;
         风水晶方位 = -1;
         无水晶方位 = -1;
+        拉艾克斯迪司的是MT = false;
         
         究极冲击波起始方位 = -1;
         究极冲击波为顺时针 = false;
