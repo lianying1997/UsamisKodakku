@@ -52,6 +52,7 @@ public class UDM_P3
         特殊方法
         - 屏蔽艾克斯迪司释放钢铁暴雷时的连线
         - 巨大凯夫卡释放上桌技能时透明化
+        - 治疗与输出职业在决战 Buff 期间，无法选中不能造成伤害的 Boss
         """;
     
     const string UpdateInfo =
