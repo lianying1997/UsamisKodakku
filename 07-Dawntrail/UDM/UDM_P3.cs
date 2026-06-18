@@ -57,14 +57,12 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复测试标点优先级时未重置数据导致优先级错误的 Bug。
-        2. 弃用“P3A1 - 拉艾克斯迪司的是 MT”的用户设置，脚本将根据决战 Buff 类型自主判断。
-        3. 令 P3 冰封 NoCCHH 打法的第二枚黄圈引导路径少许靠近场中。
-        4. 增加用户配置项“P3 - 卡奥斯诅咒敕令绘图深度”，Imgui 玩家请适当调低。
+        1. [x] 增加特殊功能，治疗与输出职业在决战 Buff 期间，无法选中不能造成伤害的 Boss。
+        2. [x] 增加诅咒敕令半场刀绘图颜色设置
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.30";
+    private const string Version = "0.0.0.31";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -80,6 +78,9 @@ public class UDM_P3
 
     [UserSetting("启用方法设置中带*的特殊功能")]
     public static bool SpecialMode { get; set; } = false;
+    
+    [UserSetting("P3 - 卡奥斯诅咒敕令绘图颜色")]
+    public ScriptColor CursedEdictColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 0.643f, 0f, 1.0f) };
     
     [UserSetting("P3 - 卡奥斯诅咒敕令绘图深度（Imgui请调2以内）")]
     public static float CursedEdictWhiteVal { get; set; } = 4;
@@ -251,6 +252,64 @@ public class UDM_P3
         // 顺便恢复透明度
         var obj = sa.GetById(ev.SourceId);
         sa.AlphaModify(obj, 1f, currentAlpha => currentAlpha <= 0.8f);
+    }
+    
+    [ScriptMethod(name: "*P3_防火墙_屏蔽无效目标", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:49890"],
+        userControl: true)]
+    public void P3_防火墙_屏蔽无效目标(Event ev, ScriptAccessory sa)
+    {
+        if (!SpecialMode) return;
+        if (sa.GetMyIndex() <= 1) return;
+        
+        _udmP3Param.判断防火墙目标Framework = sa.Method.RegistFrameworkUpdateAction(Action);
+        const uint chaos_buff = 4192;
+        const uint exdeath_buff = 4194;
+        
+        const int 应战卡奥斯 = 1;
+        const int 应战艾克斯迪司 = 2;
+        const int 应战双人 = 3;
+        const int 没有应战 = 4;
+
+        void Action()
+        {
+            var myObject = sa.Data.MyObject;
+            if (myObject is null) return;
+            
+            int currentState = (myObject.HasStatus(chaos_buff), myObject.HasStatus(exdeath_buff)) switch
+            {
+                (true, false) => 应战卡奥斯,
+                (false, true) => 应战艾克斯迪司,
+                (false, false) => 没有应战,
+                _ => 应战双人
+            };
+            
+            if (currentState == _udmP3Param.上一次防火墙状态 && _udmP3Param.上一次防火墙状态 != 0) return;
+            _udmP3Param.上一次防火墙状态 = currentState;
+
+            switch (currentState)
+            {
+                case 应战卡奥斯:
+                    sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_卡奥斯), true);
+                    sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_艾克斯迪司), false);
+                    break;
+                case 应战艾克斯迪司:
+                    sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_卡奥斯), false);
+                    sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_艾克斯迪司), true);
+                    break;
+                default:
+                    sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_卡奥斯), true);
+                    sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_艾克斯迪司), true);
+                    break;
+            };
+        }
+    }
+    
+    [ScriptMethod(name: "P3_狂暴前解除防火墙", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47878", "TargetIndex:1"], userControl: Debugging)]
+    public void P3_狂暴前解除防火墙(Event ev, ScriptAccessory sa)
+    {
+        sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_卡奥斯), true);
+        sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_艾克斯迪司), true);
     }
     
     [ScriptMethod(name: "P3_根据Buff判断MTST", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(419[24])$"],
@@ -1492,7 +1551,7 @@ public class UDM_P3
         eventCondition: ["ActionId:regex:^(47873)$"], userControl: true)]
     public void P3B_诅咒敕令半场刀(Event ev, ScriptAccessory sa)
     {
-        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, sa.Data.DefaultDangerColor.WithW(CursedEdictWhiteVal), byTime: true);
+        sa.DrawRect(ev.SourceId, 800, 4200, $"诅咒敕令半场刀", 0, 80, 30, CursedEdictColor.V4.WithW(CursedEdictWhiteVal), byTime: true);
     }
     
     [ScriptMethod(name: "P3B_本色出演的我辣尾", eventType: EventTypeEnum.StartCasting,
@@ -2564,6 +2623,8 @@ internal class UDMP3Params
     public ulong ObjectId_卡奥斯 = 0;
     public ulong ObjectId_艾克斯迪司 = 0;
     public bool 拉艾克斯迪司的是MT = false;
+    public string 判断防火墙目标Framework = "";
+    public int 上一次防火墙状态 = 0;
     
     // ---- 一运 ----
     public bool 是长火 = false;
@@ -2629,6 +2690,9 @@ internal class UDMP3Params
         风水晶方位 = -1;
         无水晶方位 = -1;
         拉艾克斯迪司的是MT = false;
+        sa.Method.UnregistFrameworkUpdateAction(判断防火墙目标Framework);
+        判断防火墙目标Framework = "";
+        上一次防火墙状态 = 0;
         
         究极冲击波起始方位 = -1;
         究极冲击波为顺时针 = false;
@@ -3432,6 +3496,30 @@ internal static class SpecialFunction
             sa.Log.Error(e.ToString());
             throw;
         }
+    }
+    
+    public static void SetTargetable(this ScriptAccessory sa, IGameObject? obj, bool targetable)
+    {
+        if (obj == null || !obj.IsValid())
+        {
+            sa.Log.Error($"传入的IGameObject不合法。");
+            return;
+        }
+        unsafe
+        {
+            GameObject* charaStruct = (GameObject*)obj.Address;
+            if (targetable)
+            {
+                if (obj.IsDead || obj.IsTargetable) return;
+                charaStruct->TargetableStatus |= ObjectTargetableFlags.IsTargetable;
+            }
+            else
+            {
+                if (!obj.IsTargetable) return;
+                charaStruct->TargetableStatus &= ~ObjectTargetableFlags.IsTargetable;
+            }
+        }
+        sa.Log.Debug($"SetTargetable {targetable} => {obj.Name} {obj}");
     }
     
     public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha,
