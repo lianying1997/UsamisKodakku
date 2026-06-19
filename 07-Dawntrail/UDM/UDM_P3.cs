@@ -58,12 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [x] 增加特殊功能，治疗与输出职业在决战 Buff 期间，无法选中不能造成伤害的 Boss。
-        2. [x] 增加诅咒敕令半场刀绘图颜色设置
+        1. 增加结尾阶段控制，避免分摊图案影响到后续阶段。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.31";
+    private const string Version = "0.0.0.32";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -2424,6 +2423,7 @@ public class UDM_P3
     public void P3B2_顶起删除轰击旋风(Event ev, ScriptAccessory sa)
     {
         sa.Method.RemoveDraw($"轰击旋风.*");
+        _udmP3Param.当前阶段 = 3300;
     }
     
     [ScriptMethod(name: "P3B2_冰封移动提示", eventType: EventTypeEnum.StartCasting,
