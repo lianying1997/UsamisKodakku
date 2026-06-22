@@ -58,11 +58,14 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 增加结尾阶段控制，避免分摊图案影响到后续阶段。
+        1. [-] 现在经纬聚爆将根据更准确的施法结束日志进行绘图。
+        2. [ ] 现在冰封踩塔将根据更准确的踩塔日志进行指路。
+        3. [x] 暴雷死刑增加死刑目标与艾克斯迪司的连线。
+        4. [ ] 增加黑洞接线 TTS 播报。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.32";
+    private const string Version = "0.0.0.33";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -260,7 +263,9 @@ public class UDM_P3
     {
         if (!SpecialMode) return;
         if (sa.GetMyIndex() <= 1) return;
-        
+        if (防火墙已开启) return;
+
+        防火墙已开启 = true;        
         _udmP3Param.判断防火墙目标Framework = sa.Method.RegistFrameworkUpdateAction(Action);
         const uint chaos_buff = 4192;
         const uint exdeath_buff = 4194;
@@ -310,6 +315,7 @@ public class UDM_P3
     {
         sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_卡奥斯), true);
         sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_艾克斯迪司), true);
+        防火墙已开启 = false;
     }
     
     [ScriptMethod(name: "P3_根据Buff判断MTST", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(419[24])$"],
@@ -421,7 +427,7 @@ public class UDM_P3
         _udmP3Param.无水晶方位 = 6 - _udmP3Param.火水晶方位 - _udmP3Param.水水晶方位 - _udmP3Param.风水晶方位;
         _udmP3Param.一运水晶记录.Set();
     }
-    
+
     [ScriptMethod(name: "P3A_暴雷死刑范围", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:47881"], userControl: true)]
     public void P3A_暴雷死刑范围(Event ev, ScriptAccessory sa)
@@ -429,6 +435,16 @@ public class UDM_P3
         var dp = sa.DrawCircle(ev.SourceId, 0, 8000, $"靠近死刑", 5f, sa.Data.DefaultDangerColor.WithW(2f), draw: false);
         dp.SetOwnersDistanceOrder(true, 1);
         sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
+    }
+
+    [ScriptMethod(name: "P3A_暴雷死刑目标连线", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:47881"], userControl: true)]
+    public void P3A_暴雷死刑目标连线(Event ev, ScriptAccessory sa)
+    {
+        var color = new Vector4(0.1f, 1f, 1f, 1f);
+        var dp = sa.DrawLine(ev.SourceId, 0, 0, 8000, $"艾克斯迪司与死刑目标连线", 0, 1, 40, color, byY: true, draw: false);
+        dp.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp);
     }
     
     [ScriptMethod(name: "P3A_暴雷死刑通用提示", eventType: EventTypeEnum.StartCasting,
@@ -439,27 +455,41 @@ public class UDM_P3
         sa.Method.TextInfo($"艾克斯迪司 靠近死刑", 3000);
         sa.Method.TTS($"艾克斯迪司 靠近死刑", 3);
     }
-    
+
     [ScriptMethod(name: "P3A_经纬聚爆", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:regex:^(47869|47870)$"], userControl: true)]
-    public void P3A_经纬聚爆(Event ev, ScriptAccessory sa)
+    public void P3A_经纬聚爆第一段(Event ev, ScriptAccessory sa)
     {
         const uint 纬度聚爆 = 47870;    // 先打左右
         const uint 经度聚爆 = 47869;    // 先打上下
-        bool 先打左右 = ev.ActionId == 纬度聚爆;
+        _udmP3Param.绘制经纬聚爆范围 = true;
+        _udmP3Param.经纬聚爆第二段绘制完毕 = false;
+        _udmP3Param.经纬聚爆先打左右 = ev.ActionId == 纬度聚爆;
         _udmP3Param.ObjectId_卡奥斯 = ev.SourceId;
-        
+
         // 第一轮
-        sa.DrawFan(ev.SourceId, 0, 5000, $"第一轮前左", 90f.DegToRad(), (先打左右 ? 90f : 0f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
-        sa.DrawFan(ev.SourceId, 0, 5000, $"第一轮后右", 90f.DegToRad(), (先打左右 ? -90f : 180f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
-        
-        // 第二轮
-        sa.DrawFan(ev.SourceId, 5000, 2500, $"第二轮前左", 90f.DegToRad(), (!先打左右 ? 90f : 0f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
-        sa.DrawFan(ev.SourceId, 5000, 2500, $"第二轮后右", 90f.DegToRad(), (!先打左右 ? -90f : 180f).DegToRad(),
-            60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+        sa.DrawFan(ev.SourceId, 0, 10000, $"第一轮前左", 90f.DegToRad(), (_udmP3Param.经纬聚爆先打左右 ? 90f : 0f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+        sa.DrawFan(ev.SourceId, 0, 10000, $"第一轮后右", 90f.DegToRad(), (_udmP3Param.经纬聚爆先打左右 ? -90f : 180f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+    }
+
+    [ScriptMethod(name: "P3A_经纬聚爆第二段与删除绘图", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:regex:^(47869|47870)$"], suppress: 500, userControl: true)]
+    public void P3A_经纬聚爆第二段与删除绘图(Event ev, ScriptAccessory sa)
+    {
+        // TODO
+        // [ ] 改 ActionEffect 判断正则
+
+        if (!绘制经纬聚爆范围) return;
+
+        if (_udmP3Param.经纬聚爆第二段绘制完毕)
+            sa.Method.RemoveDraw($"第二轮[前左|后右]");
+        else
+        {
+            sa.Method.RemoveDraw($"第一轮[前左|后右]");
+            _udmP3Param.经纬聚爆第二段绘制完毕 = true;
+            sa.DrawFan(ev.SourceId, 0, 10000, $"第二轮前左", 90f.DegToRad(), (!_udmP3Param.经纬聚爆先打左右 ? 90f : 0f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+            sa.DrawFan(ev.SourceId, 0, 10000, $"第二轮后右", 90f.DegToRad(), (!_udmP3Param.经纬聚爆先打左右 ? -90f : 180f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+        }
     }
 
     #endregion P3A 深层痛楚 通用部分
@@ -2626,6 +2656,10 @@ internal class UDMP3Params
     public bool 拉艾克斯迪司的是MT = false;
     public string 判断防火墙目标Framework = "";
     public int 上一次防火墙状态 = 0;
+    public bool 防火墙已开启 = false;
+    public bool 经纬聚爆先打左右 = false;
+    public bool 绘制经纬聚爆范围 = false;
+    public bool 经纬聚爆第二段绘制完毕 = false;
     
     // ---- 一运 ----
     public bool 是长火 = false;
@@ -2694,6 +2728,10 @@ internal class UDMP3Params
         sa.Method.UnregistFrameworkUpdateAction(判断防火墙目标Framework);
         判断防火墙目标Framework = "";
         上一次防火墙状态 = 0;
+        防火墙已开启 = false;
+        经纬聚爆先打左右 = false;
+        绘制经纬聚爆范围 = false;
+        经纬聚爆第二段绘制完毕 = false;
         
         究极冲击波起始方位 = -1;
         究极冲击波为顺时针 = false;
