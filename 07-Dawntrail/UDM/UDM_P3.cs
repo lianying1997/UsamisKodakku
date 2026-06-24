@@ -58,10 +58,10 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [-] 现在经纬聚爆将根据更准确的施法结束日志进行绘图。
-        2. [ ] 现在冰封踩塔将根据更准确的踩塔日志进行指路。
+        1. [x] 现在经纬聚爆将根据更准确的施法结束日志进行绘图。
+        2. [x] 优化冰封踩塔中，参与2、4轮踩塔的指路时间。
         3. [x] 暴雷死刑增加死刑目标与艾克斯迪司的连线。
-        4. [ ] 增加黑洞接线 TTS 播报。
+        4. [x] 增加黑洞接线 TTS 播报。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
@@ -262,10 +262,9 @@ public class UDM_P3
     public void P3_防火墙_屏蔽无效目标(Event ev, ScriptAccessory sa)
     {
         if (!SpecialMode) return;
-        if (sa.GetMyIndex() <= 1) return;
-        if (防火墙已开启) return;
+        if (_udmP3Param.防火墙已开启) return;
 
-        防火墙已开启 = true;        
+        _udmP3Param.防火墙已开启 = true;        
         _udmP3Param.判断防火墙目标Framework = sa.Method.RegistFrameworkUpdateAction(Action);
         const uint chaos_buff = 4192;
         const uint exdeath_buff = 4194;
@@ -287,6 +286,12 @@ public class UDM_P3
                 (false, false) => 没有应战,
                 _ => 应战双人
             };
+
+            if (sa.GetMyIndex() <= 1)
+            {
+                // 坦克职业不参与
+                currentState = 应战双人;
+            }
             
             if (currentState == _udmP3Param.上一次防火墙状态 && _udmP3Param.上一次防火墙状态 != 0) return;
             _udmP3Param.上一次防火墙状态 = currentState;
@@ -315,7 +320,7 @@ public class UDM_P3
     {
         sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_卡奥斯), true);
         sa.SetTargetable(sa.GetById(_udmP3Param.ObjectId_艾克斯迪司), true);
-        防火墙已开启 = false;
+        _udmP3Param.防火墙已开启 = false;
     }
     
     [ScriptMethod(name: "P3_根据Buff判断MTST", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(419[24])$"],
@@ -443,7 +448,8 @@ public class UDM_P3
     {
         var color = new Vector4(0.1f, 1f, 1f, 1f);
         var dp = sa.DrawLine(ev.SourceId, 0, 0, 8000, $"艾克斯迪司与死刑目标连线", 0, 1, 40, color, byY: true, draw: false);
-        dp.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
+        dp.TargetResolvePattern = PositionResolvePatternEnum.PlayerNearestOrder;
+        dp.TargetOrderIndex = 1;
         sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Line, dp);
     }
     
@@ -473,13 +479,10 @@ public class UDM_P3
     }
 
     [ScriptMethod(name: "P3A_经纬聚爆第二段与删除绘图", eventType: EventTypeEnum.ActionEffect,
-        eventCondition: ["ActionId:regex:^(47869|47870)$"], suppress: 500, userControl: true)]
+        eventCondition: ["ActionId:regex:^(47871)$"], suppress: 500, userControl: true)]
     public void P3A_经纬聚爆第二段与删除绘图(Event ev, ScriptAccessory sa)
     {
-        // TODO
-        // [ ] 改 ActionEffect 判断正则
-
-        if (!绘制经纬聚爆范围) return;
+        if (!_udmP3Param.绘制经纬聚爆范围) return;
 
         if (_udmP3Param.经纬聚爆第二段绘制完毕)
             sa.Method.RemoveDraw($"第二轮[前左|后右]");
@@ -1872,6 +1875,8 @@ public class UDM_P3
     {
         if (!_udmP3Param.外黑洞获取完毕.WaitOne(2000)) return;
         清理接线Framework(sa);
+        _udmP3Param.玩家正在接线 = false;
+        bool ttsHinted = false;
         
         // 第一轮黑洞起始，攻击1
         // 第二轮黑洞起始，攻击1，攻击2，攻击3
@@ -1882,6 +1887,7 @@ public class UDM_P3
         foreach (var task in tetherTasks)
         {
             绘制玩家向黑洞方位接线(sa, task);
+            ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
         }
         执行接线Framework(sa, tetherTasks);
         _udmP3Param.外黑洞获取完毕.Reset();
@@ -1893,6 +1899,8 @@ public class UDM_P3
     {
         // 删掉上一轮的连线
         清理接线Framework(sa);
+        bool ttsHinted = false;
+        
         sa.Method.RemoveDraw($"绘制黑洞接线 R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数}.*");
         _udmP3Param.黑洞喷射轮数++;
         if (_udmP3Param.黑洞轮数 is 1 or 4)
@@ -1900,15 +1908,39 @@ public class UDM_P3
             翻转黑洞有线状态();
             排序黑洞字典();
         }
-        if (_udmP3Param.黑洞喷射轮数 >= 10) return;
+        
         var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
         foreach (var task in tetherTasks)
         {
             绘制玩家向黑洞方位接线(sa, task);
+            ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
         }
+
+        if (!ttsHinted && _udmP3Param.玩家正在接线)
+        {
+            _udmP3Param.玩家正在接线 = false;
+            sa.Method.TextInfo($"回到人群", 2000);
+            sa.Method.TTS($"回到人群", 3);
+        }
+        
+        if (_udmP3Param.黑洞喷射轮数 >= 10) return;
         执行接线Framework(sa, tetherTasks);
     }
 
+    private bool 播报黑洞接线TTS(ScriptAccessory sa, int playerIdx, bool ttsHinted)
+    {
+        var myIndex = sa.GetMyIndex();
+        if (playerIdx == myIndex)
+        {
+            if (ttsHinted) return true;
+            sa.Method.TextInfo($"去接线", 2000);
+            sa.Method.TTS($"去接线", 3);
+            _udmP3Param.玩家正在接线 = true;
+            return true;
+        }
+        return false;
+    }
+    
     private void 翻转黑洞有线状态()
     {
         foreach (var 黑洞 in _udmP3Param.黑洞字典.ToList())
@@ -2028,7 +2060,6 @@ public class UDM_P3
         return tasks;
     }
     
-    // BACKUP
     private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, 
         (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
     {
@@ -2394,17 +2425,22 @@ public class UDM_P3
         var towerRegion = 获得踩塔方位(sa);
         Vector3 towerPos = new Vector3(100, 0, 110).RotateAndExtend(Center, towerRegion * 45f.DegToRad());
 
+        // 凯夫卡一定先跺右脚出西塔，如果是踩塔，东塔玩家需要延迟指路，西塔玩家直接去
+        bool towerDelay = towerRegion == (BlizKefkaIsNorth ? _udmP3Param.东塔方位 : _udmP3Param.西塔方位);
+        
         if (_udmP3Param.是第一次分摊)
         {
             sa.DrawGuidance(_udmP3Param.第二枚黄圈引导位置, towerPos, 0, 3000, $"冰封路径二 黄圈 2->塔", sa.Data.DefaultDangerColor);
-            sa.DrawCircle(towerPos, 0, 3000, $"冰封路径二 塔范围", 5f, sa.Data.DefaultSafeColor);
-            sa.DrawGuidance(towerPos, 3000, 3000, $"冰封路径二 黄圈 塔", sa.Data.DefaultSafeColor);
-            sa.DrawGuidance(towerPos, stackPos, 3000, 3000, $"冰封路径二 踩塔->分摊", sa.Data.DefaultDangerColor);
+            sa.DrawCircle(towerPos, 3000, towerDelay ? 3500 : 2500, $"冰封路径二 塔范围", 5f, sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(towerPos, 3000, towerDelay ? 3500 : 2500, $"冰封路径二 黄圈 塔", sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(towerPos, stackPos, 3000, towerDelay ? 3500 : 2500, $"冰封路径二 踩塔->分摊", sa.Data.DefaultDangerColor);
         }
         else
         {
-            sa.DrawCircle(towerPos, 500, 3000, $"冰封路径二 塔范围", 6f, sa.Data.DefaultSafeColor);
-            sa.DrawGuidance(towerPos, 500, 3000, $"冰封路径二 塔 第二轮", sa.Data.DefaultSafeColor);
+            sa.DrawCircle(towerPos, towerDelay ? 1000 : 0, towerDelay ? 3000 : 4000,
+                $"冰封路径二 塔范围", 6f, sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(towerPos, towerDelay ? 1000 : 0, towerDelay ? 3000 : 4000,
+                $"冰封路径二 塔 第二轮", sa.Data.DefaultSafeColor);
         }
 
     }
@@ -2414,16 +2450,17 @@ public class UDM_P3
         Vector3 stackPos = Center;
         var towerRegion = 获得踩塔方位(sa);
         Vector3 towerPos = new Vector3(100, 0, 110).RotateAndExtend(Center, towerRegion * 45f.DegToRad());
+        bool towerDelay = towerRegion == (BlizKefkaIsNorth ? _udmP3Param.东塔方位 : _udmP3Param.西塔方位);
         
         if (_udmP3Param.是第一次分摊)
         {
             sa.DrawGuidance(_udmP3Param.第二枚黄圈引导位置, stackPos, 0, 3000, $"冰封路径二 黄圈 2->分摊", sa.Data.DefaultDangerColor);
-            sa.DrawGuidance(stackPos, 3000, 3000, $"冰封路径二 黄圈 分摊", sa.Data.DefaultSafeColor);
-            sa.DrawGuidance(stackPos, towerPos, 3000, 3000, $"冰封路径二 分摊->踩塔", sa.Data.DefaultDangerColor);
+            sa.DrawGuidance(stackPos, 3000, towerDelay ? 3500 : 2500, $"冰封路径二 黄圈 分摊", sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(stackPos, towerPos, 3000, towerDelay ? 3500 : 2500, $"冰封路径二 分摊->踩塔", sa.Data.DefaultDangerColor);
         }
         else
         {
-            sa.DrawGuidance(stackPos, 500, 3000, $"冰封路径二 分摊 第二轮", sa.Data.DefaultSafeColor);
+            sa.DrawGuidance(stackPos, towerDelay ? 1000 : 0, towerDelay ? 3000 : 4000, $"冰封路径二 分摊 第二轮", sa.Data.DefaultSafeColor);
         }
     }
 
@@ -2691,6 +2728,7 @@ internal class UDMP3Params
     public ManualResetEvent 二运状态记录 = new(false);
     public int 黑洞轮数 = 0;
     public int 黑洞喷射轮数 = 0;
+    public bool 玩家正在接线 = false;
     public Dictionary<ulong, (int round, int region, int relativeRegion, bool hasTether)> 黑洞字典 = new();
     public ManualResetEvent 外黑洞获取完毕 = new(false);
     public ManualResetEvent 黑洞轮数增加完毕 = new(false);
@@ -2760,6 +2798,7 @@ internal class UDMP3Params
         二运状态记录 = new(false);
         黑洞轮数 = 0;
         黑洞喷射轮数 = 0;
+        玩家正在接线 = false;
         黑洞字典 = new Dictionary<ulong, (int round, int region, int relativeRegion, bool hasTether)>();
         外黑洞获取完毕 = new(false);
         黑洞轮数增加完毕 = new(false);
