@@ -58,14 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [x] 现在经纬聚爆将根据更准确的施法结束日志进行绘图。
-        2. [x] 优化冰封踩塔中，参与2、4轮踩塔的指路时间。
-        3. [x] 暴雷死刑增加死刑目标与艾克斯迪司的连线。
-        4. [x] 增加黑洞接线 TTS 播报。
+        1. [x] 重构代码，拆分用户设置功能，现在可以正常开关设置项而不影响其他。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.33";
+    private const string Version = "0.0.0.34";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -98,7 +95,7 @@ public class UDM_P3
         TLB_相反水晶_盗火文档,
         正攻,
     }
-    
+
     [UserSetting("P3B1 - 二运黑洞指挥模式")]
     public static bool P3B1CaptainMode { get; set; } = false;
     
@@ -126,7 +123,7 @@ public class UDM_P3
         一人一根线,
         攻1禁2接两根,
     }
-    
+
     [UserSetting("P3B2 - 冰封初始黄圈引导策略")]
     public static BlizStgEnum BlizStg { get; set; } = BlizStgEnum.从上下引导后四角_盗火文档;
     public enum BlizStgEnum
@@ -1004,22 +1001,38 @@ public class UDM_P3
     {
     }
     
+    [ScriptMethod(name: "P3A_二水火阶段推进", eventType: EventTypeEnum.StartCasting,
+        eventCondition: ["ActionId:regex:^(47869|47870)$"], suppress: 10000, userControl: Debugging)]
+    public void P3A_二水火阶段推进(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3102) return;
+        _udmP3Param.当前阶段 = 3110;
+        sa.DebugMsg($"[P3A_二水火阶段推进] 二水火开始，转阶段 {_udmP3Param.当前阶段}", Debugging);
+    }
+
     [ScriptMethod(name: "P3A_二水火指路", eventType: EventTypeEnum.StartCasting,
         eventCondition: ["ActionId:regex:^(47869|47870)$"], suppress: 10000, userControl: true)]
     public void P3A_二水火指路(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 != 3102) return;
-        _udmP3Param.当前阶段 = 3110;
+        if (_udmP3Param.当前阶段 != 3102 && _udmP3Param.当前阶段 != 3110) return;
         sa.DebugMsg($"[P3A_二水火指路] 开始", Debugging);
         执行水火指路逻辑(sa, _udmP3Param.二水火指路与绘图时间);
+    }
+
+    [ScriptMethod(name: "P3A_二水火结束阶段推进", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:regex:^(4786[01])$"], suppress: 10000, userControl: Debugging)]
+    public void P3A_二水火结束阶段推进(Event ev, ScriptAccessory sa)
+    {
+        if (_udmP3Param.当前阶段 != 3110) return;
+        _udmP3Param.当前阶段 = 3111;
+        sa.DebugMsg($"[P3A_二水火结束阶段推进] 二水火结束，转阶段 {_udmP3Param.当前阶段}", Debugging);
     }
 
     [ScriptMethod(name: "P3A_二水火结束拉怪提示", eventType: EventTypeEnum.ActionEffect,
         eventCondition: ["ActionId:regex:^(4786[01])$"], suppress: 10000, userControl: true)]
     public void P3A_二水火结束(Event ev, ScriptAccessory sa)
     {
-        if (_udmP3Param.当前阶段 != 3110) return;
-        _udmP3Param.当前阶段 = 3111;
+        if (_udmP3Param.当前阶段 != 3110 && _udmP3Param.当前阶段 != 3111) return;
         
         /*
          * 混沌之水月环 混沌之水 47862
@@ -1030,7 +1043,7 @@ public class UDM_P3
          */
         
         // 根据海啸/烈焰与当前阶段判断二水火的结束
-        sa.DebugMsg($"[P3A_二水火结束拉怪提示] 二水火结束，转阶段 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"[P3A_二水火结束拉怪提示] 二水火结束，当前阶段 {_udmP3Param.当前阶段}", Debugging);
 
         var myIndex = sa.GetMyIndex();
         if (myIndex <= 1)
@@ -1869,38 +1882,73 @@ public class UDM_P3
         }
     }
     
-    [ScriptMethod(name: "P3B1_接线逻辑_每轮初始", eventType: EventTypeEnum.AddCombatant,
-        eventCondition: ["DataId:19512"], userControl: true, suppress: 5000)]
-    public void P3B1_接线逻辑_每轮初始(Event ev, ScriptAccessory sa)
+    [ScriptMethod(name: "P3B1_接线任务准备_每轮初始", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: Debugging, suppress: 5000)]
+    public void P3B1_接线任务准备_每轮初始(Event ev, ScriptAccessory sa)
     {
         if (!_udmP3Param.外黑洞获取完毕.WaitOne(2000)) return;
+        lock (_udmP3Param)
+            _udmP3Param.黑洞接线任务准备.Reset();
         清理接线Framework(sa);
         _udmP3Param.玩家正在接线 = false;
-        bool ttsHinted = false;
         
         // 第一轮黑洞起始，攻击1
         // 第二轮黑洞起始，攻击1，攻击2，攻击3
         // 第三轮黑洞起始，锁链1，锁链2，锁链3
         // 第四轮黑洞起始，禁止1，禁止2
 
-        var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
-        foreach (var task in tetherTasks)
+        var currentTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
+        lock (_udmP3Param)
         {
-            绘制玩家向黑洞方位接线(sa, task);
-            ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
+            _udmP3Param.当前黑洞接线任务 = currentTasks;
+            _udmP3Param.黑洞接线任务版本++;
+            _udmP3Param.外黑洞获取完毕.Reset();
+            _udmP3Param.黑洞接线任务准备.Set();
         }
-        执行接线Framework(sa, tetherTasks);
-        _udmP3Param.外黑洞获取完毕.Reset();
     }
-    
-    [ScriptMethod(name: "P3B1_接线逻辑_中途", eventType: EventTypeEnum.ActionEffect,
-        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 2500)]
-    public void P3B1_接线逻辑_中途(Event ev, ScriptAccessory sa)
+
+    [ScriptMethod(name: "P3B1_黑洞接线范围绘图_每轮初始", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: true, suppress: 5000)]
+    public void P3B1_黑洞接线范围绘图_每轮初始(Event ev, ScriptAccessory sa)
     {
+        if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线范围绘图已消费版本,
+                "P3B1_黑洞接线范围绘图_每轮初始", out var tasks)) return;
+        foreach (var task in tasks)
+            绘制黑洞接线范围(sa, task);
+    }
+
+    [ScriptMethod(name: "P3B1_黑洞接线TTS_每轮初始", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: true, suppress: 5000)]
+    public void P3B1_黑洞接线TTS_每轮初始(Event ev, ScriptAccessory sa)
+    {
+        if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线TTS已消费版本,
+                nameof(P3B1_黑洞接线TTS_每轮初始), out var tasks)) return;
+        bool ttsHinted = false;
+        foreach (var task in tasks)
+            ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
+    }
+
+    [ScriptMethod(name: "P3B1_黑洞接线指路_每轮初始", eventType: EventTypeEnum.AddCombatant,
+        eventCondition: ["DataId:19512"], userControl: true, suppress: 5000)]
+    public void P3B1_黑洞接线指路_每轮初始(Event ev, ScriptAccessory sa)
+    {
+        if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线指路已消费版本,
+                nameof(P3B1_黑洞接线指路_每轮初始), out var tasks)) return;
+        if (_udmP3Param.黑洞喷射轮数 >= 10) return;
+        foreach (var task in tasks)
+            挂载玩家向黑洞方位接线指路(sa, task);
+        执行接线Framework(sa, tasks);
+    }
+
+    [ScriptMethod(name: "P3B1_接线任务准备_中途", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: Debugging, suppress: 2500)]
+    public void P3B1_接线任务准备_中途(Event ev, ScriptAccessory sa)
+    {
+        lock (_udmP3Param)
+            _udmP3Param.黑洞接线任务准备.Reset();
         // 删掉上一轮的连线
         清理接线Framework(sa);
-        bool ttsHinted = false;
-        
+
         sa.Method.RemoveDraw($"绘制黑洞接线 R{_udmP3Param.黑洞轮数} T{_udmP3Param.黑洞喷射轮数}.*");
         _udmP3Param.黑洞喷射轮数++;
         if (_udmP3Param.黑洞轮数 is 1 or 4)
@@ -1909,22 +1957,51 @@ public class UDM_P3
             排序黑洞字典();
         }
         
-        var tetherTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
-        foreach (var task in tetherTasks)
+        var currentTasks = 获取本轮黑洞接线任务(sa, _udmP3Param.黑洞轮数, _udmP3Param.黑洞喷射轮数);
+        lock (_udmP3Param)
         {
-            绘制玩家向黑洞方位接线(sa, task);
-            ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
+            _udmP3Param.当前黑洞接线任务 = currentTasks;
+            _udmP3Param.黑洞接线任务版本++;
+            _udmP3Param.黑洞接线任务准备.Set();
         }
+    }
 
-        if (!ttsHinted && _udmP3Param.玩家正在接线)
-        {
-            _udmP3Param.玩家正在接线 = false;
-            sa.Method.TextInfo($"回到人群", 2000);
-            sa.Method.TTS($"回到人群", 3);
-        }
-        
+    [ScriptMethod(name: "P3B1_黑洞接线范围绘图_中途", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 2500)]
+    public void P3B1_黑洞接线范围绘图_中途(Event ev, ScriptAccessory sa)
+    {
+        if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线范围绘图已消费版本,
+                nameof(P3B1_黑洞接线范围绘图_中途), out var tasks)) return;
+        foreach (var task in tasks)
+            绘制黑洞接线范围(sa, task);
+    }
+
+    [ScriptMethod(name: "P3B1_黑洞接线TTS_中途", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 2500)]
+    public void P3B1_黑洞接线TTS_中途(Event ev, ScriptAccessory sa)
+    {
+        if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线TTS已消费版本,
+                nameof(P3B1_黑洞接线TTS_中途), out var tasks)) return;
+        bool ttsHinted = false;
+        foreach (var task in tasks)
+            ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
+
+        if (ttsHinted || !_udmP3Param.玩家正在接线) return;
+        _udmP3Param.玩家正在接线 = false;
+        sa.Method.TextInfo($"回到人群", 2000);
+        sa.Method.TTS($"回到人群", 3);
+    }
+
+    [ScriptMethod(name: "P3B1_黑洞接线指路_中途", eventType: EventTypeEnum.ActionEffect,
+        eventCondition: ["ActionId:47868", "TargetIndex:1"], userControl: true, suppress: 2500)]
+    public void P3B1_黑洞接线指路_中途(Event ev, ScriptAccessory sa)
+    {
+        if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线指路已消费版本,
+                nameof(P3B1_黑洞接线指路_中途), out var tasks)) return;
         if (_udmP3Param.黑洞喷射轮数 >= 10) return;
-        执行接线Framework(sa, tetherTasks);
+        foreach (var task in tasks)
+            挂载玩家向黑洞方位接线指路(sa, task);
+        执行接线Framework(sa, tasks);
     }
 
     private bool 播报黑洞接线TTS(ScriptAccessory sa, int playerIdx, bool ttsHinted)
@@ -1940,7 +2017,30 @@ public class UDM_P3
         }
         return false;
     }
-    
+
+    private bool 等待黑洞接线任务(ScriptAccessory sa, ref int consumedVersion, string caller,
+        out List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)> tasks)
+    {
+        tasks = [];
+        for (var i = 0; i < 40; i++)
+        {
+            if (!_udmP3Param.黑洞接线任务准备.WaitOne(50)) continue;
+            lock (_udmP3Param)
+            {
+                if (_udmP3Param.黑洞接线任务版本 <= consumedVersion)
+                {
+                    _udmP3Param.黑洞接线任务准备.Reset();
+                    continue;
+                }
+                consumedVersion = _udmP3Param.黑洞接线任务版本;
+                tasks = _udmP3Param.当前黑洞接线任务.ToList();
+                return true;
+            }
+        }
+        sa.DebugMsg($"[{caller}] 等待黑洞接线任务超时", Debugging);
+        return false;
+    }
+
     private void 翻转黑洞有线状态()
     {
         foreach (var 黑洞 in _udmP3Param.黑洞字典.ToList())
@@ -2060,22 +2160,17 @@ public class UDM_P3
         return tasks;
     }
     
-    private void 绘制玩家向黑洞方位接线(ScriptAccessory sa, 
+    private bool 黑洞接线任务属于自己(ScriptAccessory sa,
         (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
     {
-        if (!Debugging)
-            if (sa.GetMyIndex() != task.playerIdx) return;
-        var color = new Vector4(1, 1, 0, 1);
+        return Debugging || sa.GetMyIndex() == task.playerIdx;
+    }
     
-        // task
-        // -- playerIdx 需接线的玩家
-        // -- realRegions 需接线黑洞所在方位
-        // -- blackHoles 需接线黑洞 ObjId
-        // -- name 任务名称 $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}
-        // ---- bhRound 黑洞轮数
-        // ---- bhEffectRound 黑洞喷射轮数
-        // ---- player.Key 同 playerIdx
-        // ---- regionStr 需接线黑洞所在方位的集合，即 realRegions 的 Join
+    private void 绘制黑洞接线范围(ScriptAccessory sa,
+        (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
+    {
+        if (!黑洞接线任务属于自己(sa, task)) return;
+        var color = new Vector4(1, 1, 0, 1);
         
         for (int i = 0; i < task.blackHoles.Count; i++)
         {
@@ -2089,18 +2184,22 @@ public class UDM_P3
             dp2.TargetResolvePattern = PositionResolvePatternEnum.TetherTarget;
             sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp2);
         }
-        
+
+        sa.DebugMsg($"[绘制黑洞接线范围] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
+            Debugging);
+    }
+
+    private void 挂载玩家向黑洞方位接线指路(ScriptAccessory sa,
+        (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
+    {
+        if (!黑洞接线任务属于自己(sa, task)) return;
         var guidePos = task.realRegions.Count == 1
             ? 计算黑洞顺时针侧指路点(task.realRegions[0])
             : 计算两黑洞之间指路点(task.realRegions[0], task.realRegions[1]);
         
-        // // 万一炸了就回退
-        // sa.DrawGuidance(sa.Data.PartyList[task.playerIdx], guidePos, 0, 7000, $"绘制黑洞接线 {task.name} G", sa.Data.DefaultSafeColor);
-        
-        // 建立接线 Framework
         挂载接线Framework(sa, guidePos, task);
     
-        sa.DebugMsg($"[绘制黑洞接线] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
+        sa.DebugMsg($"[挂载玩家向黑洞方位接线指路] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
             Debugging);
     }
 
@@ -2748,6 +2847,12 @@ internal class UDMP3Params
     public bool 黑洞已出现 = false;
     public bool 黑洞三麻取反 = false;
 
+    public List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)> 当前黑洞接线任务 = [];
+    public ManualResetEvent 黑洞接线任务准备 = new(false);
+    public int 黑洞接线任务版本 = 0;
+    public int 黑洞接线范围绘图已消费版本 = 0;
+    public int 黑洞接线TTS已消费版本 = 0;
+    public int 黑洞接线指路已消费版本 = 0;
     public List<接线Framework元素> 接线FrameworkList = [];
     public string 当前接线任务Framework = "";
     
@@ -2818,6 +2923,12 @@ internal class UDMP3Params
         黑洞已出现 = false;
         黑洞三麻取反 = false;
 
+        当前黑洞接线任务 = [];
+        黑洞接线任务准备 = new(false);
+        黑洞接线任务版本 = 0;
+        黑洞接线范围绘图已消费版本 = 0;
+        黑洞接线TTS已消费版本 = 0;
+        黑洞接线指路已消费版本 = 0;
         foreach (var fw in 接线FrameworkList)
         {
             if (fw.FwHandle != "")
