@@ -178,6 +178,21 @@ public class UDM_P3
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
     }
     
+    [ScriptMethod(name: "测试项：把标点给我上了", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 把标点给我上了(Event ev, ScriptAccessory sa)
+    {
+        sa.MarkPlayerByIdx(0, MarkType.Attack1);
+        sa.MarkPlayerByIdx(1, MarkType.Attack2);
+    }
+    
+    [ScriptMethod(name: "测试项：把标点给我下了", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        userControl: Debugging)]
+    public void 把标点给我下了(Event ev, ScriptAccessory sa)
+    {
+        sa.Method.MarkClear();
+    }
+    
     [ScriptMethod(name: "测试项：黑洞指挥模式测试 /e kdyhd", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:kdyhd"],
         userControl: true)]
     public void 黑洞指挥模式测试(Event ev, ScriptAccessory sa)
@@ -1922,7 +1937,7 @@ public class UDM_P3
     public void P3B1_黑洞接线TTS_每轮初始(Event ev, ScriptAccessory sa)
     {
         if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线TTS已消费版本,
-                nameof(P3B1_黑洞接线TTS_每轮初始), out var tasks)) return;
+                "P3B1_黑洞接线TTS_每轮初始", out var tasks)) return;
         bool ttsHinted = false;
         foreach (var task in tasks)
             ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
@@ -1933,7 +1948,7 @@ public class UDM_P3
     public void P3B1_黑洞接线指路_每轮初始(Event ev, ScriptAccessory sa)
     {
         if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线指路已消费版本,
-                nameof(P3B1_黑洞接线指路_每轮初始), out var tasks)) return;
+                "P3B1_黑洞接线指路_每轮初始", out var tasks)) return;
         if (_udmP3Param.黑洞喷射轮数 >= 10) return;
         foreach (var task in tasks)
             挂载玩家向黑洞方位接线指路(sa, task);
@@ -1971,7 +1986,7 @@ public class UDM_P3
     public void P3B1_黑洞接线范围绘图_中途(Event ev, ScriptAccessory sa)
     {
         if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线范围绘图已消费版本,
-                nameof(P3B1_黑洞接线范围绘图_中途), out var tasks)) return;
+                "P3B1_黑洞接线范围绘图_中途", out var tasks)) return;
         foreach (var task in tasks)
             绘制黑洞接线范围(sa, task);
     }
@@ -1981,7 +1996,7 @@ public class UDM_P3
     public void P3B1_黑洞接线TTS_中途(Event ev, ScriptAccessory sa)
     {
         if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线TTS已消费版本,
-                nameof(P3B1_黑洞接线TTS_中途), out var tasks)) return;
+                "P3B1_黑洞接线TTS_中途", out var tasks)) return;
         bool ttsHinted = false;
         foreach (var task in tasks)
             ttsHinted |= 播报黑洞接线TTS(sa, task.playerIdx, ttsHinted);
@@ -1997,7 +2012,7 @@ public class UDM_P3
     public void P3B1_黑洞接线指路_中途(Event ev, ScriptAccessory sa)
     {
         if (!等待黑洞接线任务(sa, ref _udmP3Param.黑洞接线指路已消费版本,
-                nameof(P3B1_黑洞接线指路_中途), out var tasks)) return;
+                "P3B1_黑洞接线指路_中途", out var tasks)) return;
         if (_udmP3Param.黑洞喷射轮数 >= 10) return;
         foreach (var task in tasks)
             挂载玩家向黑洞方位接线指路(sa, task);
