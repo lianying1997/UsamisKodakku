@@ -58,11 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [x] 重构代码，拆分用户设置功能，现在可以正常开关设置项而不影响其他。
+        1. 尝试修复标点狂暴的问题。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.34";
+    private const string Version = "0.0.0.35";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -146,7 +146,9 @@ public class UDM_P3
         
         _udmP3Param.Reset(sa);
         sa.Method.RemoveDraw(".*");
-        // sa.Method.MarkClear();
+        
+        if (P3B1CaptainMode)
+            sa.Method.MarkClear();
         sa.Method.ClearFrameworkUpdateAction(this);
     }
     
@@ -176,21 +178,6 @@ public class UDM_P3
     {
         _udmP3Param.ObjectId_卡奥斯 = sa.GetByDataId(19508u).First().GameObjectId;
         _udmP3Param.ObjectId_艾克斯迪司 = sa.GetByDataId(19509u).First().GameObjectId;
-    }
-    
-    [ScriptMethod(name: "测试项：把标点给我上了", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 把标点给我上了(Event ev, ScriptAccessory sa)
-    {
-        sa.MarkPlayerByIdx(0, MarkType.Attack1);
-        sa.MarkPlayerByIdx(1, MarkType.Attack2);
-    }
-    
-    [ScriptMethod(name: "测试项：把标点给我下了", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
-        userControl: Debugging)]
-    public void 把标点给我下了(Event ev, ScriptAccessory sa)
-    {
-        sa.Method.MarkClear();
     }
     
     [ScriptMethod(name: "测试项：黑洞指挥模式测试 /e kdyhd", eventType: EventTypeEnum.Chat, eventCondition: ["Type:Echo", "Message:kdyhd"],
@@ -2460,7 +2447,8 @@ public class UDM_P3
         _udmP3Param.冰封北方位 = BlizKefkaIsNorth ? _udmP3Param.凯夫卡方位 : (_udmP3Param.凯夫卡方位 + 4) % 8;
         _udmP3Param.西塔方位 = (_udmP3Param.冰封北方位 + 2) % 8;
         _udmP3Param.东塔方位 = (_udmP3Param.冰封北方位 - 2 + 8) % 8;
-        sa.Method.MarkClear();
+        if (P3B1CaptainMode)
+            sa.Method.MarkClear();
         _udmP3Param.凯夫卡方位获取完毕.Set();
         sa.DebugMsg($"[P3B2_冰封_指路] 冰封北方位 继承自 凯夫卡方位 {_udmP3Param.凯夫卡方位} C逆");
     }
