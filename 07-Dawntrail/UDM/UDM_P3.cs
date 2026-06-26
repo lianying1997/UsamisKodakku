@@ -58,11 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 尝试修复标点狂暴的问题。
+        1. 修复 P3一运 火/水组指路不确定的问题。现在于夜音式下，面向水晶，火组TH左DPS右。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.35";
+    private const string Version = "0.0.0.36";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -738,7 +738,7 @@ public class UDM_P3
 
         guidePos = _udmP3Param.基于水晶旋转(guidePos, _udmP3Param.火水晶方位);
         sa.DrawGuidance(guidePos, 0, destroyTime, $"DrawFireGuide_YY_Wf 指路", sa.Data.DefaultSafeColor);
-
+        sa.DebugMsg($"玩家为火组第 {fireIndex}，基于水晶逆时针旋转 {angleBias} deg");
     }
 
     private void DrawGuide_CCHH_Wf(ScriptAccessory sa, int destroyTime)
@@ -2977,13 +2977,15 @@ internal static class P3AExtension
         prm.风组.Add(pd.SelectSpecificPriorityIndex(2));   // 顺风
         prm.风组.Add(pd.SelectSpecificPriorityIndex(3));   // 逆风
         
-        // 风组再按 KVP.value 的个位数大小进行 sort，小的在前
-        prm.风组.Sort((a, b) => a.Value.GetDecimalDigit(0).CompareTo(b.Value.GetDecimalDigit(0)));
-        
         prm.火组.Add(pd.SelectSpecificPriorityIndex(4));
         prm.火组.Add(pd.SelectSpecificPriorityIndex(5));
         prm.水组.Add(pd.SelectSpecificPriorityIndex(6));
         prm.水组.Add(pd.SelectSpecificPriorityIndex(7));
+        
+        // 再按 KVP.value 的个位数大小进行 sort，小的在前
+        prm.风组.Sort((a, b) => a.Value.GetDecimalDigit(0).CompareTo(b.Value.GetDecimalDigit(0)));
+        prm.火组.Sort((a, b) => a.Value.GetDecimalDigit(0).CompareTo(b.Value.GetDecimalDigit(0)));
+        prm.水组.Sort((a, b) => a.Value.GetDecimalDigit(0).CompareTo(b.Value.GetDecimalDigit(0)));
     }
 
     public static bool 当前轮为火(this UDMP3Params prm)
