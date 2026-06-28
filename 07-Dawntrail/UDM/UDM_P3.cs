@@ -58,12 +58,12 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复 P3一运 火/水组指路不确定的问题。现在于夜音式下，面向水晶，火组TH左DPS右。
+        1. 修复经纬聚爆绘图删除的问题，感谢自适应的挂友们把我蒙在了没有 Bug 的温柔乡里。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.36";
-    private const string DebugVersion = "a";
+    private const string Version = "0.0.0.37";
+    private const string DebugVersion = "b";
     private int _runId = 0;
 
     private const bool Debugging = false;
@@ -489,8 +489,8 @@ public class UDM_P3
         {
             sa.Method.RemoveDraw($"第一轮[前左|后右]");
             _udmP3Param.经纬聚爆第二段绘制完毕 = true;
-            sa.DrawFan(ev.SourceId, 0, 10000, $"第二轮前左", 90f.DegToRad(), (!_udmP3Param.经纬聚爆先打左右 ? 90f : 0f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
-            sa.DrawFan(ev.SourceId, 0, 10000, $"第二轮后右", 90f.DegToRad(), (!_udmP3Param.经纬聚爆先打左右 ? -90f : 180f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+            sa.DrawFan(_udmP3Param.ObjectId_卡奥斯, 0, 10000, $"第二轮前左", 90f.DegToRad(), (!_udmP3Param.经纬聚爆先打左右 ? 90f : 0f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
+            sa.DrawFan(_udmP3Param.ObjectId_卡奥斯, 0, 10000, $"第二轮后右", 90f.DegToRad(), (!_udmP3Param.经纬聚爆先打左右 ? -90f : 180f).DegToRad(), 60, 0, sa.Data.DefaultDangerColor.WithW(2f));
         }
     }
 
