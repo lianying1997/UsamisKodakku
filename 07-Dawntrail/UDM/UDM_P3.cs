@@ -58,12 +58,12 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复经纬聚爆绘图删除的问题，感谢自适应的挂友们把我蒙在了没有 Bug 的温柔乡里。
+        1. 修复给 Boss 标点会导致黑洞指挥/指路失效的问题。（我真服了）
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.37";
-    private const string DebugVersion = "b";
+    private const string Version = "0.0.0.38";
+    private const string DebugVersion = "a";
     private int _runId = 0;
 
     private const bool Debugging = false;
@@ -166,11 +166,22 @@ public class UDM_P3
     {
         sa.DebugMsg($"{_udmP3Param.当前阶段}", Debugging);
     }
-    
+
     [ScriptMethod(name: "测试项：展示优先级表格", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
-    public void 展示优先级表格(Event ev, ScriptAccessory sa) =>
+    public void 展示优先级表格(Event ev, ScriptAccessory sa)
+    {
+        
+        var str = $"优先级字典：\n";
+        foreach (var pair in _pd.Priorities)
+        {
+            str += $"Key {pair.Key} Value {pair.Value}\n";
+        }
+        sa.DebugMsg($"{str}", Debugging);
         sa.DebugMsg(_pd.ShowPriorities(), Debugging);
+        
+    }
+        
     
     [ScriptMethod(name: "测试项：双Boss赋值", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
         userControl: Debugging)]
@@ -1790,6 +1801,7 @@ public class UDM_P3
             
             var mark = ev.Id0();
             var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            if (tidx < 0) return;
             var targetJob = sa.GetPlayerJobByIndex(tidx);
             
             var pdVal = mark switch
