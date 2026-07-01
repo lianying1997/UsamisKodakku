@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent.Struct;
@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json;
 using System.Linq;
@@ -36,18 +37,18 @@ public class UDM_P3
         二运黑洞
         - 含指路与指挥模式，需在用户设置开启，副本内使用 `/e kdyhd` 可测试标点优先级。
         - * 黑洞指路依赖标点，黑洞出现前需完成整个标点流程。
-        - 共有四种优先级配置：
+        - 共有五种优先级配置，其中：
         - * HDT("43765812")：采用 H2 > H1 > D3 > D2 > D1 > D4 > MT > ST
         - * HDT三麻取反("437658120")：基于 HDT，三麻优先级取反（ST > MT > ... > H2)
         - * THD("12345678")：采用 MT > ST > H1 > H2 > D1 > D2 > D3 > D4
         - * 若选择自定义，可从左到右细分各职能标点顺序，支持8位或9位输入。
-        - * 前八位由"1~8"组成，分别代表 MT、ST、H1、H2、D1、D2、D3、D4，第九位输入"0"代表三麻取反，输入错误则回退到“HDT三麻取反”。
-        - MT 指“卡奥斯T”，ST 指“艾克斯迪司T”，会根据决战 Buff 类型自主判断。
+        - * 前八位由"1~8"组成，第九位输入"0"代表三麻取反，输入错误则回退到“HDT三麻取反”。
 
-        二运冰封
-        - 从上下引导后四角_盗火文档：基于凯夫卡面基，上TN下DPS，然后基于场中四角分开引导
-        - 从场中引导后上下_NoCCHH：先场中，然后TN上DPS下分开引导
-        - 以凯夫卡所在方位为北：若勾选，则以最后一次“本色出演的我”所在位置为北，否则以对面（起身后能看到凯夫卡正脸的方位）为北。
+        二运黑洞指挥策略 - 美式改
+        - 根据职能与 Buff 固定标点。
+        - 无Buff D：攻/锁/禁1；无Buff T/H：攻/锁/禁2；泥土 H/D：攻/锁3
+        - 其本质为 DTH，但固定T摇2。
+        - 该策略可有效避免T摇1满地乱爬，与T摇锁3白洞前清血的毒点。
 
         特殊方法
         - 屏蔽艾克斯迪司释放钢铁暴雷时的连线
@@ -58,15 +59,16 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复给 Boss 标点会导致黑洞指挥/指路失效的问题。（我真服了）
+        1. [ ] 增加二运黑洞指挥模式标点优先级策略“美式改”，具体见说明。
+        2. [x] 删除二运黑洞指挥模式，MT 为 卡奥斯T，ST 为 艾克斯迪司T 的无意义判断。（对玩家无影响）
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.38";
+    private const string Version = "0.0.0.39";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
-    private const bool Debugging = false;
+    public const bool Debugging = true;
 
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
@@ -103,13 +105,14 @@ public class UDM_P3
     public static bool P3B1CaptainModeDevHelper { get; set; } = true;
     
     [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
-    public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.HDT;
+    public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.美式改;
 
     public enum BhPriStgEnum
     {
         HDT,
         HDT三麻取反,
         THD,
+        美式改,
         自定义
     }
 
@@ -139,7 +142,7 @@ public class UDM_P3
     public void Init(ScriptAccessory sa)
     {
         _runId++;
-        sa.Log.Debug($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
+        sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
         
         _pd.Init(sa, "初始化");
         _pdCaptain.Init(sa, "初始化");
@@ -164,7 +167,7 @@ public class UDM_P3
         userControl: Debugging)]
     public void 打印当前阶段(Event ev, ScriptAccessory sa)
     {
-        sa.DebugMsg($"{_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"{_udmP3Param.当前阶段}");
     }
 
     [ScriptMethod(name: "测试项：展示优先级表格", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
@@ -177,9 +180,8 @@ public class UDM_P3
         {
             str += $"Key {pair.Key} Value {pair.Value}\n";
         }
-        sa.DebugMsg($"{str}", Debugging);
-        sa.DebugMsg(_pd.ShowPriorities(), Debugging);
-        
+        sa.DebugMsg($"\n{str}");
+        sa.DebugMsg($"\n{_pd.ShowPriorities()}");
     }
         
     
@@ -200,13 +202,11 @@ public class UDM_P3
         {
             _pdCaptain.Init(sa, "测试");
 
-            var (priority, reverseThirdMarker, normalized) = 构筑指挥优先级字段(BhMarkPriority);
+            var (priority, normalized) = 构筑指挥优先级字段(BhMarkPriority);
             if (BhMarkPriority == BhPriStgEnum.自定义)
                 sa.Method.SendChat($"/e 输入值：{BhMarkPriorityStr}");
             sa.Method.SendChat($"/e 实际作用值：{normalized}");
-
             _pdCaptain.AddPriorities(priority);
-            _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
         
             for (int i = 0; i < _pdCaptain.Priorities.Count; i++)
             {
@@ -232,7 +232,7 @@ public class UDM_P3
     public void P3_分P_重构(Event ev, ScriptAccessory sa)
     {
         _udmP3Param.当前阶段 = 3000;
-        sa.DebugMsg($"当前阶段为：P3 重构 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"当前阶段为：P3 重构 {_udmP3Param.当前阶段}");
     }
     
     [ScriptMethod(name: "*P3B_重构时恢复凯夫卡透明度", eventType: EventTypeEnum.StartCasting,
@@ -248,7 +248,7 @@ public class UDM_P3
     public void P3_获得艾克斯迪司ObjId(Event ev, ScriptAccessory sa)
     {
         _udmP3Param.ObjectId_艾克斯迪司 = ev.SourceId;
-        sa.DebugMsg($"[P3_获得艾克斯迪司ObjId] {_udmP3Param.ObjectId_艾克斯迪司:X8}", Debugging);
+        sa.DebugMsg($"{_udmP3Param.ObjectId_艾克斯迪司:X8}");
 
         // 顺便恢复透明度
         var obj = sa.GetById(ev.SourceId);
@@ -260,7 +260,7 @@ public class UDM_P3
     public void P3_获得卡奥斯ObjId(Event ev, ScriptAccessory sa)
     {
         _udmP3Param.ObjectId_卡奥斯 = ev.SourceId;
-        sa.DebugMsg($"[P3_获得卡奥斯ObjId] {_udmP3Param.ObjectId_卡奥斯:X8}", Debugging);
+        sa.DebugMsg($"{_udmP3Param.ObjectId_卡奥斯:X8}");
         
         // 顺便恢复透明度
         var obj = sa.GetById(ev.SourceId);
@@ -351,8 +351,7 @@ public class UDM_P3
             1 => statusId == chaos_buff
         };
         sa.DebugMsg(
-            $"[P3_根据Buff判断MTST] {sa.GetPlayerJobByIndex(idx)} 获得 {statusId}，拉艾克斯迪司的是 {(_udmP3Param.拉艾克斯迪司的是MT ? "MT" : "ST")}",
-            Debugging);
+            $"{sa.GetPlayerJobByIndex(idx)} 获得 {statusId}，拉艾克斯迪司的是 {(_udmP3Param.拉艾克斯迪司的是MT ? "MT" : "ST")}");
     }
 
     #region P3A 深层痛楚 通用部分
@@ -370,7 +369,7 @@ public class UDM_P3
         _pd.Init(sa, "P3一运");
         _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
         _udmP3Param.当前阶段 = 3100;
-        sa.DebugMsg($"当前阶段为：P3 一运 深层痛楚 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"当前阶段为：P3 一运 深层痛楚 {_udmP3Param.当前阶段}");
     }
 
     
@@ -400,7 +399,7 @@ public class UDM_P3
         
             _pd.AddPriority(playerIdx, priVal);
             _udmP3Param.一运状态记录次数++;
-            sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
+            sa.DebugMsg($"记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}");
 
             if (_udmP3Param.一运状态记录完毕())
                 _udmP3Param.一运状态记录.Set();
@@ -436,7 +435,7 @@ public class UDM_P3
                 _udmP3Param.风水晶方位 = region;
                 break;
         }
-        sa.DebugMsg($"[P3A_水晶生成记录] 记录到水晶 {dataId} 于方位 {region}", Debugging);
+        sa.DebugMsg($"记录到水晶 {dataId} 于方位 {region}");
 
         if (!_udmP3Param.水晶状态记录完毕()) return;
         _udmP3Param.无水晶方位 = 6 - _udmP3Param.火水晶方位 - _udmP3Param.水水晶方位 - _udmP3Param.风水晶方位;
@@ -544,15 +543,15 @@ public class UDM_P3
     {
         if (_udmP3Param.当前阶段 != 3100) return;
         if (!_udmP3Param.一运状态记录.WaitOne(2000)) return;
-        sa.DebugMsg($"[P3A_深层痛楚判定] 一运状态记录完毕", Debugging);
+        sa.DebugMsg($"一运状态记录完毕");
         if (!_udmP3Param.一运水晶记录.WaitOne(2000)) return;
-        sa.DebugMsg($"[P3A_深层痛楚判定] 一运水晶记录完毕", Debugging);
+        sa.DebugMsg($"一运水晶记录完毕");
 
         _udmP3Param.一运状态记录.Reset();
         _udmP3Param.一运水晶记录.Reset();
 
         _udmP3Param.成员分组(sa, _pd);
-        sa.DebugMsg($"[P3A_深层痛楚判定] 成员分组完毕", Debugging);
+        sa.DebugMsg($"成员分组完毕");
 
         _udmP3Param.一水火准备.Set();
     }
@@ -581,7 +580,7 @@ public class UDM_P3
         if (_udmP3Param.当前阶段 != 3100) return;
         if (!_udmP3Param.一水火准备.WaitOne(2000)) return;
 
-        sa.DebugMsg($"[P3A_一水火指路] 开始", Debugging);
+        sa.DebugMsg($"开始");
         var myIndex = sa.GetMyIndex();
 
         // 艾克斯迪司 ST 无水晶
@@ -966,7 +965,7 @@ public class UDM_P3
     {
         if (_udmP3Param.当前阶段 != 3100) return;
         _udmP3Param.当前阶段 = 3101;
-        sa.DebugMsg($"[P3A_暴雷死刑] 暴雷死刑，一水火结束");
+        sa.DebugMsg($"暴雷死刑，一水火结束");
         
         if (sa.GetMyIndex() != (_udmP3Param.拉艾克斯迪司的是MT ? 0 : 1)) return;
         sa.DrawGuidance(ev.TargetId, 0, 5000, $"P3A_暴雷_死刑", sa.Data.DefaultSafeColor);
@@ -992,7 +991,7 @@ public class UDM_P3
                 _ => _udmP3Param.风水晶方位
             };
             执行P3拉怪指路逻辑(sa, "艾克斯迪司", aimRegion, 4000, false);
-            sa.DebugMsg($"[P3A_暴雷死刑后_拉Boss提示] 暴雷死刑结束，ST 拉艾克斯迪司");
+            sa.DebugMsg($"暴雷死刑结束，ST 拉艾克斯迪司");
         }
 
         // 正攻情况下，死刑后，卡奥斯去场中
@@ -1000,7 +999,7 @@ public class UDM_P3
         {
             if (BoAStg != BoAStgEnum.正攻) return;
             执行P3拉怪指路逻辑(sa, "卡奥斯", 0, 4000, true);
-            sa.DebugMsg($"[P3A_暴雷死刑后_拉Boss提示] 暴雷死刑结束，MT 拉卡奥斯去场中");
+            sa.DebugMsg($"暴雷死刑结束，MT 拉卡奥斯去场中");
         }
     }
     
@@ -1020,7 +1019,7 @@ public class UDM_P3
     {
         if (_udmP3Param.当前阶段 != 3102) return;
         _udmP3Param.当前阶段 = 3110;
-        sa.DebugMsg($"[P3A_二水火阶段推进] 二水火开始，转阶段 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"二水火开始，转阶段 {_udmP3Param.当前阶段}");
     }
 
     [ScriptMethod(name: "P3A_二水火指路", eventType: EventTypeEnum.StartCasting,
@@ -1028,7 +1027,7 @@ public class UDM_P3
     public void P3A_二水火指路(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3102 && _udmP3Param.当前阶段 != 3110) return;
-        sa.DebugMsg($"[P3A_二水火指路] 开始", Debugging);
+        sa.DebugMsg($"开始");
         执行水火指路逻辑(sa, _udmP3Param.二水火指路与绘图时间);
     }
 
@@ -1038,7 +1037,7 @@ public class UDM_P3
     {
         if (_udmP3Param.当前阶段 != 3110) return;
         _udmP3Param.当前阶段 = 3111;
-        sa.DebugMsg($"[P3A_二水火结束阶段推进] 二水火结束，转阶段 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"二水火结束，转阶段 {_udmP3Param.当前阶段}");
     }
 
     [ScriptMethod(name: "P3A_二水火结束拉怪提示", eventType: EventTypeEnum.ActionEffect,
@@ -1056,7 +1055,7 @@ public class UDM_P3
          */
         
         // 根据海啸/烈焰与当前阶段判断二水火的结束
-        sa.DebugMsg($"[P3A_二水火结束拉怪提示] 二水火结束，当前阶段 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"二水火结束，当前阶段 {_udmP3Param.当前阶段}");
 
         var myIndex = sa.GetMyIndex();
         if (myIndex <= 1)
@@ -1126,7 +1125,7 @@ public class UDM_P3
     public void P3A_真空波(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
-        sa.DebugMsg($"[P3A_真空波] 开始", Debugging);
+        sa.DebugMsg($"开始");
 
         if (BoAStg == BoAStgEnum.正攻)
             执行真空波正攻指路逻辑(sa);
@@ -1142,7 +1141,7 @@ public class UDM_P3
         if (!SpecialMode) return;
         
         if (_udmP3Param.当前阶段 != 3111) return;
-        sa.DebugMsg($"[P3A_真空波_卡奥斯透明] 执行", Debugging);
+        sa.DebugMsg($"执行");
         
         var runId = _runId; 
         var obj = sa.GetById(_udmP3Param.ObjectId_卡奥斯);
@@ -1165,7 +1164,7 @@ public class UDM_P3
     public void P3A_真空波后分摊(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
-        sa.DebugMsg($"[P3A_真空波] 击退后分摊", Debugging);
+        sa.DebugMsg($"击退后分摊");
         
         if (BoAStg == BoAStgEnum.正攻)
             DrawGroupCircle(sa, _udmP3Param.风组, "P3A_真空波后分摊", sa.Data.DefaultSafeColor, 6, 4000);
@@ -1289,7 +1288,7 @@ public class UDM_P3
         if (_udmP3Param.当前阶段 != 3111) return;
         if (!SpecialMode) return;
 
-        sa.DebugMsg($"[P3A1_真空波_自动面向辅助] 开始", Debugging);
+        sa.DebugMsg($"开始");
 
         var myObject = sa.Data.MyObject;
         if (myObject == null) return;
@@ -1354,11 +1353,11 @@ public class UDM_P3
         if (_udmP3Param.究极冲击波起始方位 < 0)
         {
             _udmP3Param.究极冲击波起始方位 = region;
-            sa.DebugMsg($"[P3A_究极冲击波方位记录] 起始方位 {region}", Debugging);
+            sa.DebugMsg($"起始方位 {region}");
         }
         else
         {
-            sa.DebugMsg($"[P3A_究极冲击波方位记录] 第二轮方位 {region}", Debugging);
+            sa.DebugMsg($"第二轮方位 {region}");
             
             int delta = (region - _udmP3Param.究极冲击波起始方位 + 8) % 8;
             // 7 为顺时针，1 为逆时针
@@ -1366,7 +1365,7 @@ public class UDM_P3
             _udmP3Param.究极冲击波记录完毕 = true;
             
             // 用面向计算的起始方位可直接作为终点，顺逆时针需要转换
-            sa.DebugMsg($"[P3A_究极冲击波方位记录] 为 {(_udmP3Param.究极冲击波为顺时针 ? "顺" : "逆")} 时针", Debugging);
+            sa.DebugMsg($"为 {(_udmP3Param.究极冲击波为顺时针 ? "顺" : "逆")} 时针");
         }
     }
     
@@ -1391,7 +1390,7 @@ public class UDM_P3
             };
             var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             _pd.AddPriority(playerIdx, priVal);
-            sa.DebugMsg($"[P3A_究极冲击波麻将记录] {Role[playerIdx]} 被点 {priVal / 1000}", Debugging);
+            sa.DebugMsg($"{Role[playerIdx]} 被点 {priVal / 1000}");
         }
     }
     
@@ -1400,10 +1399,10 @@ public class UDM_P3
     public void P3A_究极冲击波指路(Event ev, ScriptAccessory sa)
     {
         if (_udmP3Param.当前阶段 != 3111) return;
-        sa.DebugMsg($"[P3A_究极冲击波指路] 风分摊结束，从方位 {_udmP3Param.究极冲击波起始方位} {(_udmP3Param.究极冲击波为顺时针 ? "逆" : "顺")} 开始", Debugging);
+        sa.DebugMsg($"风分摊结束，从方位 {_udmP3Param.究极冲击波起始方位} {(_udmP3Param.究极冲击波为顺时针 ? "逆" : "顺")} 开始");
         var priVal = _pd.Priorities[sa.GetMyIndex()];
         var num = priVal.GetDecimalDigit(3);
-        sa.DebugMsg($"[P3A_究极冲击波指路] 玩家被点麻将 {priVal.GetDecimalDigit(3)}", Debugging);
+        sa.DebugMsg($"玩家被点麻将 {priVal.GetDecimalDigit(3)}");
         if (num == 0) return;
 
         // 顺则逆转
@@ -1432,23 +1431,26 @@ public class UDM_P3
         _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
         _udmP3Param.当前阶段 = 3200;
         
-        sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"当前阶段为：P3 二运 地震 {_udmP3Param.当前阶段}");
     }
 
     // 根据不同类的输入重载一次
-    private (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
+    private (List<int> priority, string normalized) 构筑指挥优先级字段(BhPriStgEnum prioritySetting)
     {
         var priorityText = prioritySetting switch
         {
             BhPriStgEnum.THD => "12345678",
             BhPriStgEnum.自定义 => BhMarkPriorityStr,
             BhPriStgEnum.HDT三麻取反 => "437658120",
+            BhPriStgEnum.美式改 => "56781234",
             _ => "43765812"
         };
+
+        _udmP3Param.混沌泥土最末 = prioritySetting == BhPriStgEnum.美式改;
         return 构筑指挥优先级字段(priorityText);
     }
 
-    private (List<int> priority, bool reverseThirdMarker, string normalized) 构筑指挥优先级字段(string prioritySetting)
+    private (List<int> priority, string normalized) 构筑指挥优先级字段(string prioritySetting)
     {
         var normalized = (prioritySetting ?? "").Trim();
 
@@ -1463,8 +1465,8 @@ public class UDM_P3
 
         var roleIdxMap = new Dictionary<char, int>
         {
-            ['1'] = _udmP3Param.拉艾克斯迪司的是MT ? 1 : 0,
-            ['2'] = _udmP3Param.拉艾克斯迪司的是MT ? 0 : 1,
+            ['1'] = 0,
+            ['2'] = 1,
             ['3'] = 2,
             ['4'] = 3,
             ['5'] = 4,
@@ -1477,7 +1479,8 @@ public class UDM_P3
             // priority [职能] = 优先级，输入的"12345678"要再映射到"01(10)234567"
             priority[roleIdxMap[normalized[i]]] = i + 1;
 
-        return (priority.ToList(), normalized.Length == 9 && normalized[8] == '0', normalized);
+        _udmP3Param.黑洞三麻取反 = normalized.Length == 9 && normalized[8] == '0';
+        return (priority.ToList(), normalized);
     }
     
     [ScriptMethod(name: "*P3B_黑洞、冰封期间双Boss透明", eventType: EventTypeEnum.StartCasting,
@@ -1601,7 +1604,7 @@ public class UDM_P3
                 sa.DrawGuidance(guidePos, 0, 8000, $"响亮亮耳光 指路", sa.Data.DefaultSafeColor);
         }
         
-        sa.DebugMsg($"[P3B_响亮亮耳光] {actionStr}");
+        sa.DebugMsg($"{actionStr}");
         sa.Method.TextInfo($"响亮亮耳光 {actionStr}", 3000);
         sa.Method.TTS($"{actionStr}", 3);
     }
@@ -1656,7 +1659,7 @@ public class UDM_P3
     }
     
     [ScriptMethod(name: "P3B1_状态添加记录", eventType: EventTypeEnum.StatusAdd,
-        eventCondition: ["StatusID:regex:^(300[456])$", "SourceId:E0000000"],
+        eventCondition: ["StatusID:regex:^(300[456]|1604)$", "SourceId:E0000000"],
         userControl: Debugging)]
     public void P3B_状态添加(Event ev, ScriptAccessory sa)
     {
@@ -1664,15 +1667,15 @@ public class UDM_P3
         const uint 第一目标 = 3004;
         const uint 第二目标 = 3005;
         const uint 第三目标 = 3006;
+        const uint 混沌之泥土 = 1604;
 
         lock (_pdCaptain)
         {
             if (!_udmP3Param.获得过第一个黑洞状态)
             {
                 _pdCaptain.Init(sa, "P3二运指挥");
-                var (priority, reverseThirdMarker, _) = 构筑指挥优先级字段(BhMarkPriority);
+                var (priority, _) = 构筑指挥优先级字段(BhMarkPriority);
                 _pdCaptain.AddPriorities(priority);
-                _udmP3Param.黑洞三麻取反 = reverseThirdMarker;
                 _udmP3Param.获得过第一个黑洞状态 = true;
             }
 
@@ -1680,15 +1683,16 @@ public class UDM_P3
             var playerIdx = sa.GetPlayerIdIndex((uint)ev.TargetId);
             var priVal = ev.StatusId switch
             {
-                第一目标 => 10,
-                第二目标 => 20,
-                第三目标 => 30,
+                第一目标 => 100,
+                第二目标 => 200,
+                第三目标 => 300,
+                混沌之泥土 => _udmP3Param.混沌泥土最末 ? 10 : 0,
                 _ => 0
             };
-        
+
             _pdCaptain.AddPriority(playerIdx, priVal);
             _udmP3Param.二运状态记录次数++;
-            sa.DebugMsg($"[P3A_状态添加记录] 记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}", Debugging);
+            sa.DebugMsg($"记录到状态 {statusId} / {priVal} 于角色 {Role[playerIdx]}");
 
             if (_udmP3Param.二运状态记录完毕())
                 _udmP3Param.二运状态记录.Set();
@@ -1705,14 +1709,14 @@ public class UDM_P3
         if (!_udmP3Param.二运状态记录.WaitOne(2000))
             补齐黑洞状态优先级(sa);
         
-        sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 进入指挥标点", Debugging);
-        sa.DebugMsg(_pdCaptain.ShowPriorities(), Debugging);
+        sa.DebugMsg($"进入指挥标点");
+        sa.DebugMsg(_pdCaptain.ShowPriorities());
         for (int i = 0; i < 8; i++)
         {
             var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
             var marker = GetMarkTypeByRankBh(i, _udmP3Param.黑洞三麻取反);
             sa.MarkPlayerByIdx(kvp.Key, marker);
-            sa.DebugMsg($"[P3B1_二运黑洞指挥标点] 给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}", Debugging);
+            sa.DebugMsg($"给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}");
             
             if (P3B1CaptainModeDevHelper)
                 sa.Method.SendChat($"/e 可达鸭明目张胆地把 {marker} 标给了 {sa.GetPlayerJobByIndex(kvp.Key)}");
@@ -1818,7 +1822,7 @@ public class UDM_P3
             };
             
             _pd.Priorities[tidx] = (tidx + 1) + pdVal;
-            sa.DebugMsg($"[P3B1_获得二运黑洞标点] {targetJob} 被标 {mark} == {_pd.Priorities[tidx]}", Debugging);
+            sa.DebugMsg($"{targetJob} 被标 {mark} == {_pd.Priorities[tidx]}");
         }
     }
 
@@ -1829,12 +1833,12 @@ public class UDM_P3
         if (!_udmP3Param.黑洞已出现)
         {
             _udmP3Param.黑洞已出现 = true;
-            sa.DebugMsg($"[P3B1_黑洞轮数增加] 头标记录完毕", Debugging);
-            sa.DebugMsg($"{_pd.ShowPriorities()}", Debugging);
+            sa.DebugMsg($"头标记录完毕");
+            sa.DebugMsg($"{_pd.ShowPriorities()}");
         }
         _udmP3Param.黑洞字典.Clear();
         _udmP3Param.黑洞轮数++;
-        sa.DebugMsg($"[P3B1_黑洞轮数增加] 当前阶段 {_udmP3Param.当前阶段}，清除黑洞字典 {_udmP3Param.黑洞字典.Count}", Debugging);
+        sa.DebugMsg($"当前阶段 {_udmP3Param.当前阶段}，清除黑洞字典 {_udmP3Param.黑洞字典.Count}");
         _udmP3Param.黑洞轮数增加完毕.Set();
     }
     
@@ -1870,7 +1874,7 @@ public class UDM_P3
             _udmP3Param.黑洞字典.TryAdd(sid,
                 (round: _udmP3Param.黑洞轮数, region: region, relativeRegion: relativeRegion, hasTether: false));
             var count = _udmP3Param.黑洞字典.Count;
-            sa.DebugMsg($"[P3B1_外黑洞获取] 获取到方位 {region} 相对方位 {relativeRegion} 的黑洞 #{count}", Debugging);
+            sa.DebugMsg($"获取到方位 {region} 相对方位 {relativeRegion} 的黑洞 #{count}");
             
             if (_udmP3Param.黑洞字典.Count < 3) return;
             
@@ -1885,8 +1889,7 @@ public class UDM_P3
                 valueTuple.hasTether = tetherCount > 0;
                 _udmP3Param.黑洞字典[黑洞.Key] = valueTuple;
                 sa.DebugMsg(
-                    $"[P3B1_外黑洞获取] 方位 {黑洞.Value.region} 相对方位 {黑洞.Value.relativeRegion} 的黑洞 0x{bc.GameObjectId:X8} {(tetherCount > 0 ? "有" : "没")}线",
-                    Debugging);
+                    $"方位 {黑洞.Value.region} 相对方位 {黑洞.Value.relativeRegion} 的黑洞 0x{bc.GameObjectId:X8} {(tetherCount > 0 ? "有" : "没")}线");
             }
             
             排序黑洞字典();
@@ -2051,7 +2054,7 @@ public class UDM_P3
                 return true;
             }
         }
-        sa.DebugMsg($"[{caller}] 等待黑洞接线任务超时", Debugging);
+        sa.DebugMsg($"等待黑洞接线任务超时");
         return false;
     }
 
@@ -2113,7 +2116,7 @@ public class UDM_P3
         var isKnownNoop = (bhRound, bhEffectRound) is (1, 2) or (2, 5) or (3, 8) or (4, 10);
         if (markFeatureList.Count == 0 && !isKnownNoop)
         {
-            sa.DebugMsg($"[筛选本轮接线玩家] 输入值错误 ({bhRound} {bhEffectRound})", Debugging);
+            sa.DebugMsg($"输入值错误 ({bhRound} {bhEffectRound})");
         }
         return markFeatureList;
     }
@@ -2150,7 +2153,7 @@ public class UDM_P3
             var player = 按黑洞头标特征找玩家(sa, markFeature);
             if (player.Key < 0)
             {
-                sa.DebugMsg($"[获取本轮黑洞接线任务] 未找到头标特征 {markFeature} 对应玩家", Debugging);
+                sa.DebugMsg($"未找到头标特征 {markFeature} 对应玩家");
                 continue;
             }
             
@@ -2166,11 +2169,10 @@ public class UDM_P3
             var taskName = $"R{bhRound} T{bhEffectRound} {player.Key} {regionStr}";
             tasks.Add((player.Key, realRegions, blackHoles, taskName));
             sa.DebugMsg(
-                $"[获取本轮黑洞接线任务] {taskName} | 玩家 {sa.GetPlayerJobByIndex(player.Key)}({player.Key}) | 特征 {markFeature} | 方位 {regionStr} | 黑洞 {string.Join(",", blackHoles.Select(x => x.ToString("X8")))}",
-                Debugging);
+                $"{taskName} | 玩家 {sa.GetPlayerJobByIndex(player.Key)}({player.Key}) | 特征 {markFeature} | 方位 {regionStr} | 黑洞 {string.Join(",", blackHoles.Select(x => x.ToString("X8")))}");
         }
 
-        sa.DebugMsg($"[获取本轮黑洞接线任务] R{bhRound} T{bhEffectRound} 共 {tasks.Count} 个任务", Debugging);
+        sa.DebugMsg($"R{bhRound} T{bhEffectRound} 共 {tasks.Count} 个任务");
         return tasks;
     }
     
@@ -2199,8 +2201,7 @@ public class UDM_P3
             sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp2);
         }
 
-        sa.DebugMsg($"[绘制黑洞接线范围] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
-            Debugging);
+        sa.DebugMsg($"{sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞");
     }
 
     private void 挂载玩家向黑洞方位接线指路(ScriptAccessory sa,
@@ -2213,8 +2214,7 @@ public class UDM_P3
         
         挂载接线Framework(sa, guidePos, task);
     
-        sa.DebugMsg($"[挂载玩家向黑洞方位接线指路] {sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞",
-            Debugging);
+        sa.DebugMsg($"{sa.GetPlayerJobByIndex(task.playerIdx)} 接真实方位 {string.Join(",", task.realRegions)} 的黑洞");
     }
 
     private void 挂载接线Framework(ScriptAccessory sa, Vector3 guidePos,
@@ -2263,8 +2263,7 @@ public class UDM_P3
             
             _udmP3Param.接线FrameworkList.Add(fwElement);
             sa.DebugMsg(
-                $"[挂载接线Framework] {fwElement.TaskName} | {sa.GetPlayerJobByIndex(fwElement.PlayerIndex)}({fwElement.PlayerIndex}) 玩家 {fwElement.PlayerObjId:X8} | 黑洞 {fwElement.BlackHoleId:X8} | 真实方位 {task.realRegions[i]} | 元素 {fwElement.Name}",
-                Debugging);
+                $"{fwElement.TaskName} | {sa.GetPlayerJobByIndex(fwElement.PlayerIndex)}({fwElement.PlayerIndex}) 玩家 {fwElement.PlayerObjId:X8} | 黑洞 {fwElement.BlackHoleId:X8} | 真实方位 {task.realRegions[i]} | 元素 {fwElement.Name}");
         }
     }
 
@@ -2275,8 +2274,7 @@ public class UDM_P3
         List<接线Framework元素> 当前接线任务Fws = _udmP3Param.接线FrameworkList.ToList();
         if (当前接线任务Fws.Count == 0) return;
         sa.DebugMsg(
-            $"[执行接线Framework] 本轮任务 {tasks.Count} 个，接线元素 {当前接线任务Fws.Count} 个：{string.Join(" | ", tasks.Select(task => $"{task.name}:{task.blackHoles.Count}"))}",
-            Debugging);
+            $"本轮任务 {tasks.Count} 个，接线元素 {当前接线任务Fws.Count} 个：{string.Join(" | ", tasks.Select(task => $"{task.name}:{task.blackHoles.Count}"))}");
 
         Dictionary<string, bool> 去站位指路绘制状态 = tasks.ToDictionary(task => task.name, _ => false);
         Dictionary<string, bool> 上一次任务接线完成状态 = tasks.ToDictionary(task => task.name, _ => false);
@@ -2292,14 +2290,14 @@ public class UDM_P3
                 {
                     if (fw.上一次黑洞存在状态)
                     {
-                        sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 黑洞 {fw.BlackHoleId:X8} 当前取不到", Debugging);
+                        sa.DebugMsg($"{fw.TaskName} | {fw.Name} 黑洞 {fw.BlackHoleId:X8} 当前取不到");
                         fw.上一次黑洞存在状态 = false;
                     }
                     continue;
                 }
                 if (!fw.上一次黑洞存在状态)
                 {
-                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 黑洞 {fw.BlackHoleId:X8} 已重新取到", Debugging);
+                    sa.DebugMsg($"{fw.TaskName} | {fw.Name} 黑洞 {fw.BlackHoleId:X8} 已重新取到");
                     fw.上一次黑洞存在状态 = true;
                 }
                 var 当前接线目标 = sa.GetTetherSource((IBattleChara)bh, 0x54);
@@ -2308,8 +2306,7 @@ public class UDM_P3
                 {
                     var 当前接线目标Job列表 = string.Join(",", 当前接线目标.Select(x => sa.GetPlayerJobById((uint)x)));
                     sa.DebugMsg(
-                        $"[Action] {fw.TaskName} | {fw.Name} 线目标变化：{(当前接线目标列表 == "" ? "无" : 当前接线目标列表)} | {当前接线目标Job列表}",
-                        Debugging);
+                        $"{fw.TaskName} | {fw.Name} 线目标变化：{(当前接线目标列表 == "" ? "无" : 当前接线目标列表)} | {当前接线目标Job列表}");
                     fw.上一次接线目标列表 = 当前接线目标列表;
                 }
                 var 刚才已接到线 = fw.Tethered;
@@ -2322,7 +2319,7 @@ public class UDM_P3
                     if (!fw.去接线指路已绘制 && 刚才已接到线) continue;
                     if (fw.上一次去接线指路绘图名 != "")
                         sa.Method.RemoveDraw(fw.上一次去接线指路绘图名);
-                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 接到线了，目标 {fw.PlayerObjId:X8}/{sa.GetPlayerJobByIndex(fw.PlayerIndex)}", Debugging);
+                    sa.DebugMsg($"{fw.TaskName} | {fw.Name} 接到线了，目标 {fw.PlayerObjId:X8}/{sa.GetPlayerJobByIndex(fw.PlayerIndex)}");
                     fw.去接线指路已绘制 = false;
                     fw.上一次接线目标 = 0;
                     fw.上一次去接线指路绘图名 = "";
@@ -2336,12 +2333,12 @@ public class UDM_P3
                     {
                         sa.Method.RemoveDraw(去站位指路绘图名(fw.TaskName));
                         去站位指路绘制状态[fw.TaskName] = false;
-                        sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 线目标数量 {当前接线目标.Count}，移除去站位指路", Debugging);
+                        sa.DebugMsg($"{fw.TaskName} | {fw.Name} 线目标数量 {当前接线目标.Count}，移除去站位指路");
                     }
                     if (!fw.去接线指路已绘制) continue;
                     if (fw.上一次去接线指路绘图名 != "")
                         sa.Method.RemoveDraw(fw.上一次去接线指路绘图名);
-                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 线目标数量 {当前接线目标.Count}，移除去接线指路", Debugging);
+                    sa.DebugMsg($"{fw.TaskName} | {fw.Name} 线目标数量 {当前接线目标.Count}，移除去接线指路");
                     fw.去接线指路已绘制 = false;
                     fw.上一次接线目标 = 0;
                     fw.上一次去接线指路绘图名 = "";
@@ -2355,7 +2352,7 @@ public class UDM_P3
                 {
                     sa.Method.RemoveDraw(去站位指路绘图名(fw.TaskName));
                     去站位指路绘制状态[fw.TaskName] = false;
-                    sa.DebugMsg($"[Action] {fw.TaskName} | {fw.Name} 线被错误目标 {当前接线目标ObjId:X8}/{sa.GetPlayerJobById((uint)当前接线目标ObjId)} 接到，移除去站位指路", Debugging);
+                    sa.DebugMsg($"{fw.TaskName} | {fw.Name} 线被错误目标 {当前接线目标ObjId:X8}/{sa.GetPlayerJobById((uint)当前接线目标ObjId)} 接到，移除去站位指路");
                 }
                 if (fw.上一次去接线指路绘图名 != "")
                     sa.Method.RemoveDraw(fw.上一次去接线指路绘图名);
@@ -2363,8 +2360,7 @@ public class UDM_P3
                 // 顺利来到这里：当前没接到线，黑洞明确有线连着玩家，这根线连着错误的玩家
                 var 当前去接线指路绘图名 = $"{fw.去接线指路绘图名前缀} {当前接线目标ObjId:X8}";
                 sa.DebugMsg(
-                    $"[Action] {fw.TaskName} | {fw.Name} 快去接线：{sa.GetPlayerJobByIndex(fw.PlayerIndex)}({fw.PlayerObjId:X8}) -> {sa.GetPlayerJobById((uint)当前接线目标ObjId)}({当前接线目标ObjId:X8})",
-                    Debugging);
+                    $"{fw.TaskName} | {fw.Name} 快去接线：{sa.GetPlayerJobByIndex(fw.PlayerIndex)}({fw.PlayerObjId:X8}) -> {sa.GetPlayerJobById((uint)当前接线目标ObjId)}({当前接线目标ObjId:X8})");
                 sa.DrawGuidance(fw.PlayerObjId, 当前接线目标ObjId, 0, 7000, 当前去接线指路绘图名, sa.Data.DefaultSafeColor);
                 fw.去接线指路已绘制 = true;
                 fw.上一次接线目标 = 当前接线目标ObjId;
@@ -2379,8 +2375,7 @@ public class UDM_P3
                 if (allTethered != 上一次任务接线完成状态.GetValueOrDefault(taskName))
                 {
                     sa.DebugMsg(
-                        $"[ActionGuide] {taskName} 接线完成状态变化：{allTethered} | {string.Join(",", taskFws.Select(fw => $"{fw.Name}={fw.Tethered}"))}",
-                        Debugging);
+                        $"{taskName} 接线完成状态变化：{allTethered} | {string.Join(",", taskFws.Select(fw => $"{fw.Name}={fw.Tethered}"))}");
                     上一次任务接线完成状态[taskName] = allTethered;
                 }
                 if (!allTethered)
@@ -2388,7 +2383,7 @@ public class UDM_P3
                     if (!去站位指路绘制状态.GetValueOrDefault(taskName)) continue;
                     sa.Method.RemoveDraw(去站位指路绘图名(taskName));
                     去站位指路绘制状态[taskName] = false;
-                    sa.DebugMsg($"[ActionGuide] {taskName} 未全接到，移除去站位指路", Debugging);
+                    sa.DebugMsg($"{taskName} 未全接到，移除去站位指路");
                     continue;
                 }
 
@@ -2397,7 +2392,7 @@ public class UDM_P3
                     sa.Method.RemoveDraw($"绘制黑洞接线 {taskName} G去接线 {fw.Name}.*");
 
                 var guideFw = taskFws.First();
-                sa.DebugMsg($"[ActionGuide] 去站位吧 {taskName} | 玩家 {sa.GetPlayerJobByIndex(guideFw.PlayerIndex)}({guideFw.PlayerObjId:X8}) | GuidePos {guideFw.GuidePos}", Debugging);
+                sa.DebugMsg($"去站位吧 {taskName} | 玩家 {sa.GetPlayerJobByIndex(guideFw.PlayerIndex)}({guideFw.PlayerObjId:X8}) | GuidePos {guideFw.GuidePos}");
                 // $"绘制黑洞接线 {taskName} G去站位";
                 sa.DrawGuidance(guideFw.PlayerObjId, guideFw.GuidePos, 0, 7000, 去站位指路绘图名(taskName), sa.Data.DefaultSafeColor);
                 去站位指路绘制状态[taskName] = true;
@@ -2454,7 +2449,7 @@ public class UDM_P3
     public void P3B2_冰封_转阶段(Event ev, ScriptAccessory sa)
     {
         _udmP3Param.当前阶段 = 3210;
-        sa.DebugMsg($"当前阶段为：P3B2 二运 冰封 {_udmP3Param.当前阶段}", Debugging);
+        sa.DebugMsg($"当前阶段为：P3B2 二运 冰封 {_udmP3Param.当前阶段}");
         _udmP3Param.凯夫卡方位 = _udmP3Param.巨大凯夫卡方位获取(sa, false);
         _udmP3Param.冰封北方位 = BlizKefkaIsNorth ? _udmP3Param.凯夫卡方位 : (_udmP3Param.凯夫卡方位 + 4) % 8;
         _udmP3Param.西塔方位 = (_udmP3Param.冰封北方位 + 2) % 8;
@@ -2462,7 +2457,7 @@ public class UDM_P3
         if (P3B1CaptainMode)
             sa.Method.MarkClear();
         _udmP3Param.凯夫卡方位获取完毕.Set();
-        sa.DebugMsg($"[P3B2_冰封_指路] 冰封北方位 继承自 凯夫卡方位 {_udmP3Param.凯夫卡方位} C逆");
+        sa.DebugMsg($"冰封北方位 继承自 凯夫卡方位 {_udmP3Param.凯夫卡方位} C逆");
     }
     
     [ScriptMethod(name: "P3B2_冰封_引导路径", eventType: EventTypeEnum.StartCasting,
@@ -2861,6 +2856,7 @@ internal class UDMP3Params
     public bool 获得过第一个黑洞状态 = false;
     public bool 黑洞已出现 = false;
     public bool 黑洞三麻取反 = false;
+    public bool 混沌泥土最末 = false;
 
     public List<(int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name)> 当前黑洞接线任务 = [];
     public ManualResetEvent 黑洞接线任务准备 = new(false);
@@ -2937,6 +2933,7 @@ internal class UDMP3Params
         获得过第一个黑洞状态 = false;
         黑洞已出现 = false;
         黑洞三麻取反 = false;
+        混沌泥土最末 = false;
 
         当前黑洞接线任务 = [];
         黑洞接线任务准备 = new(false);
@@ -2958,7 +2955,7 @@ internal class UDMP3Params
     }
     
     public void Dbg(ScriptAccessory sa, string msg) =>
-        sa.DebugMsg(msg, Debugging);
+        sa.DebugMsg(msg);
 }
     
 internal static class P3AExtension
@@ -3030,14 +3027,14 @@ internal static class P3AExtension
 internal static class P3BExtension
 {
     public static bool 二运状态记录完毕(this UDMP3Params prm) =>
-        prm.二运状态记录次数 == 8;
+        prm.二运状态记录次数 == 10;
 
     public static int 巨大凯夫卡方位获取(this UDMP3Params prm, ScriptAccessory sa, bool cwFromA = true)
     {
         var obj = sa.GetByDataId(19504u).FirstOrDefault();
         if (obj == null)
         {
-            prm.Dbg(sa, $"[巨大凯夫卡方位获取] 获取失败");
+            prm.Dbg(sa, $"获取失败");
             return 0;
         }
         
@@ -3047,7 +3044,7 @@ internal static class P3BExtension
             : (obj.Rotation.RadianToRegion(8, isDiagDiv: true) + 4) % 8;
         
         // prm.凯夫卡方位 = region;
-        prm.Dbg(sa, $"[巨大凯夫卡方位获取] 凯夫卡方位 {region} {(cwFromA ? "A顺" : "C逆")}");
+        prm.Dbg(sa, $"凯夫卡方位 {region} {(cwFromA ? "A顺" : "C逆")}");
         return region;
     }
 
@@ -3057,7 +3054,7 @@ internal static class P3BExtension
         var bossRegion = prm.凯夫卡方位;
         var attackRegion = (bossRegion + 8 + (isRightHand ? -2 : 2)) % 8;
         var safeRegion = (bossRegion + 8 + (isRightHand ? 2 : -2)) % 8;
-        prm.Dbg(sa, $"[巨大凯夫卡半场刀方向] 攻击 {attackRegion} 安全 {safeRegion} A顺");
+        prm.Dbg(sa, $"攻击 {attackRegion} 安全 {safeRegion} A顺");
         return (attackRegion, safeRegion);
     }
     
@@ -3645,12 +3642,22 @@ internal static class MarkerHelper
 
 internal static class DebugFunction
 {
-    public static void DebugMsg(this ScriptAccessory sa, string msg, bool enable = true, bool showInChatBox = true)
+    private static readonly List<string> PrefixWhiteList = [""];
+    private static readonly List<string> PrefixBlackList = [""];
+    public static void DebugMsg(this ScriptAccessory sa, string msg,
+        [CallerMemberName] string prefix = "",
+        bool showInChatBox = true, bool enableWhiteList = false, bool enableBlackList = true)
     {
-        // if (!enable) return;
-        // sa.Log.Debug(msg);
-        // if (!showInChatBox) return;
-        // sa.Method.SendChat($"/e {msg}");
+        if (!UsamisTools.Debugging) return;
+
+        if (enableWhiteList)
+            if (!PrefixWhiteList.Contains(prefix)) return;
+        if (enableBlackList)
+            if (PrefixBlackList.Contains(prefix)) return;
+
+        sa.Log.Debug($"[{prefix}] {msg}");
+        if (!showInChatBox) return;
+        sa.Method.SendChat($"/e [{prefix}] {msg}");
     }
 }
 
