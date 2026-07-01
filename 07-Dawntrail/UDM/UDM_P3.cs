@@ -44,11 +44,10 @@ public class UDM_P3
         - * 若选择自定义，可从左到右细分各职能标点顺序，支持8位或9位输入。
         - * 前八位由"1~8"组成，第九位输入"0"代表三麻取反，输入错误则回退到“HDT三麻取反”。
 
-        二运黑洞指挥策略 - 美式改
-        - 根据职能与 Buff 固定标点。
+        二运黑洞指挥策略 - 美式T2泥3
+        - 根据职能与 Buff 固定标点，其本质为 DTH，但固定T摇2。
         - 无Buff D：攻/锁/禁1；无Buff T/H：攻/锁/禁2；泥土 H/D：攻/锁3
-        - 其本质为 DTH，但固定T摇2。
-        - 该策略可有效避免T摇1满地乱爬，与T摇锁3白洞前清血的毒点。
+        - 可避免T摇攻1禁1满地乱爬、摇攻3卡奥斯离开场中读半场刀、摇锁3白洞前清血的毒点。
 
         特殊方法
         - 屏蔽艾克斯迪司释放钢铁暴雷时的连线
@@ -59,7 +58,7 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [ ] 增加二运黑洞指挥模式标点优先级策略“美式改”，具体见说明。
+        1. [ ] 增加二运黑洞指挥模式标点优先级策略“美式T2泥3”，具体见说明。
         2. [x] 删除二运黑洞指挥模式，MT 为 卡奥斯T，ST 为 艾克斯迪司T 的无意义判断。（对玩家无影响）
         """;
 
@@ -105,14 +104,14 @@ public class UDM_P3
     public static bool P3B1CaptainModeDevHelper { get; set; } = true;
     
     [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
-    public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.美式改;
+    public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.HDT;
 
     public enum BhPriStgEnum
     {
         HDT,
         HDT三麻取反,
         THD,
-        美式改,
+        美式T2泥3,
         自定义
     }
 
@@ -1442,11 +1441,11 @@ public class UDM_P3
             BhPriStgEnum.THD => "12345678",
             BhPriStgEnum.自定义 => BhMarkPriorityStr,
             BhPriStgEnum.HDT三麻取反 => "437658120",
-            BhPriStgEnum.美式改 => "56781234",
+            BhPriStgEnum.美式T2泥3 => "56781234",
             _ => "43765812"
         };
 
-        _udmP3Param.混沌泥土最末 = prioritySetting == BhPriStgEnum.美式改;
+        _udmP3Param.混沌泥土最末 = prioritySetting == BhPriStgEnum.美式T2泥3;
         return 构筑指挥优先级字段(priorityText);
     }
 
@@ -2950,23 +2949,20 @@ internal class UDMP3Params
         if (当前接线任务Framework != "")
             sa.Method.UnregistFrameworkUpdateAction(当前接线任务Framework);
         当前接线任务Framework = "";
-        
-        Dbg(sa, $"绝妖星乱舞 P3 参数重置");
+
+        sa.DebugMsg($"绝妖星乱舞 P3 参数重置");
     }
-    
-    public void Dbg(ScriptAccessory sa, string msg) =>
-        sa.DebugMsg(msg);
 }
     
 internal static class P3AExtension
 {
     public static void 打印水晶与分组(this UDMP3Params prm, ScriptAccessory sa, PriorityDict pd)
     { 
-        prm.Dbg(sa, $"是长 {(prm.是长火 ? "火" : "水")}");
-        prm.Dbg(sa, $"火 {prm.火水晶方位} 水 {prm.水水晶方位} 风 {prm.风水晶方位} 无 {prm.无水晶方位}");
-        prm.Dbg(sa, pd.ShowGroup("风组", prm.风组));
-        prm.Dbg(sa, pd.ShowGroup("水组", prm.水组));
-        prm.Dbg(sa, pd.ShowGroup("火组", prm.火组));
+        sa.DebugMsg($"是长 {(prm.是长火 ? "火" : "水")}");
+        sa.DebugMsg($"火 {prm.火水晶方位} 水 {prm.水水晶方位} 风 {prm.风水晶方位} 无 {prm.无水晶方位}");
+        sa.DebugMsg(pd.ShowGroup("风组", prm.风组));
+        sa.DebugMsg(pd.ShowGroup("水组", prm.水组));
+        sa.DebugMsg(pd.ShowGroup("火组", prm.火组));
     }
     
     public static bool 一运状态记录完毕(this UDMP3Params prm) => 
@@ -3019,7 +3015,7 @@ internal static class P3AExtension
         bool result = false;
         foreach (var kvp in prm.水组)
             result |= kvp.Key % 4 <= 1;
-        prm.Dbg(sa, $"水组 {(result ? "有" : "无")} 近战");
+        sa.DebugMsg($"水组 {(result ? "有" : "无")} 近战");
         return result;
     }
 }
@@ -3034,7 +3030,7 @@ internal static class P3BExtension
         var obj = sa.GetByDataId(19504u).FirstOrDefault();
         if (obj == null)
         {
-            prm.Dbg(sa, $"获取失败");
+            sa.DebugMsg($"获取失败");
             return 0;
         }
         
@@ -3044,7 +3040,7 @@ internal static class P3BExtension
             : (obj.Rotation.RadianToRegion(8, isDiagDiv: true) + 4) % 8;
         
         // prm.凯夫卡方位 = region;
-        prm.Dbg(sa, $"凯夫卡方位 {region} {(cwFromA ? "A顺" : "C逆")}");
+        sa.DebugMsg($"凯夫卡方位 {region} {(cwFromA ? "A顺" : "C逆")}");
         return region;
     }
 
@@ -3054,7 +3050,7 @@ internal static class P3BExtension
         var bossRegion = prm.凯夫卡方位;
         var attackRegion = (bossRegion + 8 + (isRightHand ? -2 : 2)) % 8;
         var safeRegion = (bossRegion + 8 + (isRightHand ? 2 : -2)) % 8;
-        prm.Dbg(sa, $"攻击 {attackRegion} 安全 {safeRegion} A顺");
+        sa.DebugMsg($"攻击 {attackRegion} 安全 {safeRegion} A顺");
         return (attackRegion, safeRegion);
     }
     
@@ -3648,7 +3644,7 @@ internal static class DebugFunction
         [CallerMemberName] string prefix = "",
         bool showInChatBox = true, bool enableWhiteList = false, bool enableBlackList = true)
     {
-        if (!UsamisTools.Debugging) return;
+        if (!UDM_P3.Debugging) return;
 
         if (enableWhiteList)
             if (!PrefixWhiteList.Contains(prefix)) return;
