@@ -67,7 +67,7 @@ public class UDM_P3
     private const string DebugVersion = "a";
     private int _runId = 0;
 
-    public const bool Debugging = true;
+    public const bool Debugging = false;
 
     private static readonly List<string> Role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
     private static readonly Vector3 Center = new Vector3(100, 0, 100);
