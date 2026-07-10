@@ -58,12 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. [x] 增加二运黑洞指挥模式标点优先级策略“美式T2泥3”，具体见说明。
-        2. [x] 删除二运黑洞指挥模式，MT 为 卡奥斯T，ST 为 艾克斯迪司T 的无意义判断。（对玩家无影响）
+        1. 修复上版本更新后，少 buff 则指挥模式标点不生效的 Bug
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.39";
+    private const string Version = "0.0.0.40";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -1734,11 +1733,11 @@ public class UDM_P3
         
         foreach (var kvp in _pdCaptain.Priorities)
         {
-            if (kvp.Value >= 30)
+            if (kvp.Value >= 300)
                 count_3++;
-            else if (kvp.Value >= 20)
+            else if (kvp.Value >= 200)
                 count_2++;
-            else if (kvp.Value >= 10)
+            else if (kvp.Value >= 100)
                 count_1++;
             else
             {
@@ -1752,11 +1751,11 @@ public class UDM_P3
         {
             var addVal = 输出补救模式优先级增加值(count_1, count_2, count_3);
             
-            if (addVal == 30)
+            if (addVal == 300)
                 count_3++;
-            else if (addVal == 20)
+            else if (addVal == 200)
                 count_2++;
-            else if (addVal == 10)
+            else if (addVal == 100)
                 count_1++;
             else
             {
@@ -1771,9 +1770,9 @@ public class UDM_P3
 
     private int 输出补救模式优先级增加值(int count_1, int count_2, int count_3)
     {
-        if (count_1 < 3) return 10;
-        if (count_2 < 3) return 20;
-        if (count_3 < 2) return 30;
+        if (count_1 < 3) return 100;
+        if (count_2 < 3) return 200;
+        if (count_3 < 2) return 300;
         return 0; 
     }
 
