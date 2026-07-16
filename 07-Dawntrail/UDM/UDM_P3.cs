@@ -1219,7 +1219,7 @@ public class UDM_P3
         DrawFacingArrow(sa, 0, false, $"DrawWindGuideVw 面向辅助自身", destroyTime);
         var dp = sa.DrawLine(sa.Data.Me, _udmP3Param.ObjectId_艾克斯迪司, 0, destroyTime, $"DrawWindGuideVw 与艾克斯迪司连线",
             (needBack ? 0 : 180f).DegToRad(), 1, 4.5f, sa.Data.DefaultSafeColor, draw: false);
-        sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Arrow, dp);
+        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
         
         sa.Method.TextInfo($"目标圈内 {needBackStr} 艾克斯迪司 击退", 4000);
         sa.Method.TTS($"{needBackStr}Boss击退", 3);
