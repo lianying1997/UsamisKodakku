@@ -16,7 +16,7 @@ using KodakkuAssist.Module.Draw.Manager;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "7252512d-2f42-4f80-814a-a8c623ecaf87",
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d",
     version: "0.0.2.3", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class Ucob
 {
@@ -326,35 +326,6 @@ public class Ucob
     [ScriptMethod(name: "测试用", eventType: EventTypeEnum.Chat, eventCondition: ["abcdefgh"], userControl: false)]
     public void EchoDebug(Event ev, ScriptAccessory sa)
     {
-        var chara = sa.Data.Objects.SearchById(0x40006505);
-        if (chara == null) return;
-        var achara = sa.Data.Objects.SearchById(0x104FCCD4);
-        if (achara == null) return;
-        sa.Log.Debug($"{chara.Name}, {chara.EntityId}");
-        sa.Log.Debug($"{achara.Name}, {achara.EntityId}");
-        unsafe
-        {
-            var tetherAdd = (FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)chara.Address;
-            var a = tetherAdd->NameString;
-            var tethers = tetherAdd->Vfx.Tethers;
-            var tetherNum = tethers.Length;
-            sa.Log.Debug($"tetherNum = {tetherNum}");
-            var tetherTarget0 = tethers[0].TargetId.ObjectId;
-            var tetherId0 = tethers[0].Id;
-            sa.Log.Debug($"tetherTarget0 {tetherId0} = {tetherTarget0:x8}");   // 第一根目标
-            var tetherTarget1 = tethers[1].TargetId.ObjectId;
-            sa.Log.Debug($"tetherTarget1 = {tetherTarget1:x8}");   // 第二根目标
-            
-            var atetherAdd = (FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)achara.Address;
-            var atethers = tetherAdd->Vfx.Tethers;
-            var atetherNum = tethers.Length;
-            sa.Log.Debug($"tetherNum = {tetherNum}");
-            var atetherTarget0 = tethers[0].TargetId.ObjectId;
-            var atetherId0 = tethers[0].Id;
-            sa.Log.Debug($"tetherTarget0 {tetherId0} = {tetherTarget0:x8}");   // 第一根目标
-            var atetherTarget1 = tethers[1].TargetId.ObjectId;
-            sa.Log.Debug($"tetherTarget1 = {tetherTarget1:x8}");   // 第二根目标
-        }
     }
 
     #region 全局

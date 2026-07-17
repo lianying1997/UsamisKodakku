@@ -54,12 +54,12 @@
   {
     "Name": "UCOB [巴哈姆特绝境战]",
     "Guid": "884e415a-1210-44cc-bdff-8fab6878e87d",
-    "Version": "0.0.2.2",
+    "Version": "0.0.2.3",
     "Author": "Joshua and Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UCOB.cs",
     "Note": "基于@Joshua的巴哈初版程序改写扩充，\r\n感谢合作者@KnightRider，@Meva。\r\n请先按需求检查并设置“用户设置”栏目。\r\n鸭门。",
-    "UpdateInfo": "1. 适配鸭鸭0.5.x.x",
+    "UpdateInfo": "1. 现在若引导俯冲的不是自己，将不会再进行指路",
     "TerritoryIds": [
       733
     ]
