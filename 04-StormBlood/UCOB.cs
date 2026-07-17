@@ -16,8 +16,8 @@ using KodakkuAssist.Module.Draw.Manager;
 
 namespace UsamisScript.StormBlood.Ucob;
 
-[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "884e415a-1210-44cc-bdff-8fab6878e87d",
-    version: "0.0.2.2", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
+[ScriptType(name: "UCOB [巴哈姆特绝境战]", territorys: [733], guid: "7252512d-2f42-4f80-814a-a8c623ecaf87",
+    version: "0.0.2.3", author: "Joshua and Usami", note: noteStr, updateInfo: UpdateInfo)]
 public class Ucob
 {
     // TODO
@@ -33,7 +33,7 @@ public class Ucob
     
     private const string UpdateInfo =
         """
-        1. 适配鸭鸭0.5.x.x
+        1. 现在若引导俯冲的不是自己，将不会再进行指路
         """;
 
     [UserSetting("Debug模式，非开发用请关闭")]
@@ -926,20 +926,19 @@ public class Ucob
         switch (CauterizeTimes)
         {
             case 1:
-                CauterizeSafePosDraw(accessory);
                 CauterizeRouteDraw(sortedDragons[0].Key, tid, accessory);
                 CauterizeRouteDraw(sortedDragons[1].Key, tid, accessory);
                 break;
             case 2:
-                CauterizeSafePosDraw(accessory);
                 CauterizeRouteDraw(sortedDragons[2].Key, tid, accessory);
                 break;
             case 3:
-                CauterizeSafePosDraw(accessory);
                 CauterizeRouteDraw(sortedDragons[3].Key, tid, accessory);
                 CauterizeRouteDraw(sortedDragons[4].Key, tid, accessory);
                 break;
         }
+        if (@event.TargetId != accessory.Data.Me) return;
+            CauterizeSafePosDraw(accessory);
     }
     private void CauterizeRouteDraw(uint sid, uint tid, ScriptAccessory accessory)
     {
