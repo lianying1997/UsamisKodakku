@@ -1713,7 +1713,7 @@ public class UDM_P3
         {
             var kvp = _pdCaptain.SelectSpecificPriorityIndex(i);
             var marker = GetMarkTypeByRankBh(i, _udmP3Param.黑洞三麻取反);
-            sa.MarkPlayerByIdx(kvp.Key, marker);
+            sa.MarkPlayerByIdx(kvp.Key, marker, localString: Debugging);
             sa.DebugMsg($"给 {sa.GetPlayerJobByIndex(kvp.Key)} 标 {marker}");
             
             if (P3B1CaptainModeDevHelper)
