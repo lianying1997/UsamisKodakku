@@ -58,11 +58,11 @@ public class UDM_P3
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复上版本更新后，少 buff 则指挥模式标点不生效的 Bug
+        1. 增加黑洞指示线颜色控制。
         """;
 
     private const string Name = "绝妖星乱舞_P3";
-    private const string Version = "0.0.0.40";
+    private const string Version = "0.0.0.41";
     private const string DebugVersion = "a";
     private int _runId = 0;
 
@@ -101,6 +101,9 @@ public class UDM_P3
     
     [UserSetting("P3B1 - 帮助调试的指挥模式聊天框输出")]
     public static bool P3B1CaptainModeDevHelper { get; set; } = true;
+    
+    [UserSetting("P3B1 - 二运黑洞指示线颜色")]
+    public ScriptColor BhConnLineColor { get; set; } = new ScriptColor { V4 = new Vector4(1.0f, 1.0f, 0f, 1.0f) };
     
     [UserSetting("P3B1 - 二运黑洞指挥模式标点优先级")]
     public static BhPriStgEnum BhMarkPriority { get; set; } = BhPriStgEnum.HDT;
@@ -2184,7 +2187,7 @@ public class UDM_P3
         (int playerIdx, List<int> realRegions, List<ulong> blackHoles, string name) task)
     {
         if (!黑洞接线任务属于自己(sa, task)) return;
-        var color = new Vector4(1, 1, 0, 1);
+        var color = BhConnLineColor.V4;
         
         for (int i = 0; i < task.blackHoles.Count; i++)
         {
