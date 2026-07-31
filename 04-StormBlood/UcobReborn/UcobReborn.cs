@@ -2527,7 +2527,7 @@ public class UcobReborn
         _upm.P3.大地摇动指引线绘图版本++;
         float[] rotDegs = _upm.P3.大地摇动指引线绘图版本 == 1 ? [-20, 20, -100, 100]: [-80, 80, -140, 140];
         var isFirstRound = _pd.FindPriorityIndexOfKey(sa.GetMyIndex(), true) <= 3;
-        if (!Debugging && !(isFirstRound ^ (_upm.P3.大地摇动指引线绘图版本 == 1))) return;
+        if (!Debugging && (isFirstRound ^ (_upm.P3.大地摇动指引线绘图版本 == 1))) return;
 
         var color = Vector4.One;
         foreach (var deg in rotDegs)
