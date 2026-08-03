@@ -5,7 +5,6 @@ using KodakkuAssist.Module.GameEvent.Struct;
 using KodakkuAssist.Module.Draw;
 using KodakkuAssist.Data;
 using KodakkuAssist.Module.Draw.Manager;
-using KodakkuAssist.Module.GameOperate;
 using KodakkuAssist.Module.GameEvent.Types;
 using KodakkuAssist.Extensions;
 using System.Collections.Generic;
@@ -70,7 +69,6 @@ public class UcobReborn
         RefreshParams();
         _pd.Init(sa, "P1黑球");
         sa.Method.RemoveDraw(".*");
-        ResetSupportUnitVisibility(sa);
         sa.Method.ClearFrameworkUpdateAction(this);
         sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
     }
@@ -98,13 +96,6 @@ public class UcobReborn
             await Task.Delay(intervalMs);
         }
         return false;
-    }
-
-    private void ResetSupportUnitVisibility(ScriptAccessory sa)
-    {
-        var objEnums = sa.GetByDataId(9020u);
-        foreach (var obj in objEnums)
-            sa.WriteVisible(obj, true);
     }
 
     #region 测试项
@@ -3988,28 +3979,9 @@ internal static class EventExtensions
         }
     }
 
-    public static bool TryParseVfxHandle(this Event ev, out nint handleId)
-    {
-        handleId = 0;
-        var rawHandle = ev["Handle"];
-        if (string.IsNullOrWhiteSpace(rawHandle))
-            return false;
-
-        var handleText = rawHandle.Trim();
-        if (handleText.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-            handleText = handleText[2..];
-
-        return nint.TryParse(handleText, System.Globalization.NumberStyles.HexNumber, null, out handleId);
-    }
-
     public static uint Id0(this Event ev)
     {
         return ParseHexId(ev["Id"], out var id) ? id : 0;
-    }
-
-    public static uint Index(this Event ev)
-    {
-        return JsonConvert.DeserializeObject<uint>(ev["Index"]);
     }
 
     public static uint DurationMilliseconds(this Event ev)
@@ -4034,34 +4006,6 @@ internal static class IbcHelper
     {
         return sa.Data.Objects.SearchById(gameObjectId);
     }
-    
-    public static IGameObject? GetMe(this ScriptAccessory sa)
-    {
-        return sa.Data.Objects.LocalPlayer;
-    }
-
-    public static IEnumerable<IGameObject?> GetByDataId(this ScriptAccessory sa, uint dataId)
-    {
-        return sa.Data.Objects.Where(x => x.DataId == dataId);
-    }
-
-    public static string GetPlayerJob(this ScriptAccessory sa, IPlayerCharacter? playerObject, bool fullName = false)
-    {
-        if (playerObject == null) return "None";
-        return fullName ? playerObject.ClassJob.Value.Name.ToString() : playerObject.ClassJob.Value.Abbreviation.ToString();
-    }
-
-    public static float GetStatusRemainingTime(this ScriptAccessory sa, IBattleChara? battleChara, uint statusId)
-    {
-        if (battleChara == null || !battleChara.IsValid()) return 0;
-        unsafe
-        {
-            BattleChara* charaStruct = (BattleChara*)battleChara.Address;
-            var statusIdx = charaStruct->GetStatusManager()->GetStatusIndex(statusId);
-            return charaStruct->GetStatusManager()->GetRemainingTime(statusIdx);
-        }
-    }
-    
     public static List<ulong> GetTetherSource(this ScriptAccessory sa, IBattleChara? battleChara, uint tetherId)
     {
         List<ulong> tetherSourceId = [];
@@ -4078,13 +4022,6 @@ internal static class IbcHelper
             }
         }
         return tetherSourceId;
-    }
-    
-    public static unsafe byte? GetTransformationId(this ScriptAccessory sa, IGameObject? obj)
-    {
-        if (obj == null) return null;
-        Character* objStruct = (Character*)obj.Address;
-        return objStruct->Timeline.ModelState;
     }
 }
 #region 计算函数
@@ -4154,33 +4091,6 @@ internal static class MathTools
     }
     
     /// <summary>
-    /// 将输入点左右折叠
-    /// </summary>
-    /// <param name="point">待折叠点</param>
-    /// <param name="centerX">中心折线坐标点</param>
-    /// <returns></returns>
-    public static Vector3 FoldPointHorizon(this Vector3 point, float centerX)
-        => point with { X = 2 * centerX - point.X };
-
-    /// <summary>
-    /// 将输入点上下折叠
-    /// </summary>
-    /// <param name="point">待折叠点</param>
-    /// <param name="centerZ">中心折线坐标点</param>
-    /// <returns></returns>
-    public static Vector3 FoldPointVertical(this Vector3 point, float centerZ)
-        => point with { Z = 2 * centerZ - point.Z };
-
-    /// <summary>
-    /// 将输入点中心对称
-    /// </summary>
-    /// <param name="point">输入点</param>
-    /// <param name="center">中心点</param>
-    /// <returns></returns>
-    public static Vector3 PointCenterSymmetry(this Vector3 point, Vector3 center) 
-        => point.RotateAndExtend(center, float.Pi, 0);
-    
-    /// <summary>
     /// 获取给定整数的指定位数
     /// </summary>
     /// <param name="val">给定数值</param>
@@ -4189,28 +4099,6 @@ internal static class MathTools
     public static int GetDecimalDigit(this int val, int x)
         => (int)(Math.Abs(val) / Math.Pow(10, x) % 10);
     
-    /// <summary>
-    /// 获取整数的指定二进制位值
-    /// </summary>
-    /// <param name="val">给定数值</param>
-    /// <param name="bitPosition">二进制位位置，从最低位开始，最低位为0</param>
-    /// <returns>返回指定位的值：0 或 1</returns>
-    public static int GetBinaryBit(this int val, int bitPosition)
-        => (val >> bitPosition) & 1;
-
-    /// <summary>
-    /// 获得两个弧度的差值，以 radReference 为 0，逆时针增加大于 0
-    /// </summary>
-    /// <param name="rad">取值角度</param>
-    /// <param name="radReference">参考角度</param>
-    /// <returns></returns>
-    public static float GetDiffRad(this float rad, float radReference)
-    {
-        var diff = (rad - radReference + 4 * float.Pi) % (2 * float.Pi);
-        if (diff > float.Pi) diff -= 2 * float.Pi;
-        return diff;
-    }
-
 }
 
 #endregion 计算函数
@@ -4273,24 +4161,6 @@ internal static class IndexHelper
         if (idx < 0 || idx >= 8 || (fourPeople && idx >= 4))
             return "Unknown";
         return fourPeople ? role4[idx] : role8[idx];
-    }
-    
-    /// <summary>
-    /// 将List内信息转换为字符串。
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="myList"></param>
-    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
-    /// <typeparam name="T"></typeparam>
-    /// <returns></returns>
-    public static string BuildListStr<T>(this ScriptAccessory sa, List<T> myList, bool isJob = false)
-    {
-        return string.Join(", ", myList.Select(item =>
-        {
-            if (isJob && item != null && item is int i)
-                return sa.GetPlayerJobByIndex(i);
-            return item?.ToString() ?? "";
-        }));
     }
 }
 #endregion 位置序列函数
@@ -4540,22 +4410,6 @@ internal static class DrawTools
         => sa.DrawRect(ownerObj, 0, delay, destroy, name, rotation, width, length, color, byTime, byY, draw, useImgui);
     
     /// <summary>
-    /// 返回背对绘图
-    /// </summary>
-    /// <param name="sa"></param>
-    /// <param name="targetObj">目标</param>
-    /// <param name="delay">延时</param>
-    /// <param name="destroy">消失时间</param>
-    /// <param name="name">绘图名字</param>
-    /// <param name="color">使用颜色</param>
-    /// <param name="draw">是否直接绘制</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory sa,
-        object targetObj, int delay, int destroy, string name, Vector4 color, bool draw = true)
-        => sa.DrawOwnerBase(sa.Data.Me, targetObj, delay, destroy, name, 0, 0, 0, 0, 0, 0,
-            DrawModeEnum.Default, DrawTypeEnum.SightAvoid, color, false, false, draw);
-
-    /// <summary>
     /// 返回击退绘图
     /// </summary>
     /// <param name="sa"></param>
@@ -4660,34 +4514,6 @@ internal static class DrawTools
             self.TargetOrderIndex = orderIdx;
         }
 
-        return self;
-    }
-    
-    /// <summary>
-    /// 赋予输入的dp以远近目标绘图
-    /// </summary>
-    /// <param name="self"></param>
-    /// <param name="setOwner">获得目标赋值给owner</param>
-    /// <param name="isNearOrder">从owner计算，近顺序或远顺序</param>
-    /// <param name="orderIdx">从1开始</param>
-    /// <returns></returns>
-    public static DrawPropertiesEdit SetDistanceOrder(this DrawPropertiesEdit self, bool setOwner, 
-        bool isNearOrder, uint orderIdx)
-    {
-        if (setOwner)
-        {
-            self.CentreResolvePattern = isNearOrder
-                ? PositionResolvePatternEnum.PlayerNearestOrder
-                : PositionResolvePatternEnum.PlayerFarestOrder;
-            self.CentreOrderIndex = orderIdx;
-        }
-        else
-        {
-            self.TargetResolvePattern = isNearOrder
-                ? PositionResolvePatternEnum.PlayerNearestOrder
-                : PositionResolvePatternEnum.PlayerFarestOrder;
-            self.TargetOrderIndex = orderIdx;
-        }
         return self;
     }
     
@@ -4816,77 +4642,6 @@ internal static class DrawTools
 
 #endregion 绘图函数
 
-#region 标点函数
-
-internal static class MarkerHelper
-{
-    public static void LocalMarkClear(this ScriptAccessory sa)
-    {
-        sa.DebugMsg($"删除本地标点。");
-        sa.Method.Mark(0xE000000, MarkType.Attack1, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack2, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack3, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack4, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack5, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack6, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack7, true);
-        sa.Method.Mark(0xE000000, MarkType.Attack8, true);
-        sa.Method.Mark(0xE000000, MarkType.Bind1, true);
-        sa.Method.Mark(0xE000000, MarkType.Bind2, true);
-        sa.Method.Mark(0xE000000, MarkType.Bind3, true);
-        sa.Method.Mark(0xE000000, MarkType.Stop1, true);
-        sa.Method.Mark(0xE000000, MarkType.Stop2, true);
-        sa.Method.Mark(0xE000000, MarkType.Square, true);
-        sa.Method.Mark(0xE000000, MarkType.Circle, true);
-        sa.Method.Mark(0xE000000, MarkType.Cross, true);
-        sa.Method.Mark(0xE000000, MarkType.Triangle, true);
-    }
-
-    public static void MarkClear(this ScriptAccessory sa,
-        bool enable = true, bool local = false, bool localString = false)
-    {
-        if (!enable) return;
-        sa.DebugMsg($"接收命令：删除标点");
-        
-        if (local)
-        {
-            if (localString)
-                sa.DebugMsg($"[字符模拟] 删除本地标点。");
-            else
-                sa.LocalMarkClear();
-        }
-        else
-            sa.Method.MarkClear();
-    }
-
-    public static void MarkPlayerByIdx(this ScriptAccessory sa, int idx, MarkType marker,
-        bool enable = true, bool local = false, bool localString = false)
-    {
-        if (!enable) return;
-        if (localString)
-            sa.DebugMsg($"[本地字符模拟] 为{idx}({sa.GetPlayerJobByIndex(idx)})标上{marker}。");
-        else
-            sa.Method.Mark(sa.Data.PartyList[idx], marker, local);
-    }
-
-    public static void MarkPlayerById(this ScriptAccessory sa, uint id, MarkType marker,
-        bool enable = true, bool local = false, bool localString = false)
-    {
-        if (!enable) return;
-        if (localString)
-            sa.DebugMsg($"[本地字符模拟] 为{sa.GetPlayerIdIndex(id)}({sa.GetPlayerJobById(id)})标上{marker}。");
-        else
-            sa.Method.Mark(id, marker, local);
-    }
-
-    public static int GetMarkedPlayerIndex(this ScriptAccessory sa, List<MarkType> markerList, MarkType marker)
-    {
-        return markerList.IndexOf(marker);
-    }
-}
-
-#endregion
-
 #region 调试函数
 
 /// <summary>
@@ -4986,91 +4741,6 @@ internal static class DebugFunction
 
 internal static class SpecialFunction
 {
-    public static unsafe void ScaleModify(this ScriptAccessory sa, IGameObject? obj, float scale, bool vfxScaled = true)
-    {
-        sa.Method.RunOnMainThreadAsync(Action);
-        void Action()
-        {
-            if (obj == null) return;
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            if (!obj.IsValid() || !charaStruct->IsReadyToDraw())
-            {
-                sa.Log.Error($"传入的IGameObject不合法。");
-                return;
-            }
-            charaStruct->Scale = scale;
-            if (vfxScaled)
-                charaStruct->VfxScale = scale;
-
-            if (charaStruct->IsCharacter())
-                ((BattleChara*)charaStruct)->Character.CharacterData.ModelScale = scale;
-        
-            charaStruct->DisableDraw();
-            charaStruct->EnableDraw();
-        
-            sa.Log.Debug($"ScaleModify => {obj.Name.TextValue} | {obj} => {scale}");
-        }
-    }
-
-    public static void SetRotation(this ScriptAccessory sa, IGameObject? obj, float radian, bool show = false)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->SetRotation(radian);
-        }
-        sa.DebugMsg($"改变面向 {obj.Name.TextValue} | {obj.GameObjectId} => {radian.RadToDeg()}");
-        
-        if (!show) return;
-        var ownerObj = sa.GetById(obj.GameObjectId);
-        if (ownerObj == null) return;
-        var dp = sa.DrawGuidance(obj.GameObjectId, 0, 0, 2000, $"改变面向 {obj.Name.TextValue}", sa.Data.DefaultSafeColor, radian, draw: false);
-        dp.FixRotation = true;
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
-    }
-
-    public static void SetPosition(this ScriptAccessory sa, IGameObject? obj, Vector3 position, bool show = false)
-    {
-        if (obj == null || !obj.IsValid())
-        {
-            sa.Log.Error($"传入的IGameObject不合法。");
-            return;
-        }
-        unsafe
-        {
-            GameObject* charaStruct = (GameObject*)obj.Address;
-            charaStruct->SetPosition(position.X, position.Y, position.Z);
-        }
-        sa.Log.Debug($"改变位置 => {obj.Name.TextValue} | {obj.EntityId} => {position}");
-        
-        if (!show) return;
-        var dp = sa.DrawCircle(position, 0, 2000, $"传送点 {obj.Name.TextValue}", 0.5f, sa.Data.DefaultSafeColor, draw: false);
-        sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
-    }
-    
-    public static unsafe void WriteVisible(this ScriptAccessory sa, IGameObject? actor, bool visible, int visibleDelayMs = 0)
-    {
-        const VisibilityFlags VISIBLE_FLAG = VisibilityFlags.None;
-        const VisibilityFlags INVISIBILITY_FLAG = VisibilityFlags.Model;
-        try
-        {
-            var flagsPtr = &((GameObject*)actor?.Address)->RenderFlags;
-            *flagsPtr = visible ? VISIBLE_FLAG : INVISIBILITY_FLAG;
-            if (!visible && visibleDelayMs > 0)
-                Task.Delay(visibleDelayMs).ContinueWith(t => sa.WriteVisible(actor, true));
-        }
-        catch (Exception e)
-        {
-            sa.Log.Error(e.ToString());
-            throw;
-        }
-    }
-
     public static unsafe void AlphaModify(this ScriptAccessory sa, IGameObject? obj, float alpha,
         Func<float, bool>? shouldModify = null)
     {
