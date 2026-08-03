@@ -40,12 +40,14 @@ public class UcobReborn
     const string UpdateInfo =
         $"""
         {Version}
-        更新
+        1. 修复 P3E 连击的三重奏 大地摇动 #1 两根指引线过近的问题。
+        2. 修复 P3A 进军的三重奏 不显示属于自己的指路的问题。
+        3. 延长 P3B 黑炎的三重奏 拐弯示意的时间
         """;
 
     private const string Name = "绝巴哈姆特 Reborn";
-    private const string Version = "0.0.0.1";
-    private const string DebugVersion = "g";
+    private const string Version = "0.0.0.2";
+    private const string DebugVersion = "a";
     private int _runId = 0;
     public const bool Debugging = false;
     
@@ -1408,6 +1410,7 @@ public class UcobReborn
         userControl: Debugging)]
     public void P3_记录Boss位置(Event ev, ScriptAccessory sa)
     {
+        if (_upm.当前阶段.GetDecimalDigit(3) != 3) return;
         var spos = ev.SourcePosition;
         if (Vector3.Distance(spos, Center) < 18) return;
         var sdid = ev.SourceDataId();
@@ -1431,7 +1434,6 @@ public class UcobReborn
                 sa.DebugMsg($"{_upm.当前阶段} 更新巴哈方位 {_upm.P3.巴哈方位} {_upm.P3.巴哈_Pos.ToStr()} ");
                 break;
         }
-        
     }
     
     [ScriptMethod(name: "P3_巴哈本体技能判定",
@@ -1785,18 +1787,18 @@ public class UcobReborn
             ])) return;
         for (int i = 0; i < sa.Data.PartyList.Count; i++)
         {
-            if (!Debugging && sa.GetMyIndex() != i) continue;
             // 降序排列
             // 0 1 2 大地摇动 北、东、西
             // 3 4 5 南分摊
             // 6 7 东、西接线
             var pdEntry = _pd.SelectSpecificPriorityIndex(i, true);
+            if (!Debugging && sa.GetMyIndex() != pdEntry.Key) continue;
             var member = sa.Data.PartyList[pdEntry.Key];
-            处理进击指路(sa, member, i);
+            处理进军指路(sa, member, i);
         }
     }
 
-    private void 处理进击指路(ScriptAccessory sa, ulong member, int pdIndex)
+    private void 处理进军指路(ScriptAccessory sa, ulong member, int pdIndex)
     {
         switch (pdIndex)
         {
@@ -1942,9 +1944,9 @@ public class UcobReborn
         sa.DrawFan(Center, 0, 1000, $"P3B_{_upm.当前阶段}_移动方向指引2", 
             45f.DegToRad(), rad2, 22, 20, sa.Data.DefaultDangerColor.WithW(2f));
         
-        sa.DrawRect(Center, 1000, 4000, $"P3B_{_upm.当前阶段}_移动方向指引1", 
+        sa.DrawRect(Center, 1000, 7500, $"P3B_{_upm.当前阶段}_移动方向指引1", 
             rad1, 2, 22, sa.Data.DefaultSafeColor.WithW(2f));
-        sa.DrawFan(Center, 1000, 4000, $"P3B_{_upm.当前阶段}_移动方向指引2", 
+        sa.DrawFan(Center, 1000, 7500, $"P3B_{_upm.当前阶段}_移动方向指引2", 
             45f.DegToRad(), rad2, 22, 20, sa.Data.DefaultSafeColor.WithW(2f));
     }
 
@@ -2525,7 +2527,7 @@ public class UcobReborn
             ])) return;
         
         _upm.P3.大地摇动指引线绘图版本++;
-        float[] rotDegs = _upm.P3.大地摇动指引线绘图版本 == 1 ? [-20, 20, -100, 100]: [-80, 80, -140, 140];
+        float[] rotDegs = _upm.P3.大地摇动指引线绘图版本 == 1 ? [-40, 40, -100, 100]: [-80, 80, -140, 140];
         var isFirstRound = _pd.FindPriorityIndexOfKey(sa.GetMyIndex(), true) <= 3;
         if (!Debugging && (isFirstRound ^ (_upm.P3.大地摇动指引线绘图版本 == 1))) return;
 
