@@ -50,7 +50,7 @@ public class UcobReborn
     private int _runId = 0;
     public const bool Debugging = false;
     
-    public static readonly Vector3 Center = new Vector3(0, 0, 0);
+    public static readonly Vector3 Center = Vector3.Zero;
     
     private UcobParams _upm = new();
     private PriorityDict _pd = new();
@@ -66,17 +66,13 @@ public class UcobReborn
     {
         _runId++;
         DrawTools.ResetLifecycle();
-        RefreshParams();
-        _pd.Init(sa, "P1黑球");
+        _upm.Reset();
+        _pd.Init("P1黑球");
         sa.Method.RemoveDraw(".*");
         sa.Method.ClearFrameworkUpdateAction(this);
         sa.DebugMsg($"脚本 {Name} v{Version}{DebugVersion} 完成初始化，_runId {_runId}");
     }
 
-    private void RefreshParams()
-    {
-        _upm.Reset();
-    }
 
     private async Task<bool> WaitUntilConditions(
         Func<bool>[] conditions,
@@ -202,7 +198,7 @@ public class UcobReborn
     {
         for (int i = 0; i < _upm.拘束器坐标.Count; i++)
         {
-            var destroyMs = _upm.当前阶段.GetDecimalDigit(4) == 3 ? 3500 : 10000;
+            var destroyMs = _upm.当前阶段.GetDecimalDigit(3) == 3 ? 3500 : 10000;
             sa.DrawCircle(_upm.拘束器坐标[i], 3500, destroyMs, $"GEN_拘束器内黑球爆炸范围{i}", 8f, new Vector4(1, 1, 0, 0.4f));
         }
     }
@@ -552,7 +548,7 @@ public class UcobReborn
         sa.DebugMsg($"{tPos.ToStr()}");
 
         // 基于国服打法，收集完三个拘束器后，进行排序，B -> C -> D
-        if (_upm.拘束器坐标.Count() != 3) return;
+        if (_upm.拘束器坐标.Count != 3) return;
 
         _upm.拘束器坐标 = _upm.拘束器坐标
             .OrderBy(pos => pos.GetRadian(Center).RadianToRegion(3, 1, true, true))
@@ -772,8 +768,7 @@ public class UcobReborn
         userControl: true, suppress: 500)]
     public async void P2A_月华冲初始(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [2000, 2001, 2002];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (2000 or 2001 or 2002)) return;
         if (!await WaitUntilConditions(
             conditions:
             [
@@ -803,7 +798,7 @@ public class UcobReborn
         _upm.P2.奈尔_ObjId = ev.SourceId;
         sa.Method.RemoveDraw(@".*");
         sa.DebugMsg($"{_upm.当前阶段}");
-        _pd.Init(sa, "P2死宣");
+        _pd.Init("P2死宣");
     }
     
     [ScriptMethod(name: "P2B_奈尔透明化", 
@@ -1122,7 +1117,7 @@ public class UcobReborn
             if (sa.GetById(member) is not { } obj) continue;
             if (((IPlayerCharacter)obj).HasStatus(210)) return;
         }
-        _pd.Init(sa, "P2死宣");
+        _pd.Init("P2死宣");
         _upm.P2.死宣参数重置();
         sa.DebugMsg($"死宣参数重置");
     }
@@ -1154,8 +1149,8 @@ public class UcobReborn
         userControl: Debugging)]
     public void P2C_小龙方位记录(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [2002, 2010];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (2002 or 2010)) return;
+        string? debugMsg = null;
         lock (_stateLock)
         {
             var spos = ev.SourcePosition;
@@ -1163,12 +1158,16 @@ public class UcobReborn
             var region = spos.GetRadian(Center).RadianToRegion(8, 4, isDiagDiv: true, isCw: true);
             _upm.P2.小龙列表.Add(new OuterDragon { ObjectId = ev.SourceId, Region = region });
             
-            if (_upm.P2.小龙列表.Count < 5) return;
-            _upm.P2.小龙列表 = _upm.P2.小龙列表.OrderBy(x => x.Region).ToList();
-            _upm.P2.获得小龙俯冲引导点();
-            sa.DebugMsg($"小龙方位 {string.Join(", ", _upm.P2.小龙列表.Select(x => x.Region))}\n" +
-                        $"引导点 {string.Join(", ", _upm.P2.小龙俯冲引导点.Select(x => x))}");
+            if (_upm.P2.小龙列表.Count >= 5)
+            {
+                _upm.P2.小龙列表 = _upm.P2.小龙列表.OrderBy(x => x.Region).ToList();
+                _upm.P2.获得小龙俯冲引导点();
+                debugMsg = $"小龙方位 {string.Join(", ", _upm.P2.小龙列表.Select(x => x.Region))}\n" +
+                           $"引导点 {string.Join(", ", _upm.P2.小龙俯冲引导点.Select(x => x))}";
+            }
         }
+        if (debugMsg != null)
+            sa.DebugMsg(debugMsg);
     }
 
     [ScriptMethod(name: "P2C_小龙俯冲序号增加",
@@ -1313,8 +1312,7 @@ public class UcobReborn
         userControl: true)]
     public async void P2D_指向击退位置(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [2010, 2020];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (2010 or 2020)) return;
         if (!await WaitUntilConditions(
             conditions:
             [
@@ -1378,8 +1376,7 @@ public class UcobReborn
         userControl: Debugging)]
     public void P3_记录奈尔ID(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [3000, 3010];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (3000 or 3010)) return;
         if (_upm.P3.奈尔_ObjId != 0) return;
         _upm.P3.奈尔_ObjId = ev.SourceId;
     }
@@ -1389,8 +1386,7 @@ public class UcobReborn
         userControl: Debugging)]
     public void P3_记录双塔尼亚ID(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [3000, 3010];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (3000 or 3010)) return;
         if (_upm.P3.双塔_ObjId != 0) return;
         _upm.P3.双塔_ObjId = ev.SourceId;
     }
@@ -1555,8 +1551,7 @@ public class UcobReborn
         userControl: Debugging, suppress: 10000)]
     public void P3_接线加深(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [3100, 3300];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (3100 or 3300)) return;
         var color = new Vector4(1f, 1f, 0.1f, 1f);
         
         // 第一根
@@ -1600,8 +1595,7 @@ public class UcobReborn
         userControl: Debugging)]
     public void P3_大地摇动范围(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [3100, 3500];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (3100 or 3500)) return;
         var color = new Vector4(0.7f, 0.7f, 0.3f, _upm.当前阶段 == 3500 ? 1f : 0.7f);
         sa.DrawFan(Center, ev.TargetId, 0, 5000, 
             $"P3_{_upm.当前阶段}_大地摇动范围", 90f.DegToRad(), 0, 50f, 0, color);
@@ -1654,7 +1648,7 @@ public class UcobReborn
         _upm.当前阶段 = 3100;
         _upm.P3.巴哈_ObjId = ev.SourceId;
         sa.Method.RemoveDraw(".*");
-        _pd.Init(sa, "P3进军");
+        _pd.Init("P3进军");
         _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
         sa.DebugMsg($"{_upm.当前阶段}");
     }
@@ -1697,7 +1691,7 @@ public class UcobReborn
                 2 or 3 => new Vector4(0.1f, 1f, 0.1f, 1),
                 _ => new Vector4(1, 0.1f, 0.1f, 1),
             };
-            var dp = sa.DrawLine(Center, 0, 0, 4000, $"P3A_{_upm.当前阶段}_旋风八方指路_指引线{i}", 
+            sa.DrawLine(Center, 0, 0, 4000, $"P3A_{_upm.当前阶段}_旋风八方指路_指引线{i}",
                 baseRad + rotDeg[i].DegToRad(), 20f, 25f, color);
             
             if (!Debugging && sa.GetMyIndex() != i) continue;
@@ -1745,23 +1739,25 @@ public class UcobReborn
     public void P3A_进军机制点名收集(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 3100) return;
+        var iconId = ev.Id0();
+        var priVal = iconId switch
+        {
+            0x0027 => 10, // 分摊
+            0x0028 => 20, // 大地摇动
+            _ => 0
+        };
+        var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+        if (!sa.IsValidPartyIndex(tidx)) return;
+        int actionCount;
         lock (_stateLock)
         {
-            var iconId = ev.Id0();
-            var priVal = iconId switch
-            {
-                0x0027 => 10, // 分摊
-                0x0028 => 20, // 大地摇动
-                _ => 0
-            };
-            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-            if (!sa.IsValidPartyIndex(tidx)) return;
             _pd.AddPriority(tidx, priVal);
             _pd.AddActionCount();
-            sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 {(priVal == 10 ? "分摊" : "大地摇动")}", priVal + _pd.ActionCount);
-            if (_pd.ActionCount != 6) return;
-            sa.DebugMsg($"进军机制点名收集完毕", 30);
+            actionCount = _pd.ActionCount;
         }
+        sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 {(priVal == 10 ? "分摊" : "大地摇动")}", priVal + actionCount);
+        if (actionCount == 6)
+            sa.DebugMsg($"进军机制点名收集完毕", 30);
     }
 
     [ScriptMethod(name: "P3A_旋风后指路",
@@ -1894,7 +1890,7 @@ public class UcobReborn
     public void P3B_黑炎阶段转换(Event ev, ScriptAccessory sa)
     {
         _upm.当前阶段 = 3200;
-        _pd.Init(sa, "P3黑炎");
+        _pd.Init("P3黑炎");
         _pd.AddPriorities([1, 2, 3, 4, 8, 7, 6, 5]);
         sa.DebugMsg($"{_upm.当前阶段}");
     }
@@ -1957,22 +1953,18 @@ public class UcobReborn
     public void P3B_黑炎机制点名收集(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 3200) return;
+        var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+        if (!sa.IsValidPartyIndex(tidx)) return;
+        int actionCount;
         lock (_stateLock)
         {
-            var iconId = ev.Id0();
-            var priVal = iconId switch
-            {
-                0x0027 => 10, // 分摊
-                _ => 0
-            };
-            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-            if (!sa.IsValidPartyIndex(tidx)) return;
-            _pd.AddPriority(tidx, priVal);
+            _pd.AddPriority(tidx, 10);
             _pd.AddActionCount();
-            sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 分摊", priVal + _pd.ActionCount);
-            if (_pd.ActionCount != 4) return;
-            sa.DebugMsg($"黑炎机制点名收集完毕", 30);
+            actionCount = _pd.ActionCount;
         }
+        sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 分摊", 10 + actionCount);
+        if (actionCount == 4)
+            sa.DebugMsg($"黑炎机制点名收集完毕", 30);
     }
 
     [ScriptMethod(name: "P3B_踩塔分摊指路",
@@ -2141,8 +2133,7 @@ public class UcobReborn
         userControl: true, suppress: 500)]
     public void P3C_以太失控后陨石流(Event ev, ScriptAccessory sa)
     {
-        List<int> validPhaseList = [3300, 3350];
-        if (!validPhaseList.Contains(_upm.当前阶段)) return;
+        if (_upm.当前阶段 is not (3300 or 3350)) return;
         var color = new Vector4(0.4f, 1, 1, 1.5f);
         执行台词连续技绘图(sa, NaelQuoteSkills.陨石流, 0, 4000, color);
     }
@@ -2311,7 +2302,7 @@ public class UcobReborn
     public void P3E_连击阶段转换(Event ev, ScriptAccessory sa)
     {
         _upm.当前阶段 = 3500;
-        _pd.Init(sa, "P3连击");
+        _pd.Init("P3连击");
         _pd.AddPriorities([1, 2, 3, 4, 5, 6, 7, 8]);
         sa.DebugMsg($"{_upm.当前阶段}");
     }
@@ -2331,7 +2322,7 @@ public class UcobReborn
                 2 or 3 => new Vector4(0.1f, 1f, 0.1f, 1),
                 _ => new Vector4(1, 0.1f, 0.1f, 1),
             };
-            var dp = sa.DrawLine(Center, 0, 0, 6500, $"P3E_{_upm.当前阶段}_连击指路准备_指引线{i}", 
+            sa.DrawLine(Center, 0, 0, 6500, $"P3E_{_upm.当前阶段}_连击指路准备_指引线{i}",
                 rotDeg[i].DegToRad(), 20f, 25f, color);
             
             if (!Debugging && sa.GetMyIndex() != i) continue;
@@ -2449,16 +2440,17 @@ public class UcobReborn
     public void P3E_大地摇动点名收集(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 3500) return;
+        var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+        if (!sa.IsValidPartyIndex(tidx)) return;
         lock (_stateLock)
         {
-            if (_pd.ActionCount >= 4)
-                return;
-            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-            if (!sa.IsValidPartyIndex(tidx)) return;
-            _pd.AddPriority(tidx, 1000);
-            _pd.AddActionCount();
-            sa.Method.RemoveDraw($"GEN_拘束器内黑球爆炸范围.*");
+            if (_pd.ActionCount < 4)
+            {
+                _pd.AddPriority(tidx, 1000);
+                _pd.AddActionCount();
+            }
         }
+        sa.Method.RemoveDraw($"GEN_拘束器内黑球爆炸范围.*");
     }
 
     [ScriptMethod(name: "P3E_大地摇动搭档连线",
@@ -2627,7 +2619,7 @@ public class UcobReborn
     public void P3F_群龙阶段转换(Event ev, ScriptAccessory sa)
     {
         _upm.当前阶段 = 3600;
-        _pd.Init(sa, $"P3群龙");
+        _pd.Init($"P3群龙");
         sa.DebugMsg($"{_upm.当前阶段}");
         sa.Method.RemoveDraw(@".*_3550.*");
     }
@@ -2833,11 +2825,13 @@ public class UcobReborn
     {
         if (_upm.当前阶段 != 3600) return;
         if (!SpecialMode) return;
+        uint objIdBias;
         lock (_stateLock)
         {
             _upm.P3.塔头标偏移++;
-            sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+            objIdBias = _upm.P3.塔头标偏移;
         }
+        sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: objIdBias);
     }
 
     [ScriptMethod(name: "P3F_删除绘图与转阶段",
@@ -2848,7 +2842,7 @@ public class UcobReborn
         if (_upm.当前阶段 != 3600) return;
         _upm.当前阶段 = 4000;
         sa.Method.RemoveDraw($".*");
-        _pd.Init(sa, $"P4黑球");
+        _pd.Init($"P4黑球");
         sa.DebugMsg($"{_upm.当前阶段}");
     }
 
@@ -3044,7 +3038,7 @@ public class UcobReborn
     public void P4_黑球计算重置(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 4000) return;
-        _pd.Init(sa, $"P4黑球");
+        _pd.Init($"P4黑球");
         _upm.P4.黑球撞球序列 = [-1, -1, -1];
     }
 
@@ -3169,7 +3163,7 @@ internal class PriorityDict
         set => Entries[key].Value = value;
     }
 
-    public void Init(ScriptAccessory sa, string annotation, int entryCount = 8,
+    public void Init(string annotation, int entryCount = 8,
         List<string>? names = null, bool refreshActionCount = true)
     {
         Entries.Clear();
