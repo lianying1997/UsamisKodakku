@@ -22,7 +22,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace UsamisKodakku.Scripts._04_StormBlood.UcobReborn;
 
-[ScriptType(name: Name, territorys: [733], guid: "e2e37136-72a2-46b0-abc7-ade17da161b7",
+[ScriptType(name: Name, territorys: [], guid: "e2e37136-72a2-46b0-abc7-ade17da161b7",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class UcobReborn
@@ -43,9 +43,9 @@ public class UcobReborn
 
     private const string Name = "绝巴哈姆特 Reborn";
     private const string Version = "0.0.0.3";
-    private const string DebugVersion = "a";
+    private const string DebugVersion = "g";
     private int _runId = 0;
-    public const bool Debugging = false;
+    public const bool Debugging = true;
     
     public static readonly Vector3 Center = Vector3.Zero;
     
@@ -122,22 +122,16 @@ public class UcobReborn
     }
     
     [ScriptMethod(name: "测试模板",
-        eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:26071"],
         userControl: Debugging)]
     public void 测试模板(Event ev, ScriptAccessory sa)
     {
-        var myObj = sa.Data.MyObject;
-        if (myObj is not { }) return;
-        var myPos = myObj.Position;
-        
-        sa.DrawLaser(myPos + new Vector3(0, 0, 1), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(1, 0.3f, 0.3f, 1));
-        sa.DrawLaser(myPos + new Vector3(0, 0, -1), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(0.3f, 1, 0.3f, 1));
-        sa.DrawLaser(myPos + new Vector3(1, 0, 0), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(1, 0.3f, 1, 1));
-        sa.DrawLaser(myPos + new Vector3(-1, 0, 0), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(0.3f, 0.3f, 1, 1));
-        sa.DrawCountDown(myPos + new Vector3(0, 0, 3), 200, iconScale: 1f, objIdBias: 1);
-        sa.DrawCountDown(myPos + new Vector3(0, 0, -3), 200, iconScale: 1f, objIdBias: 2);
-        sa.DrawCountDown(myPos + new Vector3(3, 0, 0), 200, iconScale: 1f, objIdBias: 3);
-        sa.DrawCountDown(myPos + new Vector3(-3, 0, 0), 200, iconScale: 1f, objIdBias: 4);
+        sa.DebugMsg($"hello");
+        lock (_stateLock)
+        {
+            _upm.P3.塔头标偏移++;
+            sa.DrawCountDown(ev.TargetPosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+        }
     }
     
     #endregion 测试项
@@ -1147,7 +1141,6 @@ public class UcobReborn
     public void P2C_小龙方位记录(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 is not (2002 or 2010)) return;
-        string? debugMsg = null;
         lock (_stateLock)
         {
             var spos = ev.SourcePosition;
@@ -1155,16 +1148,12 @@ public class UcobReborn
             var region = spos.GetRadian(Center).RadianToRegion(8, 4, isDiagDiv: true, isCw: true);
             _upm.P2.小龙列表.Add(new OuterDragon { ObjectId = ev.SourceId, Region = region });
             
-            if (_upm.P2.小龙列表.Count >= 5)
-            {
-                _upm.P2.小龙列表 = _upm.P2.小龙列表.OrderBy(x => x.Region).ToList();
-                _upm.P2.获得小龙俯冲引导点();
-                debugMsg = $"小龙方位 {string.Join(", ", _upm.P2.小龙列表.Select(x => x.Region))}\n" +
-                           $"引导点 {string.Join(", ", _upm.P2.小龙俯冲引导点.Select(x => x))}";
-            }
+            if (_upm.P2.小龙列表.Count < 5) return;
+            _upm.P2.小龙列表 = _upm.P2.小龙列表.OrderBy(x => x.Region).ToList();
+            _upm.P2.获得小龙俯冲引导点();
+            sa.DebugMsg($"小龙方位 {string.Join(", ", _upm.P2.小龙列表.Select(x => x.Region))}\n" +
+                        $"引导点 {string.Join(", ", _upm.P2.小龙俯冲引导点.Select(x => x))}");
         }
-        if (debugMsg != null)
-            sa.DebugMsg(debugMsg);
     }
 
     [ScriptMethod(name: "P2C_小龙俯冲序号增加",
@@ -1736,25 +1725,23 @@ public class UcobReborn
     public void P3A_进军机制点名收集(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 3100) return;
-        var iconId = ev.Id0();
-        var priVal = iconId switch
-        {
-            0x0027 => 10, // 分摊
-            0x0028 => 20, // 大地摇动
-            _ => 0
-        };
-        var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-        if (!sa.IsValidPartyIndex(tidx)) return;
-        int actionCount;
         lock (_stateLock)
         {
+            var iconId = ev.Id0();
+            var priVal = iconId switch
+            {
+                0x0027 => 10, // 分摊
+                0x0028 => 20, // 大地摇动
+                _ => 0
+            };
+            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            if (!sa.IsValidPartyIndex(tidx)) return;
             _pd.AddPriority(tidx, priVal);
             _pd.AddActionCount();
-            actionCount = _pd.ActionCount;
-        }
-        sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 {(priVal == 10 ? "分摊" : "大地摇动")}", priVal + actionCount);
-        if (actionCount == 6)
+            sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 {(priVal == 10 ? "分摊" : "大地摇动")}", priVal + _pd.ActionCount);
+            if (_pd.ActionCount != 6) return;
             sa.DebugMsg($"进军机制点名收集完毕", 30);
+        }
     }
 
     [ScriptMethod(name: "P3A_旋风后指路",
@@ -1950,18 +1937,22 @@ public class UcobReborn
     public void P3B_黑炎机制点名收集(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 3200) return;
-        var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-        if (!sa.IsValidPartyIndex(tidx)) return;
-        int actionCount;
         lock (_stateLock)
         {
-            _pd.AddPriority(tidx, 10);
+            var iconId = ev.Id0();
+            var priVal = iconId switch
+            {
+                0x0027 => 10, // 分摊
+                _ => 0
+            };
+            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            if (!sa.IsValidPartyIndex(tidx)) return;
+            _pd.AddPriority(tidx, priVal);
             _pd.AddActionCount();
-            actionCount = _pd.ActionCount;
-        }
-        sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 分摊", 10 + actionCount);
-        if (actionCount == 4)
+            sa.DebugMsg($"{sa.GetPlayerJobByIndex(tidx)} 被点名 分摊", priVal + _pd.ActionCount);
+            if (_pd.ActionCount != 4) return;
             sa.DebugMsg($"黑炎机制点名收集完毕", 30);
+        }
     }
 
     [ScriptMethod(name: "P3B_踩塔分摊指路",
@@ -2437,17 +2428,16 @@ public class UcobReborn
     public void P3E_大地摇动点名收集(Event ev, ScriptAccessory sa)
     {
         if (_upm.当前阶段 != 3500) return;
-        var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
-        if (!sa.IsValidPartyIndex(tidx)) return;
         lock (_stateLock)
         {
-            if (_pd.ActionCount < 4)
-            {
-                _pd.AddPriority(tidx, 1000);
-                _pd.AddActionCount();
-            }
+            if (_pd.ActionCount >= 4)
+                return;
+            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            if (!sa.IsValidPartyIndex(tidx)) return;
+            _pd.AddPriority(tidx, 1000);
+            _pd.AddActionCount();
+            sa.Method.RemoveDraw($"GEN_拘束器内黑球爆炸范围.*");
         }
-        sa.Method.RemoveDraw($"GEN_拘束器内黑球爆炸范围.*");
     }
 
     [ScriptMethod(name: "P3E_大地摇动搭档连线",
@@ -2814,7 +2804,7 @@ public class UcobReborn
             sa.TTS("踩塔");
         }
     }
-
+    
     // [ScriptMethod(name: "P3F_踩塔判定倒计时",
     //     eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9951"],
     //     userControl: true)]
@@ -2822,28 +2812,14 @@ public class UcobReborn
     // {
     //     if (_upm.当前阶段 != 3600) return;
     //     if (!SpecialMode) return;
+    //     uint objIdBias;
     //     lock (_stateLock)
     //     {
     //         _upm.P3.塔头标偏移++;
-    //         sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+    //         objIdBias = _upm.P3.塔头标偏移;
     //     }
+    //     sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: objIdBias);
     // }
-    
-    [ScriptMethod(name: "P3F_踩塔判定倒计时",
-        eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9951"],
-        userControl: true)]
-    public void P3F_踩塔判定倒计时(Event ev, ScriptAccessory sa)
-    {
-        if (_upm.当前阶段 != 3600) return;
-        if (!SpecialMode) return;
-        uint objIdBias;
-        lock (_stateLock)
-        {
-            _upm.P3.塔头标偏移++;
-            objIdBias = _upm.P3.塔头标偏移;
-        }
-        sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: objIdBias);
-    }
 
     [ScriptMethod(name: "P3F_删除绘图与转阶段",
         eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(9906)$", "TargetIndex:1"],
@@ -4610,7 +4586,7 @@ internal static class DrawTools
     {
         var virtualObjectId = 0x40001234u + objIdBias;
         var objHandle = sa.Method.ObjectMethod.CreateEmptyChara(virtualObjectId);
-
+        
         Task.Delay(Math.Max(50, delayMs)).ContinueWith(t =>
         {
             var handle = sa.Method.VfxMethod.CreateLockOn(lockonId, virtualObjectId, Vector4.One, destroyAt: destroyMs,
