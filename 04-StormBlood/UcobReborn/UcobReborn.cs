@@ -22,7 +22,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace UsamisKodakku.Scripts._04_StormBlood.UcobReborn;
 
-[ScriptType(name: Name, territorys: [], guid: "e2e37136-72a2-46b0-abc7-ade17da161b7",
+[ScriptType(name: Name, territorys: [733], guid: "e2e37136-72a2-46b0-abc7-ade17da161b7",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 public class UcobReborn
@@ -42,10 +42,10 @@ public class UcobReborn
         """;
 
     private const string Name = "绝巴哈姆特 Reborn";
-    private const string Version = "0.0.0.3";
+    private const string Version = "0.0.0.4";
     private const string DebugVersion = "g";
     private int _runId = 0;
-    public const bool Debugging = true;
+    public const bool Debugging = false;
     
     public static readonly Vector3 Center = Vector3.Zero;
     
@@ -127,6 +127,7 @@ public class UcobReborn
     public void 测试模板(Event ev, ScriptAccessory sa)
     {
         sa.DebugMsg($"hello");
+        
         lock (_stateLock)
         {
             _upm.P3.塔头标偏移++;
@@ -2812,13 +2813,12 @@ public class UcobReborn
     // {
     //     if (_upm.当前阶段 != 3600) return;
     //     if (!SpecialMode) return;
-    //     uint objIdBias;
     //     lock (_stateLock)
     //     {
     //         _upm.P3.塔头标偏移++;
-    //         objIdBias = _upm.P3.塔头标偏移;
+    //         sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
     //     }
-    //     sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: objIdBias);
+    //     
     // }
 
     [ScriptMethod(name: "P3F_删除绘图与转阶段",
@@ -4603,7 +4603,11 @@ internal static class DrawTools
             {
                 sa.Method.VfxMethod.SetVfxSpeed(handle, speed);
             });
-            Task.Delay(destroyMs).ContinueWith(t => sa.Method.ObjectMethod.DestoryChara(objHandle));
+            Task.Delay(destroyMs).ContinueWith(t =>
+            {
+                if (sa.GetById(virtualObjectId) is not { } obj) return;
+                sa.Method.ObjectMethod.DestoryChara(objHandle);
+            });
         });
     }
 

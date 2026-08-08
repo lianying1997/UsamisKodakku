@@ -239,12 +239,12 @@
   {
     "Name": "绝巴哈姆特 Reborn",
     "Guid": "e2e37136-72a2-46b0-abc7-ade17da161b7",
-    "Version": "0.0.0.3",
+    "Version": "0.0.0.4",
     "Author": "Usami",
     "Repo": "",
     "DownloadUrl": "https://raw.githubusercontent.com/lianying1997/UsamisKodakku/refs/heads/main/04-StormBlood/UcobReborn/UcobReborn.cs",
-    "Note": "0.0.0.3\r\n基于 UCOB [巴哈姆特绝境战] 脚本的重置版。\r\n加了很多很多东西。\r\n原脚本作者：Joshua，Meva，KnightRider，Usami",
-    "UpdateInfo": "0.0.0.3\r\n1. 移除了 P3F_踩塔判定倒计时。",
+    "Note": "0.0.0.4\r\n基于 UCOB [巴哈姆特绝境战] 脚本的重置版。\r\n加了很多很多东西。\r\n原脚本作者：Joshua，Meva，KnightRider，Usami",
+    "UpdateInfo": "0.0.0.4\r\n1. 移除了 P3F_踩塔判定倒计时。",
     "TerritoryIds": [
       733
     ]
