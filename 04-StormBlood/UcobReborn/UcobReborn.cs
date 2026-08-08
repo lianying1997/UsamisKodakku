@@ -22,7 +22,6 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace UsamisKodakku.Scripts._04_StormBlood.UcobReborn;
 
-
 [ScriptType(name: Name, territorys: [733], guid: "e2e37136-72a2-46b0-abc7-ade17da161b7",
     version: Version, author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
@@ -39,13 +38,11 @@ public class UcobReborn
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复 P3E 连击的三重奏 大地摇动 #1 两根指引线过近的问题。
-        2. 修复 P3A 进军的三重奏 不显示属于自己的指路的问题。
-        3. 延长 P3B 黑炎的三重奏 拐弯示意的时间
+        1. 移除了 P3F_踩塔判定倒计时。
         """;
 
     private const string Name = "绝巴哈姆特 Reborn";
-    private const string Version = "0.0.0.2";
+    private const string Version = "0.0.0.3";
     private const string DebugVersion = "a";
     private int _runId = 0;
     public const bool Debugging = false;
@@ -129,22 +126,35 @@ public class UcobReborn
     }
     
     [ScriptMethod(name: "测试模板",
-        eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloayaWorld:asdf"],
+        eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(26071)$"],
         userControl: Debugging)]
     public void 测试模板(Event ev, ScriptAccessory sa)
     {
-        var myObj = sa.Data.MyObject;
-        if (myObj is not { }) return;
-        var myPos = myObj.Position;
+        // sa.DebugMsg($"Hello Koda! {Name}");
         
-        sa.DrawLaser(myPos + new Vector3(0, 0, 1), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(1, 0.3f, 0.3f, 1));
-        sa.DrawLaser(myPos + new Vector3(0, 0, -1), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(0.3f, 1, 0.3f, 1));
-        sa.DrawLaser(myPos + new Vector3(1, 0, 0), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(1, 0.3f, 1, 1));
-        sa.DrawLaser(myPos + new Vector3(-1, 0, 0), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(0.3f, 0.3f, 1, 1));
-        sa.DrawCountDown(myPos + new Vector3(0, 0, 3), 200, iconScale: 1f, objIdBias: 1);
-        sa.DrawCountDown(myPos + new Vector3(0, 0, -3), 200, iconScale: 1f, objIdBias: 2);
-        sa.DrawCountDown(myPos + new Vector3(3, 0, 0), 200, iconScale: 1f, objIdBias: 3);
-        sa.DrawCountDown(myPos + new Vector3(-3, 0, 0), 200, iconScale: 1f, objIdBias: 4);
+        sa.DebugMsg($"hello");
+        
+        lock (_stateLock)
+        {
+            _upm.P3.塔头标偏移++;
+            sa.DrawCountDown(ev.TargetPosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+        }
+        
+        // var myObj = sa.Data.MyObject;
+        // if (myObj is not { }) return;
+        // var myPos = myObj.Position;
+        
+        // lock (_stateLock)
+        // {
+        //     sa.DrawLaser(myPos + new Vector3(0, 0, 1), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(1, 0.3f, 0.3f, 1));
+        //     sa.DrawLaser(myPos + new Vector3(0, 0, -1), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(0.3f, 1, 0.3f, 1));
+        //     sa.DrawLaser(myPos + new Vector3(1, 0, 0), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(1, 0.3f, 1, 1));
+        //     sa.DrawLaser(myPos + new Vector3(-1, 0, 0), 0, 5200, new Vector3(2f, 5f, 2f), new Vector4(0.3f, 0.3f, 1, 1));
+        //     sa.DrawCountDown(myPos + new Vector3(0, 0, 3), 200, iconScale: 1f, objIdBias: 1);
+        //     sa.DrawCountDown(myPos + new Vector3(0, 0, -3), 200, iconScale: 1f, objIdBias: 2);
+        //     sa.DrawCountDown(myPos + new Vector3(3, 0, 0), 200, iconScale: 1f, objIdBias: 3);
+        //     sa.DrawCountDown(myPos + new Vector3(-3, 0, 0), 200, iconScale: 1f, objIdBias: 4);
+        // }
     }
     
     #endregion 测试项
@@ -2826,19 +2836,19 @@ public class UcobReborn
         }
     }
 
-    [ScriptMethod(name: "P3F_踩塔判定倒计时",
-        eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9951"],
-        userControl: true)]
-    public void P3F_踩塔判定倒计时(Event ev, ScriptAccessory sa)
-    {
-        if (_upm.当前阶段 != 3600) return;
-        if (!SpecialMode) return;
-        lock (_stateLock)
-        {
-            _upm.P3.塔头标偏移++;
-            sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
-        }
-    }
+    // [ScriptMethod(name: "P3F_踩塔判定倒计时",
+    //     eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:9951"],
+    //     userControl: true)]
+    // public void P3F_踩塔判定倒计时(Event ev, ScriptAccessory sa)
+    // {
+    //     if (_upm.当前阶段 != 3600) return;
+    //     if (!SpecialMode) return;
+    //     lock (_stateLock)
+    //     {
+    //         _upm.P3.塔头标偏移++;
+    //         sa.DrawCountDown(ev.SourcePosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+    //     }
+    // }
 
     [ScriptMethod(name: "P3F_删除绘图与转阶段",
         eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(9906)$", "TargetIndex:1"],
