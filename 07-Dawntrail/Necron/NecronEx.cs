@@ -24,16 +24,17 @@ using Lumina.Excel.Sheets;
 namespace UsamisKodakku.Scripts._07_DawnTrail.NecronEx;
 
 [ScriptType(name: Name, territorys: [1296], guid: "1829f7d6-9e64-4cf7-9be4-e5d8a2e03d21",
-    version: "0.0.0.7", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
+    version: "0.0.0.8", author: "Usami", note: NoteStr, updateInfo: UpdateInfo)]
 
 // ^(?!.*((武僧|机工士|龙骑士|武士|忍者|蝰蛇剑士|钐镰客|舞者|吟游诗人|占星术士|贤者|学者|(朝日|夕月)小仙女|炽天使|白魔法师|战士|骑士|暗黑骑士|绝枪战士|绘灵法师|黑魔法师|青魔法师|召唤师|宝石兽|亚灵神巴哈姆特|亚灵神不死鸟|迦楼罗之灵|泰坦之灵|伊弗利特之灵|后式自走人偶)|F\] (Used|Cast))).*35501.*$
 // ^\[\w+\|[^|]+\|E\]\s\w+
 
 public class NecronEx
 {
-    private const string
-        Name = "NecronEx [永恒之暗悲惶歼灭战]",
-        DebugVersion = "a";
+    private const string Name = "NecronEx [永恒之暗悲惶歼灭战]";
+    private const string DebugVersion = "a";
+    
+    private const string Version = "0.0.0.8";
     
     const string NoteStr =
         $"""
@@ -44,7 +45,7 @@ public class NecronEx
     const string UpdateInfo =
         $"""
         {Version}
-        1. 修复 MT/D1, ST/D2 组在青之二/四重波指路相反的错误。
+        1. 上传官方库。
         """;
 
     private const bool
