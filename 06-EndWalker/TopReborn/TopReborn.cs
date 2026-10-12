@@ -44,7 +44,7 @@ public class TopReborn
          """;
 
     private const string Name = "绝欧精装 Reborn";
-    private const string Version = "0.0.0.18";
+    private const string Version = "0.0.0.19";
     private const string DebugVersion = "a";
 
     private const bool Debugging = false;
@@ -5684,6 +5684,7 @@ public static class SpecialFunction
             sa.Log.Error($"传入的IGameObject不合法。");
             return;
         }
+        radian = MathF.IEEERemainder(radian, 2 * float.Pi);
         unsafe
         {
             GameObject* charaStruct = (GameObject*)obj.Address;
