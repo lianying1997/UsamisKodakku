@@ -40,7 +40,7 @@ public class TopReborn
     const string UpdateInfo =
         $"""
          {Version}
-         1. 适配 P5 二运在女人击退踩塔时标点的指挥逻辑，以解决 P5 二运后半不指路的问题。
+         1. 在 Coda 佬的帮助下修复了队友视角下的自动面向功能。
          """;
 
     private const string Name = "绝欧精装 Reborn";

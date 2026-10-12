@@ -126,12 +126,13 @@ public class UcobReborn
         userControl: Debugging)]
     public void 测试模板(Event ev, ScriptAccessory sa)
     {
-        sa.DebugMsg($"hello");
-        
+        sa.DebugMsg($"hello1");
         lock (_stateLock)
         {
             _upm.P3.塔头标偏移++;
-            sa.DrawCountDown(ev.TargetPosition, 3000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+            sa.DrawCountDown(ev.TargetPosition, 2000, iconScale: 1f, objIdBias: _upm.P3.塔头标偏移);
+            if (_upm.P3.塔头标偏移 > 4) return;
+            sa.DrawLockOn(ev.TargetPosition, 1, 1000, 4000, 4 * Vector3.One, objIdBias: _upm.P3.塔头标偏移);
         }
     }
     
