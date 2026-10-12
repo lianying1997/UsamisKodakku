@@ -5684,6 +5684,7 @@ public static class SpecialFunction
             sa.Log.Error($"传入的IGameObject不合法。");
             return;
         }
+        radian = MathF.IEEERemainder(radian, 2 * float.Pi);
         unsafe
         {
             GameObject* charaStruct = (GameObject*)obj.Address;
